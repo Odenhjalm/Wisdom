@@ -1,0 +1,34 @@
+# Flutter / Dart
+.dart_tool/
+.packages
+build/
+
+# iOS
+ios/Pods/
+ios/.symlinks/
+ios/Flutter/Flutter.framework
+ios/Flutter/Flutter.podspec
+
+# Android
+android/.gradle/
+android/app/build/
+
+# Env / nycklar
+.env
+.env.*
+*.pem
+*.key
+*.p8
+*.keystore
+*.jks
+**/private-key*
+
+#other
+.buildlog/
+.pub-cache/
+.flutter-plugins*
+.melos_tool/
+.idea/
+.metadata
+*.iml
+EOF
