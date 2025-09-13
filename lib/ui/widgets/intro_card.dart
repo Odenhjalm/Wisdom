@@ -22,9 +22,9 @@ class IntroCard extends StatelessWidget {
       borderRadius: BorderRadius.circular(18),
       child: Ink(
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(.08),
+          color: Colors.white.withOpacity(.12),
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: Colors.white.withOpacity(.14)),
+          border: Border.all(color: Colors.white.withOpacity(.26)),
         ),
         padding: const EdgeInsets.all(16),
         child: Row(

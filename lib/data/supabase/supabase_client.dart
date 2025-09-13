@@ -3,12 +3,20 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class Supa {
   static Future<void> init() async {
-    final url = dotenv.get('SUPABASE_URL', fallback: '');
-    final anon = dotenv.get('SUPABASE_ANON', fallback: '');
+    // Stötta både SUPABASE_ANON och SUPABASE_ANON_KEY + trimma ev. felskrivna tecken
+    String _v(String key) => (dotenv.maybeGet(key) ?? '').trim();
+    final rawUrl = _v('SUPABASE_URL');
+    // Ta bort ev. backslash som hamnat i .env vid radbrytning
+    final url = rawUrl.replaceAll('\\\n', '').replaceAll('\\', '').trim();
+    final anon = _v('SUPABASE_ANON').isNotEmpty
+        ? _v('SUPABASE_ANON')
+        : _v('SUPABASE_ANON_KEY');
+
     await Supabase.initialize(
       url: url,
       anonKey: anon,
-      // authFlowType: AuthFlowType.pkce,  // <-- ta bort i din version
+      // PKCE auth flow
+      authOptions: const FlutterAuthClientOptions(authFlowType: AuthFlowType.pkce),
     );
   }
 

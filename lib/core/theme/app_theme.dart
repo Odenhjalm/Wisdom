@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_fonts/google_fonts.dart';
+import 'package:andlig_app/core/theme/typography.dart';
 
 class AppThemeData {
   final ThemeData light;
@@ -9,11 +9,11 @@ class AppThemeData {
 }
 
 ColorScheme _scheme(Brightness b) =>
-    ColorScheme.fromSeed(seedColor: const Color(0xFF6D83F2), brightness: b);
+    ColorScheme.fromSeed(seedColor: const Color(0xFF6B62FF), brightness: b);
 
 final appThemeProvider = Provider<AppThemeData>((ref) {
-  final textLight = GoogleFonts.interTextTheme();
-  final textDark = GoogleFonts.interTextTheme(ThemeData.dark().textTheme);
+  final textLight = AppTypography.textTheme(brightness: Brightness.light);
+  final textDark = AppTypography.textTheme(brightness: Brightness.dark);
 
   ThemeData buildTheme(Brightness b, TextTheme txt) {
     final cs = _scheme(b);
@@ -28,19 +28,21 @@ final appThemeProvider = Provider<AppThemeData>((ref) {
         surfaceTintColor: Colors.transparent,
         foregroundColor: cs.onSurface,
       ),
-      scaffoldBackgroundColor: b == Brightness.light
-          ? const Color(0xFFF7F7FA)
-          : const Color(0xFF0C0D10),
+      scaffoldBackgroundColor:
+          b == Brightness.light ? const Color(0xFFF7F7FA) : const Color(0xFF0C0D10),
       cardTheme: CardThemeData(
-        color: b == Brightness.light ? Colors.white : const Color(0xFF14161A),
+        // Glasliknande kort – svag fyllnad, tydligare kant
+        color: b == Brightness.light
+            ? Colors.white.withOpacity(0.10)
+            : const Color(0xFF14161A).withOpacity(0.16),
         elevation: 0,
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(16),
           side: BorderSide(
             color: b == Brightness.light
-                ? const Color(0x1F000000)
-                : const Color(0x22FFFFFF),
+                ? Colors.white.withOpacity(0.45)
+                : Colors.white.withOpacity(0.40),
           ),
         ),
       ),
@@ -56,7 +58,7 @@ final appThemeProvider = Provider<AppThemeData>((ref) {
             ? const Color(0xFFF3F4F6)
             : const Color(0xFF151821),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(16),
           borderSide: BorderSide.none,
         ),
         contentPadding:
@@ -66,8 +68,7 @@ final appThemeProvider = Provider<AppThemeData>((ref) {
         style: ElevatedButton.styleFrom(
           elevation: 0,
           padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
@@ -75,12 +76,18 @@ final appThemeProvider = Provider<AppThemeData>((ref) {
           foregroundColor: cs.primary,
           side: BorderSide(color: cs.primary.withOpacity(0.35)),
           padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        ),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          foregroundColor: cs.primary,
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         ),
       ),
       listTileTheme: ListTileThemeData(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         iconColor: cs.primary,
       ),
       iconTheme: IconThemeData(color: cs.primary),

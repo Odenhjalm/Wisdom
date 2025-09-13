@@ -23,21 +23,21 @@ class AuthProfileService {
   }
 
   Future<void> _ensureProfile(User user) async {
-    await _sb.from('profiles').upsert({
-      'user_id': user.id,
-      'email': user.email,
-      'display_name': user.email?.split('@').first ?? 'Användare',
+    // Använd RPC för att undvika schema-header-problem vid login
+    await _sb.schema('app').rpc('ensure_profile', params: {
+      'p_email': user.email,
+      'p_display_name': user.email?.split('@').first ?? 'Användare',
     });
   }
 
   Future<Map<String, dynamic>?> getMyProfile() async {
     final user = _sb.auth.currentUser;
     if (user == null) return null;
-    return await _sb
-        .from('profiles')
-        .select()
-        .eq('user_id', user.id)
-        .maybeSingle();
+    final res = await _sb.schema('app').rpc('get_my_profile');
+    if (res == null) return null;
+    if (res is Map) return res.cast<String, dynamic>();
+    if (res is List && res.isNotEmpty) return Map<String, dynamic>.from(res.first as Map);
+    return null;
   }
 
   Future<void> signOut() => _sb.auth.signOut();

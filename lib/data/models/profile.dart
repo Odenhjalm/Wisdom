@@ -12,9 +12,9 @@ class Profile {
   });
 
   factory Profile.fromJson(Map<String, dynamic> j) => Profile(
-    id: j['id'] as String,
-    role: (j['role'] as String?) ?? 'free',
-    displayName: j['display_name'] as String?,
-    photoUrl: j['photo_url'] as String?,
-  );
+        id: (j['user_id'] ?? j['id']) as String,
+        role: (j['role'] as String?) ?? 'user',
+        displayName: j['display_name'] as String?,
+        photoUrl: j['photo_url'] as String?,
+      );
 }

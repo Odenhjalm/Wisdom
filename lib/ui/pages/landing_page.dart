@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import '../widgets/hero_badge.dart';
 import '../widgets/hero_cta.dart';
 import '../widgets/intro_card.dart';
+import '../widgets/app_scaffold.dart';
 
 class LandingPage extends StatefulWidget {
   const LandingPage({super.key});
@@ -29,7 +30,7 @@ class _LandingPageState extends State<LandingPage> with WidgetsBindingObserver {
     _bg = const AssetImage('assets/images/hero_landingpage.png');
 
     _scroll.addListener(() {
-      setState(() => _offset = _scroll.offset.clamp(0, 400));
+      setState(() => _offset = _scroll.offset.clamp(0.0, 400.0));
     });
   }
 
@@ -53,11 +54,22 @@ class _LandingPageState extends State<LandingPage> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     final t = Theme.of(context).textTheme;
     final cs = Theme.of(context).colorScheme;
-
-    // Parallax‐faktor (lägre = långsammare rörelse)
-    final y = -_offset * 0.25;
+    final size = MediaQuery.of(context).size;
+    // Subtil parallax – ytterligare förfinad: lite svagare och hårdare cap
+    final f = size.width >= 900 ? 0.20 : 0.14;
+    final y = -(_offset.clamp(0.0, 120.0)) * f;
+    // Premium-gradient – något djupare, tydligare separation
+    final topGrad = size.width >= 900 ? 0.40 : 0.44;
+    final bottomGrad = size.width >= 900 ? 0.62 : 0.66;
+    // Skala upp bilden aningen för att garanterat klippa bort ev. vit kant i asset
+    final imgScale = size.width >= 1200
+        ? 1.06
+        : (size.width >= 900 ? 1.08 : 1.12);
+    // Lägg på diskret sidovignette för att dölja ev. ljusa kanter på extrema aspect ratios
+    final sideVignette = size.width >= 900 ? 0.08 : 0.10;
 
     return Scaffold(
+      backgroundColor: Colors.black,
       extendBodyBehindAppBar: true,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
@@ -69,24 +81,48 @@ class _LandingPageState extends State<LandingPage> with WidgetsBindingObserver {
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Row(
             children: [
-              // “logo”
-              Container(
-                height: 36,
-                width: 36,
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(.9),
-                  borderRadius: BorderRadius.circular(10),
+              // “logo” – glass badge (blur + translucent)
+              ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+                  child: Container(
+                    height: 36,
+                    width: 36,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          Colors.white.withOpacity(.18),
+                          Colors.white.withOpacity(.08),
+                        ],
+                      ),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.white.withOpacity(.28)),
+                    ),
+                    child: const Icon(
+                      Icons.self_improvement_rounded,
+                      size: 22,
+                      color: Colors.white,
+                    ),
+                  ),
                 ),
-                child: Icon(Icons.self_improvement_rounded,
-                    size: 22, color: cs.primary),
               ),
               const SizedBox(width: 10),
               Text(
                 'Andlig Visdom',
                 style: t.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w900,
                   color: Colors.white,
-                  letterSpacing: .2,
+                  letterSpacing: .25,
+                  shadows: [
+                    Shadow(
+                      color: Colors.black.withOpacity(.50),
+                      blurRadius: 6,
+                      offset: const Offset(0, 1),
+                    ),
+                  ],
                 ),
               ),
               const Spacer(),
@@ -114,41 +150,22 @@ class _LandingPageState extends State<LandingPage> with WidgetsBindingObserver {
           ),
         ),
       ),
-      body: Stack(
-        fit: StackFit.expand,
-        children: [
-          // 1) Bakgrund m. parallax
-          Transform.translate(
-            offset: Offset(0, y),
-            child: Image(
-              image: _bg,
-              fit: BoxFit.cover,
-            ),
-          ),
-
-          // 2) Subtil dim + färg‐gradient
-          DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Colors.black.withOpacity(.28),
-                  Colors.black.withOpacity(.56),
-                ],
-              ),
-            ),
-          ),
-
-          // 3) Diskreta “partiklar”
-          const _ParticlesLayer(),
-
-          // 4) Innehåll
-          SafeArea(
-            child: ListView(
-              controller: _scroll,
-              padding: EdgeInsets.zero,
-              children: [
+      body: FullBleedBackground(
+        image: _bg,
+        alignment: Alignment.topCenter,
+        topOpacity: topGrad,
+        bottomOpacity: bottomGrad,
+        yOffset: y,
+        scale: imgScale,
+        sideVignette: sideVignette,
+        child: Stack(
+          children: [
+            const _ParticlesLayer(),
+            SafeArea(
+              child: ListView(
+                controller: _scroll,
+                padding: EdgeInsets.zero,
+                children: [
                 // HERO
                 Center(
                   child: ConstrainedBox(
@@ -197,11 +214,8 @@ class _LandingPageState extends State<LandingPage> with WidgetsBindingObserver {
 
                 // SEKTION 2 – Intro-grenar
                 Container(
-                  decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(.22),
-                    border: Border(
-                      top: BorderSide(color: Colors.white.withOpacity(.08)),
-                    ),
+                  decoration: const BoxDecoration(
+                    color: Colors.transparent,
                   ),
                   child: Center(
                     child: ConstrainedBox(
@@ -284,12 +298,12 @@ class _LandingPageState extends State<LandingPage> with WidgetsBindingObserver {
                     child: Padding(
                       padding: const EdgeInsets.fromLTRB(20, 22, 20, 44),
                       child: Card(
-                        color: Colors.white.withOpacity(.08),
+                        color: Colors.white.withOpacity(.18),
                         surfaceTintColor: Colors.transparent,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(18),
                           side:
-                              BorderSide(color: Colors.white.withOpacity(.16)),
+                              BorderSide(color: Colors.white.withOpacity(.22)),
                         ),
                         child: Padding(
                           padding: const EdgeInsets.all(18),
@@ -330,8 +344,9 @@ class _LandingPageState extends State<LandingPage> with WidgetsBindingObserver {
                 ),
               ],
             ),
-          ),
-        ],
+            ),
+          ],
+        ),
       ),
     );
   }

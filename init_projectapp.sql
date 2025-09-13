@@ -270,6 +270,11 @@ as $$
       or exists(select 1 from mem where status='active');
 $$;
 
+create or replace function app.get_config()
+returns app.app_config language sql stable as $$
+  select * from app.app_config where id=1
+$$;
+
 create or replace function app.free_consumed_count(p_user uuid)
 returns integer
 language sql stable
@@ -308,6 +313,11 @@ drop policy if exists "profiles_update_own" on app.profiles;
 create policy "profiles_update_own" on app.profiles for update
 using (auth.uid() = user_id);
 
+-- Tillåt admin att uppdatera profiler (för lärargodkännande m.m.)
+drop policy if exists "profiles_admin_update" on app.profiles;
+create policy "profiles_admin_update" on app.profiles for update
+using (app.is_admin()) with check (app.is_admin());
+
 drop policy if exists "profiles_insert_self" on app.profiles;
 create policy "profiles_insert_self" on app.profiles for insert
 with check (auth.uid() = user_id);
@@ -318,7 +328,8 @@ using (is_published = true or app.is_teacher());
 
 drop policy if exists "courses_teacher_write" on app.courses;
 create policy "courses_teacher_write" on app.courses for all
-using (app.is_teacher()) with check (app.is_teacher());
+using (app.is_teacher() and (created_by = auth.uid() or app.is_admin()))
+with check (app.is_teacher() and (created_by = auth.uid() or app.is_admin()));
 
 drop policy if exists "modules_read" on app.modules;
 create policy "modules_read" on app.modules for select
@@ -326,7 +337,16 @@ using (exists(select 1 from app.courses c where c.id=course_id and (c.is_publish
 
 drop policy if exists "modules_teacher_write" on app.modules;
 create policy "modules_teacher_write" on app.modules for all
-using (app.is_teacher()) with check (app.is_teacher());
+using (
+  app.is_teacher() and exists (
+    select 1 from app.courses c where c.id = modules.course_id and (c.created_by = auth.uid() or app.is_admin())
+  )
+)
+with check (
+  app.is_teacher() and exists (
+    select 1 from app.courses c where c.id = modules.course_id and (c.created_by = auth.uid() or app.is_admin())
+  )
+);
 
 drop policy if exists "lessons_read" on app.lessons;
 create policy "lessons_read" on app.lessons for select
@@ -343,7 +363,24 @@ using (
 
 drop policy if exists "lessons_teacher_write" on app.lessons;
 create policy "lessons_teacher_write" on app.lessons for all
-using (app.is_teacher()) with check (app.is_teacher());
+using (
+  app.is_teacher() and exists (
+    select 1
+    from app.modules m
+    join app.courses c on c.id = m.course_id
+    where m.id = lessons.module_id
+      and (c.created_by = auth.uid() or app.is_admin())
+  )
+)
+with check (
+  app.is_teacher() and exists (
+    select 1
+    from app.modules m
+    join app.courses c on c.id = m.course_id
+    where m.id = lessons.module_id
+      and (c.created_by = auth.uid() or app.is_admin())
+  )
+);
 
 drop policy if exists "media_read" on app.lesson_media;
 create policy "media_read" on app.lesson_media for select
@@ -362,7 +399,26 @@ using (
 
 drop policy if exists "media_teacher_write" on app.lesson_media;
 create policy "media_teacher_write" on app.lesson_media for all
-using (app.is_teacher()) with check (app.is_teacher());
+using (
+  app.is_teacher() and exists (
+    select 1
+    from app.lessons l
+    join app.modules m on m.id = l.module_id
+    join app.courses c on c.id = m.course_id
+    where l.id = lesson_media.lesson_id
+      and (c.created_by = auth.uid() or app.is_admin())
+  )
+)
+with check (
+  app.is_teacher() and exists (
+    select 1
+    from app.lessons l
+    join app.modules m on m.id = l.module_id
+    join app.courses c on c.id = m.course_id
+    where l.id = lesson_media.lesson_id
+      and (c.created_by = auth.uid() or app.is_admin())
+  )
+);
 
 drop policy if exists "enroll_read_own_or_teacher" on app.enrollments;
 create policy "enroll_read_own_or_teacher" on app.enrollments for select
@@ -472,6 +528,23 @@ using (requester_id = auth.uid() or reader_id = auth.uid() or app.is_teacher())
 with check (requester_id = auth.uid() or reader_id = auth.uid() or app.is_teacher());
 
 -- ---------- 4) RPC ----------
+-- Lärar-godkännande och moderering
+create or replace function app.approve_teacher(p_user uuid)
+returns void language plpgsql security definer as $$
+begin
+  update app.profiles set role='teacher' where user_id = p_user;
+  update app.teacher_requests
+     set status='approved', reviewed_by = auth.uid(), updated_at = now()
+   where user_id = p_user;
+end; $$;
+
+create or replace function app.reject_teacher(p_user uuid)
+returns void language plpgsql security definer as $$
+begin
+  update app.teacher_requests
+     set status='rejected', reviewed_by = auth.uid(), updated_at = now()
+   where user_id = p_user;
+end; $$;
 create or replace function app.start_order(p_course_id uuid, p_amount_cents integer, p_currency text default 'sek', p_metadata jsonb default '{}'::jsonb)
 returns app.orders language plpgsql security definer as $$
 declare v_user uuid := auth.uid(); v_order app.orders;
@@ -746,6 +819,19 @@ begin
   delete from app.teacher_requests where user_id = p_user;
   delete from app.teacher_directory where user_id = p_user;
   delete from app.teacher_slots where teacher_id = p_user;
+-- ---------- -1) App Config ----------
+create table if not exists app.app_config (
+  id integer primary key default 1,
+  free_course_limit integer not null default 5,
+  platform_fee_pct numeric not null default 10
+);
+alter table app.app_config enable row level security;
+drop policy if exists "cfg_public_read" on app.app_config;
+create policy "cfg_public_read" on app.app_config for select using (true);
+
+insert into app.app_config(id)
+select 1 where not exists (select 1 from app.app_config where id=1);
+
   delete from app.profiles where user_id = p_user;
   -- auth.users raderas via Supabase Auth Admin API
 end; $$;
