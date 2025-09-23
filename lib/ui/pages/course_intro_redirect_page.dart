@@ -7,7 +7,8 @@ class CourseIntroRedirectPage extends StatefulWidget {
   const CourseIntroRedirectPage({super.key});
 
   @override
-  State<CourseIntroRedirectPage> createState() => _CourseIntroRedirectPageState();
+  State<CourseIntroRedirectPage> createState() =>
+      _CourseIntroRedirectPageState();
 }
 
 class _CourseIntroRedirectPageState extends State<CourseIntroRedirectPage> {

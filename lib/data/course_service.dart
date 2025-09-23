@@ -5,40 +5,43 @@ import 'package:flutter/foundation.dart';
 class CourseService {
   final _sb = Supabase.instance.client;
   Future<Map<String, dynamic>?> getAppConfig() async {
-    final rows = await _sb.app.from('app_config').select('*').eq('id', 1).maybeSingle();
+    final rows =
+        await _sb.app.from('app_config').select('*').eq('id', 1).maybeSingle();
     if (rows == null) return null;
     return Map<String, dynamic>.from(rows as Map);
   }
 
   Future<Map<String, dynamic>?> firstFreeIntroCourse() async {
-    final rows = await _sb
-        .app.from('courses')
-        .select('id, slug, title, description, is_free_intro, is_published')
+    final rows = await _sb.app
+        .from('courses')
+        .select(
+            'id, slug, title, description, video_url, is_free_intro, is_published')
         .eq('is_published', true)
         .eq('is_free_intro', true)
         .order('created_at')
         .limit(1);
-    if (rows is List && rows.isNotEmpty) {
-      return Map<String, dynamic>.from(rows.first);
+    if (rows.isNotEmpty) {
+      return Map<String, dynamic>.from(rows.first as Map);
     }
     return null;
   }
 
   Future<Map<String, dynamic>?> getCourseBySlug(String slug) async {
-    final rows = await _sb
-        .app.from('courses')
-        .select('id, slug, title, description, is_free_intro, is_published')
+    final rows = await _sb.app
+        .from('courses')
+        .select(
+            'id, slug, title, description, video_url, is_free_intro, is_published')
         .eq('slug', slug)
         .limit(1);
-    if (rows is List && rows.isNotEmpty) {
-      return Map<String, dynamic>.from(rows.first);
+    if (rows.isNotEmpty) {
+      return Map<String, dynamic>.from(rows.first as Map);
     }
     return null;
   }
 
   Future<List<Map<String, dynamic>>> listModules(String courseId) async {
-    final rows = await _sb
-        .app.from('modules')
+    final rows = await _sb.app
+        .from('modules')
         .select('id, title, position')
         .eq('course_id', courseId)
         .order('position');
@@ -48,8 +51,8 @@ class CourseService {
   }
 
   Future<Map<String, dynamic>?> getModule(String moduleId) async {
-    final row = await _sb
-        .app.from('modules')
+    final row = await _sb.app
+        .from('modules')
         .select('id, course_id, title, position')
         .eq('id', moduleId)
         .maybeSingle();
@@ -59,8 +62,8 @@ class CourseService {
 
   Future<List<Map<String, dynamic>>> listLessonsForModule(String moduleId,
       {bool onlyIntro = false}) async {
-    final base = _sb
-        .app.from('lessons')
+    final base = _sb.app
+        .from('lessons')
         .select('id, title, position, is_intro, content_markdown')
         .eq('module_id', moduleId);
     final rows = onlyIntro
@@ -72,8 +75,8 @@ class CourseService {
   }
 
   Future<Map<String, dynamic>?> getLesson(String lessonId) async {
-    final row = await _sb
-        .app.from('lessons')
+    final row = await _sb.app
+        .from('lessons')
         .select('id, title, content_markdown, is_intro, module_id')
         .eq('id', lessonId)
         .maybeSingle();
@@ -82,8 +85,8 @@ class CourseService {
   }
 
   Future<List<Map<String, dynamic>>> listLessonMedia(String lessonId) async {
-    final rows = await _sb
-        .app.from('lesson_media')
+    final rows = await _sb.app
+        .from('lesson_media')
         .select('id, kind, storage_path, position')
         .eq('lesson_id', lessonId)
         .order('position');
@@ -98,7 +101,8 @@ class CourseService {
     });
   }
 
-  Future<Map<String, dynamic>> startOrder({required String courseId, required int amountCents}) async {
+  Future<Map<String, dynamic>> startOrder(
+      {required String courseId, required int amountCents}) async {
     final res = await _sb.schema('app').rpc('start_order', params: {
       'p_course_id': courseId,
       'p_amount_cents': amountCents,
@@ -114,14 +118,14 @@ class CourseService {
   Future<Map<String, dynamic>?> latestOrderForCourse(String courseId) async {
     final uid = _sb.auth.currentUser?.id;
     if (uid == null) return null;
-    final rows = await _sb
-        .app.from('orders')
+    final rows = await _sb.app
+        .from('orders')
         .select('id, status, amount_cents, created_at')
         .eq('user_id', uid)
         .eq('course_id', courseId)
         .order('created_at', ascending: false)
         .limit(1);
-    if (rows is List && rows.isNotEmpty) {
+    if (rows.isNotEmpty) {
       return Map<String, dynamic>.from(rows.first as Map);
     }
     return null;
@@ -130,8 +134,7 @@ class CourseService {
   Future<List<Map<String, dynamic>>> myEnrolledCourses() async {
     final uid = _sb.auth.currentUser?.id;
     if (uid == null) return [];
-    final enr = await _sb
-        .app
+    final enr = await _sb.app
         .from('enrollments')
         .select('course_id')
         .eq('user_id', uid);
@@ -142,10 +145,10 @@ class CourseService {
     if (ids.isEmpty) return [];
     // Some postgrest versions lack `in_`; use generic filter with SQL 'in' operator
     final inList = '(${ids.map((e) => '"$e"').join(',')})';
-    final rows = await _sb
-        .app
+    final rows = await _sb.app
         .from('courses')
-        .select('id, slug, title, description, cover_url, is_published')
+        .select(
+            'id, slug, title, description, cover_url, video_url, is_published')
         .filter('id', 'in', inList);
     return (rows as List? ?? [])
         .map((e) => Map<String, dynamic>.from(e))
@@ -192,7 +195,9 @@ class CourseService {
 
   Future<bool> isEnrolled(String courseId) async {
     try {
-      final res = await _sb.schema('app').rpc('can_access_course', params: {'p_course': courseId});
+      final res = await _sb
+          .schema('app')
+          .rpc('can_access_course', params: {'p_course': courseId});
       if (res is bool) return res;
     } catch (_) {}
     return false;

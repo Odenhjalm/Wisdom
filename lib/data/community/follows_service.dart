@@ -13,13 +13,22 @@ class FollowsService {
   }
 
   Future<List<String>> followersOf(String userId) async {
-    final rows = await _sb.app.from('follows').select('follower_id').eq('followee_id', userId);
-    return (rows as List? ?? []).map((e) => (e as Map)['follower_id'] as String).toList();
+    final rows = await _sb.app
+        .from('follows')
+        .select('follower_id')
+        .eq('followee_id', userId);
+    return (rows as List? ?? [])
+        .map((e) => (e as Map)['follower_id'] as String)
+        .toList();
   }
 
   Future<List<String>> followingOf(String userId) async {
-    final rows = await _sb.app.from('follows').select('followee_id').eq('follower_id', userId);
-    return (rows as List? ?? []).map((e) => (e as Map)['followee_id'] as String).toList();
+    final rows = await _sb.app
+        .from('follows')
+        .select('followee_id')
+        .eq('follower_id', userId);
+    return (rows as List? ?? [])
+        .map((e) => (e as Map)['followee_id'] as String)
+        .toList();
   }
 }
-

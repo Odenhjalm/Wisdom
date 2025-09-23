@@ -37,21 +37,22 @@ class _AdminPageState extends State<AdminPage> {
     final res = await Supa.client.schema('app').rpc('get_my_profile');
     final row = (res is Map)
         ? res.cast<String, dynamic>()
-        : (res is List && res.isNotEmpty ? (res.first as Map).cast<String, dynamic>() : null);
+        : (res is List && res.isNotEmpty
+            ? (res.first as Map).cast<String, dynamic>()
+            : null);
     final admin = row?['role'] == 'admin';
     List<Map<String, dynamic>> reqs = [];
     List<Map<String, dynamic>> certs = [];
     if (admin) {
-      final rows = await Supa.client
-          .app.from('teacher_requests')
+      final rows = await Supa.client.app
+          .from('teacher_requests')
           .select('user_id, message, status, created_at')
           .order('created_at', ascending: false);
       reqs = (rows as List? ?? [])
           .map((e) => Map<String, dynamic>.from(e as Map))
           .toList();
 
-      final certRows = await Supa.client
-          .app
+      final certRows = await Supa.client.app
           .from('certificates')
           .select('id, user_id, title, issuer, issued_at, verified')
           .order('created_at', ascending: false)
@@ -89,8 +90,7 @@ class _AdminPageState extends State<AdminPage> {
     try {
       await Supa.client.app
           .from('certificates')
-          .update({'verified': verified})
-          .eq('id', certId);
+          .update({'verified': verified}).eq('id', certId);
       await _load();
     } catch (e) {
       if (!mounted) return;
@@ -136,61 +136,80 @@ class _AdminPageState extends State<AdminPage> {
       title: 'Admin',
       body: ListView(
         children: [
-          Text('Läraransökningar', style: t.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
+          Text('Läraransökningar',
+              style: t.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
           const SizedBox(height: 8),
           if (_requests.isEmpty)
-            const Card(child: ListTile(title: Text('Inga ansökningar just nu.')))
+            const Card(
+                child: ListTile(title: Text('Inga ansökningar just nu.')))
           else
             ..._requests.map((r) => Card(
                   child: ListTile(
                     leading: const Icon(Icons.person_add_alt_1_rounded),
                     title: Text(r['user_id'] as String),
-                    subtitle: Text('${r['status']} • ${r['created_at']}\n${r['message'] ?? ''}'),
+                    subtitle: Text(
+                        '${r['status']} • ${r['created_at']}\n${r['message'] ?? ''}'),
                     isThreeLine: true,
                     trailing: Wrap(spacing: 8, children: [
                       ElevatedButton(
-                        onPressed: _busy ? null : () => _approve(r['user_id'] as String),
+                        onPressed: _busy
+                            ? null
+                            : () => _approve(r['user_id'] as String),
                         child: const Text('Godkänn'),
                       ),
                       OutlinedButton(
-                        onPressed: _busy ? null : () => _reject(r['user_id'] as String),
+                        onPressed: _busy
+                            ? null
+                            : () => _reject(r['user_id'] as String),
                         child: const Text('Avslå'),
                       ),
                     ]),
                   ),
                 )),
           const SizedBox(height: 18),
-          Text('Certifikat (granskning)', style: t.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
+          Text('Certifikat (granskning)',
+              style: t.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
           const SizedBox(height: 8),
           if (_certs.isEmpty)
             const Card(child: ListTile(title: Text('Inga certifikat ännu.')))
           else
-            ..._certs.map((c) => Card(
-                  child: ListTile(
-                    leading: Icon(
-                      c['verified'] == true ? Icons.verified_rounded : Icons.verified_outlined,
-                      color: c['verified'] == true ? Colors.lightGreen : null,
-                    ),
-                    title: Text(c['title'] as String? ?? 'Certifikat'),
-                    subtitle: Text([
-                      c['user_id'] as String? ?? '',
-                      if ((c['issuer'] as String?)?.isNotEmpty == true) c['issuer'] as String,
-                      if ((c['issued_at'] as String?)?.isNotEmpty == true) 'Utfärdat: ${c['issued_at']}',
-                    ].where((e) => (e as String).isNotEmpty).join(' • ')),
-                    trailing: Wrap(spacing: 8, children: [
-                      if (c['verified'] != true)
-                        ElevatedButton(
-                          onPressed: _busy ? null : () => _setCertVerified(c['id'] as String, true),
-                          child: const Text('Verifiera'),
-                        )
-                      else
-                        OutlinedButton(
-                          onPressed: _busy ? null : () => _setCertVerified(c['id'] as String, false),
-                          child: const Text('Avverifiera'),
-                        ),
-                    ]),
+            ..._certs.map((c) {
+              final details = <String>[
+                c['user_id'] as String? ?? '',
+                if ((c['issuer'] as String?)?.isNotEmpty == true)
+                  c['issuer'] as String,
+                if ((c['issued_at'] as String?)?.isNotEmpty == true)
+                  'Utfärdat: ${c['issued_at']}',
+              ]..removeWhere((e) => e.isEmpty);
+              return Card(
+                child: ListTile(
+                  leading: Icon(
+                    c['verified'] == true
+                        ? Icons.verified_rounded
+                        : Icons.verified_outlined,
+                    color: c['verified'] == true ? Colors.lightGreen : null,
                   ),
-                )),
+                  title: Text(c['title'] as String? ?? 'Certifikat'),
+                  subtitle: Text(details.join(' • ')),
+                  trailing: Wrap(spacing: 8, children: [
+                    if (c['verified'] != true)
+                      ElevatedButton(
+                        onPressed: _busy
+                            ? null
+                            : () => _setCertVerified(c['id'] as String, true),
+                        child: const Text('Verifiera'),
+                      )
+                    else
+                      OutlinedButton(
+                        onPressed: _busy
+                            ? null
+                            : () => _setCertVerified(c['id'] as String, false),
+                        child: const Text('Avverifiera'),
+                      ),
+                  ]),
+                ),
+              );
+            }),
         ],
       ),
     );

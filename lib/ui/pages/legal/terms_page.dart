@@ -17,9 +17,11 @@ class TermsPage extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Allmänna villkor', style: t.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
+                  Text('Allmänna villkor',
+                      style:
+                          t.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
                   const SizedBox(height: 8),
-                  const Text('Dessa villkor reglerar användningen av tjänsten. ' 
+                  const Text('Dessa villkor reglerar användningen av tjänsten. '
                       'Denna text är en platshållare – ersätt med juridiskt granskade villkor.'),
                 ],
               ),
@@ -30,4 +32,3 @@ class TermsPage extends StatelessWidget {
     );
   }
 }
-

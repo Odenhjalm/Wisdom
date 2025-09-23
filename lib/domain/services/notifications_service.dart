@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:flutter/foundation.dart' show VoidCallback;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/foundation.dart';
 
@@ -39,9 +38,9 @@ class NotificationsService {
   }
 
   /// Subscribe to notifications for a specific user; returns a cancel function.
-  Future<VoidCallback?> watchMyNotifications({required void Function(Map<String, dynamic> row) onInsert}) async {
-    final fm = _fm; // only to ensure Firebase is configured; not strictly needed
-    final sb = FirebaseMessaging; // ignore: unused_local_variable
+  Future<VoidCallback?> watchMyNotifications(
+      {required void Function(Map<String, dynamic> row) onInsert}) async {
+    if (_fm == null) return null;
     try {
       final client = Supabase.instance.client;
       final uid = client.auth.currentUser?.id;
@@ -52,10 +51,12 @@ class NotificationsService {
             event: PostgresChangeEvent.insert,
             schema: 'app',
             table: 'notifications',
-            filter: PostgresChangeFilter.eq('user_id', uid),
             callback: (payload) {
               final row = (payload.newRecord as Map?)?.cast<String, dynamic>();
-              if (row != null) onInsert(row);
+              if (row == null) return;
+              // Manual filter by user_id to match current user
+              if (row['user_id'] != uid) return;
+              onInsert(row);
             },
           )
           .subscribe();

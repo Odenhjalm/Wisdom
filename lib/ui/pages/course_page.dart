@@ -85,7 +85,8 @@ class _CoursePageState extends State<CoursePage> {
     if (_freeCount >= _freeLimit) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Du har förbrukat alla $_freeLimit gratis-intros.')),
+        SnackBar(
+            content: Text('Du har förbrukat alla $_freeLimit gratis-intros.')),
       );
       return;
     }
@@ -116,7 +117,8 @@ class _CoursePageState extends State<CoursePage> {
     setState(() => _ordering = true);
     try {
       final pay = PaymentsService();
-      final order = await pay.startCourseOrder(courseId: id, amountCents: price);
+      final order =
+          await pay.startCourseOrder(courseId: id, amountCents: price);
       if (!mounted) return;
       // Watch order updates in realtime
       try {
@@ -132,7 +134,8 @@ class _CoursePageState extends State<CoursePage> {
       final url = await pay.createCheckoutSession(
         orderId: order['id'] as String,
         amountCents: price,
-        successUrl: 'https://andlig.app/payment/success?order_id=${order['id']}',
+        successUrl:
+            'https://andlig.app/payment/success?order_id=${order['id']}',
         cancelUrl: 'https://andlig.app/payment/cancel?order_id=${order['id']}',
         customerEmail: null,
       );
@@ -191,12 +194,14 @@ class _CoursePageState extends State<CoursePage> {
                 children: [
                   Text(
                     c['title'] ?? 'Kurs',
-                    style: t.headlineMedium?.copyWith(fontWeight: FontWeight.w800),
+                    style:
+                        t.headlineMedium?.copyWith(fontWeight: FontWeight.w800),
                   ),
                   const SizedBox(height: 8),
                   if (c['description'] != null)
                     Text(c['description'] as String,
-                        style: t.bodyLarge?.copyWith(color: cs.onSurfaceVariant)),
+                        style:
+                            t.bodyLarge?.copyWith(color: cs.onSurfaceVariant)),
                   const SizedBox(height: 12),
                   Row(
                     children: [
@@ -206,7 +211,8 @@ class _CoursePageState extends State<CoursePage> {
                             ? const SizedBox(
                                 height: 18,
                                 width: 18,
-                                child: CircularProgressIndicator(strokeWidth: 2),
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2),
                               )
                             : const Text('Starta gratis intro'),
                       ),
@@ -215,23 +221,31 @@ class _CoursePageState extends State<CoursePage> {
                         OutlinedButton(
                           onPressed: _ordering ? null : _buyCourse,
                           child: _ordering
-                              ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                              : Text('Köp hela kursen (${priceCents / 100} kr)'),
+                              ? const SizedBox(
+                                  height: 18,
+                                  width: 18,
+                                  child:
+                                      CircularProgressIndicator(strokeWidth: 2))
+                              : Text(
+                                  'Köp hela kursen (${priceCents / 100} kr)'),
                         ),
                     ],
                   ),
                   const SizedBox(height: 8),
-                  Text('Använda gratis-intros: $_freeCount/$_freeLimit $enrolledText',
+                  Text(
+                      'Använda gratis-intros: $_freeCount/$_freeLimit $enrolledText',
                       style: t.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
                   const SizedBox(height: 8),
                   if (_latestOrder != null)
                     Row(
                       children: [
-                        Text('Betalstatus: ${_latestOrder!['status']}', style: t.bodySmall),
+                        Text('Betalstatus: ${_latestOrder!['status']}',
+                            style: t.bodySmall),
                         const SizedBox(width: 10),
                         TextButton(
                           onPressed: () async {
-                            final order = await _svc.latestOrderForCourse(c['id'] as String);
+                            final order = await _svc
+                                .latestOrderForCourse(c['id'] as String);
                             if (!mounted) return;
                             setState(() => _latestOrder = order);
                           },
@@ -253,10 +267,13 @@ class _CoursePageState extends State<CoursePage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(m['title'] as String, style: t.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
+                    Text(m['title'] as String,
+                        style: t.titleLarge
+                            ?.copyWith(fontWeight: FontWeight.w700)),
                     const SizedBox(height: 8),
                     ...lessons.map((l) => ListTile(
-                          leading: const Icon(Icons.play_circle_outline_rounded),
+                          leading:
+                              const Icon(Icons.play_circle_outline_rounded),
                           title: Text(l['title'] as String? ?? 'Lektion'),
                           subtitle: (l['is_intro'] == true)
                               ? const Text('Förhandsvisning')

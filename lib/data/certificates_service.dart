@@ -1,6 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'models/certificate.dart';
-import 'supabase/supabase_client.dart';
 import 'package:andlig_app/core/supabase_ext.dart';
 
 class CertificatesService {
@@ -31,7 +30,11 @@ class CertificatesService {
     final uid = _sb.auth.currentUser?.id;
     if (uid == null) throw Exception('Inte inloggad');
     final payload = c.toInsertJson();
-    final res = await _sb.app.from('certificates').insert(payload).select().maybeSingle();
+    final res = await _sb.app
+        .from('certificates')
+        .insert(payload)
+        .select()
+        .maybeSingle();
     if (res == null) return null;
     return Certificate.fromJson(Map<String, dynamic>.from(res));
   }

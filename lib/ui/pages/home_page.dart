@@ -39,7 +39,10 @@ class _HomePageState extends State<HomePage> {
     try {
       final rows = await _svc.myEnrolledCourses();
       // progress
-      final ids = rows.map((e) => (e['id'] as String?) ?? '').where((e) => e.isNotEmpty).toList();
+      final ids = rows
+          .map((e) => (e['id'] as String?) ?? '')
+          .where((e) => e.isNotEmpty)
+          .toList();
       // ignore: use_build_context_synchronously
       final progressSvc = ProgressService();
       final progress = await progressSvc.getProgressForCourses(ids);
@@ -50,7 +53,8 @@ class _HomePageState extends State<HomePage> {
       setState(() {
         _myCourses = rows;
         _progress = progress;
-        _displayName = (prof?['display_name'] as String?) ?? (prof?['email'] as String?);
+        _displayName =
+            (prof?['display_name'] as String?) ?? (prof?['email'] as String?);
         _feed = feed;
         _loading = false;
       });
@@ -116,7 +120,7 @@ class _HomePageState extends State<HomePage> {
       transparentAppBar: true,
       appBarForegroundColor: Colors.white,
       background: const FullBleedBackground(
-        image: AssetImage('assets/images/hero_landingpage.png'),
+        image: AssetImage('assets/images/bakgrund.png'),
         alignment: Alignment.topCenter,
         topOpacity: 0.35,
         bottomOpacity: 0.55,
@@ -143,13 +147,16 @@ class _HomePageState extends State<HomePage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Dela något i communityt', style: t.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+                  Text('Dela något i communityt',
+                      style:
+                          t.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
                   const SizedBox(height: 8),
                   TextField(
                     controller: _composer,
                     minLines: 2,
                     maxLines: 4,
-                    decoration: const InputDecoration(hintText: 'Skriv ett inlägg...'),
+                    decoration:
+                        const InputDecoration(hintText: 'Skriv ett inlägg...'),
                   ),
                   const SizedBox(height: 8),
                   Align(
@@ -157,7 +164,10 @@ class _HomePageState extends State<HomePage> {
                     child: ElevatedButton(
                       onPressed: _posting ? null : _createPost,
                       child: _posting
-                          ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                          ? const SizedBox(
+                              height: 18,
+                              width: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2))
                           : const Text('Publicera'),
                     ),
                   ),
@@ -173,11 +183,15 @@ class _HomePageState extends State<HomePage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Nyligen i communityt', style: t.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
+                    Text('Nyligen i communityt',
+                        style: t.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.w800)),
                     const SizedBox(height: 8),
                     ..._feed.map((p) => ListTile(
                           leading: const Icon(Icons.person_rounded),
-                          title: Text((p['profile']?['display_name'] as String?) ?? 'Användare'),
+                          title: Text(
+                              (p['profile']?['display_name'] as String?) ??
+                                  'Användare'),
                           subtitle: Text(p['content'] as String? ?? ''),
                         )),
                   ],
@@ -192,9 +206,12 @@ class _HomePageState extends State<HomePage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text('Välkommen hem.',
-                      style: t.displaySmall?.copyWith(fontWeight: FontWeight.w800)),
+                      style: t.displaySmall
+                          ?.copyWith(fontWeight: FontWeight.w800)),
                   const SizedBox(height: 8),
-                  Text('Utforska introduktionskurser (gratis förhandsvisningar).', style: t.bodyLarge),
+                  Text(
+                      'Utforska introduktionskurser (gratis förhandsvisningar).',
+                      style: t.bodyLarge),
                   const SizedBox(height: 14),
                   Wrap(
                     spacing: 12,
@@ -231,7 +248,8 @@ class _HomePageState extends State<HomePage> {
             child: ListTile(
               leading: const Icon(Icons.workspace_premium_rounded),
               title: const Text('Bli certifierad och lås upp communityt'),
-              subtitle: const Text('Publicera ceremonier, sessioner och läsningar.'),
+              subtitle:
+                  const Text('Publicera ceremonier, sessioner och läsningar.'),
               trailing: ElevatedButton(
                 onPressed: () => context.push('/course/intro'),
                 child: const Text('Läs mer'),
@@ -245,12 +263,18 @@ class _HomePageState extends State<HomePage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Mina kurser', style: t.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
+                  Text('Mina kurser',
+                      style:
+                          t.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
                   const SizedBox(height: 10),
                   if (_loading)
-                    const Center(child: Padding(padding: EdgeInsets.all(8), child: CircularProgressIndicator()))
+                    const Center(
+                        child: Padding(
+                            padding: EdgeInsets.all(8),
+                            child: CircularProgressIndicator()))
                   else if (_myCourses.isEmpty)
-                    Text('Du är ännu inte anmäld till någon kurs.', style: t.bodyMedium)
+                    Text('Du är ännu inte anmäld till någon kurs.',
+                        style: t.bodyMedium)
                   else
                     CoursesGrid(courses: _myCourses, progress: _progress),
                 ],

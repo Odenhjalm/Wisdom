@@ -7,7 +7,9 @@ class ProfileRepository {
     if (u == null) return null;
     final res = await Supa.client.rpc('app.get_my_profile');
     if (res == null) return null;
-    final row = (res is Map) ? res : ((res is List && res.isNotEmpty) ? res.first : null);
+    final row = (res is Map)
+        ? res
+        : ((res is List && res.isNotEmpty) ? res.first : null);
     if (row == null) return null;
     return Profile.fromJson((row as Map).cast<String, dynamic>());
   }

@@ -11,9 +11,10 @@ class StudioService {
   Future<List<Map<String, dynamic>>> myCourses() async {
     final uid = _uid;
     if (uid == null) return [];
-    final rows = await _sb
-        .app.from('courses')
-        .select('id, slug, title, description, is_free_intro, price_cents, is_published, updated_at')
+    final rows = await _sb.app
+        .from('courses')
+        .select(
+            'id, slug, title, description, is_free_intro, price_cents, is_published, updated_at')
         .eq('created_by', uid)
         .order('updated_at', ascending: false);
     return (rows as List? ?? [])
@@ -30,24 +31,29 @@ class StudioService {
   }) async {
     final uid = _uid;
     if (uid == null) throw Exception('Not authenticated');
-    final row = await _sb.app.from('courses').insert({
-      'title': title,
-      'slug': slug,
-      'description': description,
-      'price_cents': priceCents,
-      'is_free_intro': isFreeIntro,
-      'is_published': false,
-      'created_by': uid,
-    }).select().maybeSingle();
+    final row = await _sb.app
+        .from('courses')
+        .insert({
+          'title': title,
+          'slug': slug,
+          'description': description,
+          'price_cents': priceCents,
+          'is_free_intro': isFreeIntro,
+          'is_published': false,
+          'created_by': uid,
+        })
+        .select()
+        .maybeSingle();
     if (row == null) throw Exception('Insert failed');
     return Map<String, dynamic>.from(row as Map);
   }
 
-  Future<Map<String, dynamic>> updateCourse(String id, Map<String, dynamic> patch) async {
+  Future<Map<String, dynamic>> updateCourse(
+      String id, Map<String, dynamic> patch) async {
     final uid = _uid;
     if (uid == null) throw Exception('Not authenticated');
-    final row = await _sb
-        .app.from('courses')
+    final row = await _sb.app
+        .from('courses')
         .update(patch)
         .eq('id', id)
         .eq('created_by', uid)
@@ -65,8 +71,8 @@ class StudioService {
 
   // ----- Modules -----
   Future<List<Map<String, dynamic>>> listModules(String courseId) async {
-    final rows = await _sb
-        .app.from('modules')
+    final rows = await _sb.app
+        .from('modules')
         .select('id, title, position')
         .eq('course_id', courseId)
         .order('position');
@@ -80,8 +86,8 @@ class StudioService {
     required String title,
     int position = 0,
   }) async {
-    final row = await _sb
-        .app.from('modules')
+    final row = await _sb.app
+        .from('modules')
         .insert({'course_id': courseId, 'title': title, 'position': position})
         .select()
         .maybeSingle();
@@ -89,9 +95,10 @@ class StudioService {
     return Map<String, dynamic>.from(row as Map);
   }
 
-  Future<Map<String, dynamic>> updateModule(String id, Map<String, dynamic> patch) async {
-    final row = await _sb
-        .app.from('modules')
+  Future<Map<String, dynamic>> updateModule(
+      String id, Map<String, dynamic> patch) async {
+    final row = await _sb.app
+        .from('modules')
         .update(patch)
         .eq('id', id)
         .select()
@@ -106,8 +113,8 @@ class StudioService {
 
   // ----- Lessons -----
   Future<List<Map<String, dynamic>>> listLessons(String moduleId) async {
-    final rows = await _sb
-        .app.from('lessons')
+    final rows = await _sb.app
+        .from('lessons')
         .select('id, title, position, is_intro')
         .eq('module_id', moduleId)
         .order('position');
@@ -145,8 +152,8 @@ class StudioService {
 
   // ----- Media -----
   Future<List<Map<String, dynamic>>> listLessonMedia(String lessonId) async {
-    final rows = await _sb
-        .app.from('lesson_media')
+    final rows = await _sb.app
+        .from('lesson_media')
         .select('id, kind, storage_path, position, created_at')
         .eq('lesson_id', lessonId)
         .order('position');
@@ -172,26 +179,26 @@ class StudioService {
     final uid = _uid;
     if (uid == null) throw Exception('Not authenticated');
 
-    final path = '$uid/$lessonId/${DateTime.now().millisecondsSinceEpoch}_$filename';
-    await _sb.storage
-        .from('media')
-        .uploadBinary(path, data, fileOptions: FileOptions(upsert: true, contentType: contentType));
+    final path =
+        '$uid/$lessonId/${DateTime.now().millisecondsSinceEpoch}_$filename';
+    await _sb.storage.from('media').uploadBinary(path, data,
+        fileOptions: FileOptions(upsert: true, contentType: contentType));
 
     // Hitta nästa position
-    final last = await _sb
-        .app.from('lesson_media')
+    final last = await _sb.app
+        .from('lesson_media')
         .select('position')
         .eq('lesson_id', lessonId)
         .order('position', ascending: false)
         .limit(1);
     int nextPos = 1;
-    if (last is List && last.isNotEmpty) {
+    if (last.isNotEmpty) {
       final p = (last.first as Map)['position'] as int?;
       if (p != null) nextPos = p + 1;
     }
 
-    final row = await _sb
-        .app.from('lesson_media')
+    final row = await _sb.app
+        .from('lesson_media')
         .insert({
           'lesson_id': lessonId,
           'kind': _kindFromContentType(contentType),
@@ -205,8 +212,8 @@ class StudioService {
   }
 
   Future<void> deleteLessonMedia(String id) async {
-    final row = await _sb
-        .app.from('lesson_media')
+    final row = await _sb.app
+        .from('lesson_media')
         .select('storage_path')
         .eq('id', id)
         .maybeSingle();

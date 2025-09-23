@@ -13,7 +13,10 @@ class RemoteConfigService {
     }
   }
 
-  Future<void> init({Duration fetchTimeout = const Duration(seconds: 10), Duration minimumFetchInterval = const Duration(hours: 1), Map<String, RemoteConfigValue> defaults = const {}}) async {
+  Future<void> init(
+      {Duration fetchTimeout = const Duration(seconds: 10),
+      Duration minimumFetchInterval = const Duration(hours: 1),
+      Map<String, RemoteConfigValue> defaults = const {}}) async {
     final rc = _rc;
     if (rc == null) return;
     await rc.setConfigSettings(RemoteConfigSettings(

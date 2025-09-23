@@ -8,7 +8,8 @@ import 'package:andlig_app/data/studio_service.dart';
 import 'package:file_selector/file_selector.dart' as fs;
 import 'package:andlig_app/ui/widgets/hero_background.dart';
 import 'package:andlig_app/data/certificates_service.dart';
-import 'package:andlig_app/data/models/certificate.dart';
+import 'package:andlig_app/domain/services/auth_service.dart';
+import 'package:andlig_app/core/widgets/glass_card.dart';
 
 class StudioPage extends StatefulWidget {
   const StudioPage({super.key});
@@ -23,6 +24,7 @@ class _StudioPageState extends State<StudioPage> {
   bool _loading = true;
   bool _sending = false;
   int _verifiedCerts = 0;
+  bool _hasTeacherAccess = false;
 
   @override
   void initState() {
@@ -32,19 +34,26 @@ class _StudioPageState extends State<StudioPage> {
 
   Future<void> _load() async {
     setState(() => _loading = true);
+    bool teacherAccess = false;
     try {
       final p = await _repo.getMe();
       // verified certs for gating
-      final certs = await CertificatesService().myCertificates(verifiedOnly: true);
+      final certs =
+          await CertificatesService().myCertificates(verifiedOnly: true);
+      teacherAccess = await AuthService().isTeacher();
       if (!mounted) return;
       setState(() {
         _me = p;
         _verifiedCerts = certs.length;
+        _hasTeacherAccess = teacherAccess;
         _loading = false;
       });
     } catch (_) {
       if (!mounted) return;
-      setState(() => _loading = false);
+      setState(() {
+        _hasTeacherAccess = teacherAccess;
+        _loading = false;
+      });
     }
   }
 
@@ -89,7 +98,7 @@ class _StudioPageState extends State<StudioPage> {
     }
 
     final role = _me?.role ?? 'user';
-    final isTeacher = role == 'teacher' || role == 'admin';
+    final isTeacher = _hasTeacherAccess || role == 'teacher' || role == 'admin';
     if (isTeacher) {
       return const _StudioShell();
     }
@@ -97,45 +106,59 @@ class _StudioPageState extends State<StudioPage> {
     final t = Theme.of(context).textTheme;
     return AppScaffold(
       title: 'Studio',
-      body: Card(
-        child: Padding(
-          padding: const EdgeInsets.all(18),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text('Ansök som lärare',
-                  style: t.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
-              const SizedBox(height: 8),
-              Text(
-                _verifiedCerts > 0
-                    ? 'För att få tillgång till Studio behöver du bli godkänd lärare. Skicka in en ansökan så återkommer vi.'
-                    : 'Du behöver minst ett verifierat certifikat för att kunna ansöka som lärare. Lägg till certifikat på din profil och invänta verifiering, därefter kan du skicka ansökan.',
-              ),
-              const SizedBox(height: 12),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: ElevatedButton(
-                  onPressed: (_sending || _verifiedCerts == 0) ? null : _applyAsTeacher,
+      extendBodyBehindAppBar: true,
+      transparentAppBar: true,
+      background: const HeroBackground(
+        asset: 'assets/images/bakgrund.png',
+        alignment: Alignment.topCenter,
+        opacity: 0.72,
+      ),
+      body: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          GlassCard(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('Ansök som lärare',
+                    style: t.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
+                const SizedBox(height: 8),
+                Text(
+                  _verifiedCerts > 0
+                      ? 'För att få tillgång till Studio behöver du bli godkänd lärare. Skicka in en ansökan så återkommer vi.'
+                      : 'Du behöver minst ett verifierat certifikat för att kunna ansöka som lärare. Lägg till certifikat på din profil och invänta verifiering, därefter kan du skicka ansökan.',
+                ),
+                const SizedBox(height: 12),
+                ElevatedButton(
+                  onPressed: (_sending || _verifiedCerts == 0)
+                      ? null
+                      : _applyAsTeacher,
                   child: _sending
                       ? const SizedBox(
                           height: 18,
                           width: 18,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : Text(_verifiedCerts == 0 ? 'Certifikat krävs' : 'Ansök som lärare'),
+                      : Text(_verifiedCerts == 0
+                          ? 'Certifikat krävs'
+                          : 'Ansök som lärare'),
                 ),
-              ),
-              if (_verifiedCerts == 0) ...[
-                const SizedBox(height: 8),
-                TextButton(
-                  onPressed: () => Navigator.of(context).pushNamed('/profile'),
-                  child: const Text('Gå till profil för att lägga till certifikat'),
-                ),
+                if (_verifiedCerts == 0) ...[
+                  const SizedBox(height: 8),
+                  TextButton(
+                    onPressed: () =>
+                        Navigator.of(context).pushNamed('/profile'),
+                    child: const Text(
+                        'Gå till profil för att lägga till certifikat'),
+                  ),
+                ],
               ],
-            ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -159,26 +182,44 @@ class _StudioShellState extends State<_StudioShell> {
     ];
     return AppScaffold(
       title: 'Studio',
-      body: Stack(
-        children: [
-          const HeroBackground(asset: 'assets/images/hero_landingpage.png', alignment: Alignment.topCenter, opacity: 0.8),
-          Column(
-            children: [
-              SegmentedButton<int>(
+      extendBodyBehindAppBar: true,
+      transparentAppBar: true,
+      background: const HeroBackground(
+        asset: 'assets/images/bakgrund.png',
+        alignment: Alignment.topCenter,
+        opacity: 0.78,
+      ),
+      body: Align(
+        alignment: Alignment.topLeft,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SegmentedButton<int>(
               segments: const [
-                ButtonSegment(value: 0, label: Text('Mina kurser'), icon: Icon(Icons.menu_book_rounded)),
-                ButtonSegment(value: 1, label: Text('Moduler & Lektioner'), icon: Icon(Icons.view_list_rounded)),
-                ButtonSegment(value: 2, label: Text('Media'), icon: Icon(Icons.perm_media_rounded)),
-                ButtonSegment(value: 3, label: Text('Inställningar'), icon: Icon(Icons.settings_rounded)),
+                ButtonSegment(
+                    value: 0,
+                    label: Text('Mina kurser'),
+                    icon: Icon(Icons.menu_book_rounded)),
+                ButtonSegment(
+                    value: 1,
+                    label: Text('Moduler & Lektioner'),
+                    icon: Icon(Icons.view_list_rounded)),
+                ButtonSegment(
+                    value: 2,
+                    label: Text('Media'),
+                    icon: Icon(Icons.perm_media_rounded)),
+                ButtonSegment(
+                    value: 3,
+                    label: Text('Inställningar'),
+                    icon: Icon(Icons.settings_rounded)),
               ],
               selected: {_tab},
               onSelectionChanged: (s) => setState(() => _tab = s.first),
-              ),
-              const SizedBox(height: 12),
-              Expanded(child: pages[_tab]),
-            ],
-          ),
-        ],
+            ),
+            const SizedBox(height: 12),
+            Expanded(child: pages[_tab]),
+          ],
+        ),
       ),
     );
   }
@@ -254,7 +295,9 @@ class _MyCoursesPageState extends State<_MyCoursesPage> {
                           ? Icons.public_rounded
                           : Icons.lock_clock_rounded,
                     ),
-                    title: Text(c['title'] ?? 'Untitled', style: t.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+                    title: Text(c['title'] ?? 'Untitled',
+                        style: t.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.w700)),
                     subtitle: Text(c['slug'] ?? ''),
                     trailing: Wrap(
                       spacing: 8,
@@ -371,9 +414,13 @@ class _CourseEditorDialogState extends State<_CourseEditorDialog> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              TextField(controller: _title, decoration: const InputDecoration(labelText: 'Titel')), 
+              TextField(
+                  controller: _title,
+                  decoration: const InputDecoration(labelText: 'Titel')),
               const SizedBox(height: 8),
-              TextField(controller: _slug, decoration: const InputDecoration(labelText: 'Slug')), 
+              TextField(
+                  controller: _slug,
+                  decoration: const InputDecoration(labelText: 'Slug')),
               const SizedBox(height: 8),
               TextField(
                 controller: _desc,
@@ -403,8 +450,12 @@ class _CourseEditorDialogState extends State<_CourseEditorDialog> {
         ),
       ),
       actions: [
-        TextButton(onPressed: _saving ? null : () => Navigator.of(context).pop(false), child: const Text('Avbryt')),
-        ElevatedButton(onPressed: _saving ? null : _save, child: Text(_saving ? 'Sparar…' : 'Spara')),
+        TextButton(
+            onPressed: _saving ? null : () => Navigator.of(context).pop(false),
+            child: const Text('Avbryt')),
+        ElevatedButton(
+            onPressed: _saving ? null : _save,
+            child: Text(_saving ? 'Sparar…' : 'Spara')),
       ],
     );
   }
@@ -432,8 +483,8 @@ class _TeacherSettingsPageState extends State<_TeacherSettingsPage> {
     setState(() => _loading = true);
     final u = Supa.client.auth.currentUser;
     if (u != null) {
-      final res = await Supa.client
-          .app.from('teacher_directory')
+      final res = await Supa.client.app
+          .from('teacher_directory')
           .select('headline, specialties')
           .eq('user_id', u.id)
           .maybeSingle();
@@ -460,7 +511,8 @@ class _TeacherSettingsPageState extends State<_TeacherSettingsPage> {
           .toList();
       await Supa.client.app.from('teacher_directory').upsert({
         'user_id': u.id,
-        'headline': _headline.text.trim().isEmpty ? null : _headline.text.trim(),
+        'headline':
+            _headline.text.trim().isEmpty ? null : _headline.text.trim(),
         'specialties': specs.isEmpty ? null : specs,
       });
       if (!mounted) return;
@@ -496,7 +548,8 @@ class _TeacherSettingsPageState extends State<_TeacherSettingsPage> {
             children: [
               TextField(
                 controller: _headline,
-                decoration: const InputDecoration(labelText: 'Rubrik (headline)'),
+                decoration:
+                    const InputDecoration(labelText: 'Rubrik (headline)'),
               ),
               const SizedBox(height: 8),
               TextField(
@@ -546,7 +599,8 @@ class _ModulesLessonsPageState extends State<_ModulesLessonsPage> {
     setState(() => _loading = true);
     final rows = await _svc.myCourses();
     String? pick = _selectedCourseId;
-    if (rows.isNotEmpty && (pick == null || !rows.any((c) => c['id'] == pick))) {
+    if (rows.isNotEmpty &&
+        (pick == null || !rows.any((c) => c['id'] == pick))) {
       pick = rows.first['id'] as String;
     }
     if (!mounted) return;
@@ -584,7 +638,8 @@ class _ModulesLessonsPageState extends State<_ModulesLessonsPage> {
         initial: module,
       ),
     );
-    if (res == true && _selectedCourseId != null) await _loadModules(_selectedCourseId!);
+    if (res == true && _selectedCourseId != null)
+      await _loadModules(_selectedCourseId!);
   }
 
   Future<void> _deleteModule(String id) async {
@@ -594,8 +649,12 @@ class _ModulesLessonsPageState extends State<_ModulesLessonsPage> {
         title: const Text('Ta bort modul?'),
         content: const Text('Detta tar även bort dess lektioner.'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Avbryt')),
-          ElevatedButton(onPressed: () => Navigator.pop(context, true), child: const Text('Ta bort')),
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Avbryt')),
+          ElevatedButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Ta bort')),
         ],
       ),
     );
@@ -605,12 +664,14 @@ class _ModulesLessonsPageState extends State<_ModulesLessonsPage> {
     }
   }
 
-  Future<void> _addOrEditLesson({required String moduleId, Map<String, dynamic>? lesson}) async {
+  Future<void> _addOrEditLesson(
+      {required String moduleId, Map<String, dynamic>? lesson}) async {
     final res = await showDialog<bool>(
       context: context,
       builder: (_) => _LessonEditorDialog(moduleId: moduleId, initial: lesson),
     );
-    if (res == true && _selectedCourseId != null) await _loadModules(_selectedCourseId!);
+    if (res == true && _selectedCourseId != null)
+      await _loadModules(_selectedCourseId!);
   }
 
   Future<void> _deleteLesson(String id) async {
@@ -619,8 +680,12 @@ class _ModulesLessonsPageState extends State<_ModulesLessonsPage> {
       builder: (_) => AlertDialog(
         title: const Text('Ta bort lektion?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Avbryt')),
-          ElevatedButton(onPressed: () => Navigator.pop(context, true), child: const Text('Ta bort')),
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Avbryt')),
+          ElevatedButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Ta bort')),
         ],
       ),
     );
@@ -634,7 +699,8 @@ class _ModulesLessonsPageState extends State<_ModulesLessonsPage> {
   Widget build(BuildContext context) {
     if (_loading) return const Center(child: CircularProgressIndicator());
     if (_selectedCourseId == null || _courses.isEmpty) {
-      return const Center(child: Text('Skapa en kurs under "Mina kurser" först.'));
+      return const Center(
+          child: Text('Skapa en kurs under "Mina kurser" först.'));
     }
     final t = Theme.of(context).textTheme;
     return Column(
@@ -680,7 +746,9 @@ class _ModulesLessonsPageState extends State<_ModulesLessonsPage> {
                     children: [
                       Row(
                         children: [
-                          Text(m['title'] as String? ?? 'Modul', style: t.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+                          Text(m['title'] as String? ?? 'Modul',
+                              style: t.titleMedium
+                                  ?.copyWith(fontWeight: FontWeight.w700)),
                           const Spacer(),
                           IconButton(
                             tooltip: 'Redigera',
@@ -698,7 +766,8 @@ class _ModulesLessonsPageState extends State<_ModulesLessonsPage> {
                       Row(
                         children: [
                           ElevatedButton.icon(
-                            onPressed: () => _addOrEditLesson(moduleId: m['id'] as String),
+                            onPressed: () =>
+                                _addOrEditLesson(moduleId: m['id'] as String),
                             icon: const Icon(Icons.add_rounded),
                             label: const Text('Ny lektion'),
                           ),
@@ -712,17 +781,21 @@ class _ModulesLessonsPageState extends State<_ModulesLessonsPage> {
                               contentPadding: EdgeInsets.zero,
                               leading: const Icon(Icons.menu_book_outlined),
                               title: Text(l['title'] as String? ?? 'Lektion'),
-                              subtitle: Text('Pos ${l['position'] ?? 0}${(l['is_intro'] == true) ? ' • Intro' : ''}'),
+                              subtitle: Text(
+                                  'Pos ${l['position'] ?? 0}${(l['is_intro'] == true) ? ' • Intro' : ''}'),
                               trailing: Wrap(spacing: 8, children: [
                                 IconButton(
                                   tooltip: 'Redigera',
                                   icon: const Icon(Icons.edit_rounded),
-                                  onPressed: () => _addOrEditLesson(moduleId: m['id'] as String, lesson: l),
+                                  onPressed: () => _addOrEditLesson(
+                                      moduleId: m['id'] as String, lesson: l),
                                 ),
                                 IconButton(
                                   tooltip: 'Ta bort',
-                                  icon: const Icon(Icons.delete_outline_rounded),
-                                  onPressed: () => _deleteLesson(l['id'] as String),
+                                  icon:
+                                      const Icon(Icons.delete_outline_rounded),
+                                  onPressed: () =>
+                                      _deleteLesson(l['id'] as String),
                                 ),
                               ]),
                             )),
@@ -776,7 +849,8 @@ class _ModuleEditorDialogState extends State<_ModuleEditorDialog> {
     setState(() => _saving = true);
     try {
       if (widget.initial == null) {
-        await _svc.createModule(courseId: widget.courseId, title: title, position: pos);
+        await _svc.createModule(
+            courseId: widget.courseId, title: title, position: pos);
       } else {
         await _svc.updateModule(widget.initial!['id'] as String, {
           'title': title,
@@ -787,7 +861,8 @@ class _ModuleEditorDialogState extends State<_ModuleEditorDialog> {
       Navigator.of(context).pop(true);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Kunde inte spara: $e')));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Kunde inte spara: $e')));
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -802,15 +877,24 @@ class _ModuleEditorDialogState extends State<_ModuleEditorDialog> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            TextField(controller: _title, decoration: const InputDecoration(labelText: 'Titel')),
+            TextField(
+                controller: _title,
+                decoration: const InputDecoration(labelText: 'Titel')),
             const SizedBox(height: 8),
-            TextField(controller: _position, decoration: const InputDecoration(labelText: 'Position'), keyboardType: TextInputType.number),
+            TextField(
+                controller: _position,
+                decoration: const InputDecoration(labelText: 'Position'),
+                keyboardType: TextInputType.number),
           ],
         ),
       ),
       actions: [
-        TextButton(onPressed: _saving ? null : () => Navigator.of(context).pop(false), child: const Text('Avbryt')),
-        ElevatedButton(onPressed: _saving ? null : _save, child: Text(_saving ? 'Sparar…' : 'Spara')),
+        TextButton(
+            onPressed: _saving ? null : () => Navigator.of(context).pop(false),
+            child: const Text('Avbryt')),
+        ElevatedButton(
+            onPressed: _saving ? null : _save,
+            child: Text(_saving ? 'Sparar…' : 'Spara')),
       ],
     );
   }
@@ -868,7 +952,8 @@ class _LessonEditorDialogState extends State<_LessonEditorDialog> {
       Navigator.of(context).pop(true);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Kunde inte spara: $e')));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Kunde inte spara: $e')));
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -884,15 +969,24 @@ class _LessonEditorDialogState extends State<_LessonEditorDialog> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              TextField(controller: _title, decoration: const InputDecoration(labelText: 'Titel')),
+              TextField(
+                  controller: _title,
+                  decoration: const InputDecoration(labelText: 'Titel')),
               const SizedBox(height: 8),
-              TextField(controller: _position, decoration: const InputDecoration(labelText: 'Position'), keyboardType: TextInputType.number),
+              TextField(
+                  controller: _position,
+                  decoration: const InputDecoration(labelText: 'Position'),
+                  keyboardType: TextInputType.number),
               const SizedBox(height: 8),
-              SwitchListTile(value: _isIntro, onChanged: (v) => setState(() => _isIntro = v), title: const Text('Intro (förhandsvisning)')),
+              SwitchListTile(
+                  value: _isIntro,
+                  onChanged: (v) => setState(() => _isIntro = v),
+                  title: const Text('Intro (förhandsvisning)')),
               const SizedBox(height: 8),
               TextField(
                 controller: _content,
-                decoration: const InputDecoration(labelText: 'Innehåll (Markdown)'),
+                decoration:
+                    const InputDecoration(labelText: 'Innehåll (Markdown)'),
                 maxLines: 10,
               ),
             ],
@@ -900,8 +994,12 @@ class _LessonEditorDialogState extends State<_LessonEditorDialog> {
         ),
       ),
       actions: [
-        TextButton(onPressed: _saving ? null : () => Navigator.of(context).pop(false), child: const Text('Avbryt')),
-        ElevatedButton(onPressed: _saving ? null : _save, child: Text(_saving ? 'Sparar…' : 'Spara')),
+        TextButton(
+            onPressed: _saving ? null : () => Navigator.of(context).pop(false),
+            child: const Text('Avbryt')),
+        ElevatedButton(
+            onPressed: _saving ? null : _save,
+            child: Text(_saving ? 'Sparar…' : 'Spara')),
       ],
     );
   }
@@ -977,7 +1075,17 @@ class _MediaPageState extends State<_MediaPage> {
     if (_lessonId == null) return;
     // Use file_selector to pick a file
     try {
-      const typeGroup = fs.XTypeGroup(label: 'media', extensions: <String>['png', 'jpg', 'jpeg', 'gif', 'mp4', 'mov', 'mp3', 'wav', 'pdf']);
+      const typeGroup = fs.XTypeGroup(label: 'media', extensions: <String>[
+        'png',
+        'jpg',
+        'jpeg',
+        'gif',
+        'mp4',
+        'mov',
+        'mp3',
+        'wav',
+        'pdf'
+      ]);
       final xfile = await fs.openFile(acceptedTypeGroups: [typeGroup]);
       if (xfile == null) return;
       final bytes = await xfile.readAsBytes();
@@ -992,7 +1100,8 @@ class _MediaPageState extends State<_MediaPage> {
       await _loadMedia(_lessonId!);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Uppladdning misslyckades: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Uppladdning misslyckades: $e')));
     }
   }
 
@@ -1033,7 +1142,8 @@ class _MediaPageState extends State<_MediaPage> {
   @override
   Widget build(BuildContext context) {
     if (_loading) return const Center(child: CircularProgressIndicator());
-    if (_courses.isEmpty) return const Center(child: Text('Skapa en kurs först.'));
+    if (_courses.isEmpty)
+      return const Center(child: Text('Skapa en kurs först.'));
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1045,7 +1155,11 @@ class _MediaPageState extends State<_MediaPage> {
             const Text('Kurs:'),
             DropdownButton<String>(
               value: _courseId,
-              items: _courses.map((c) => DropdownMenuItem(value: c['id'] as String, child: Text(c['title'] as String? ?? 'Untitled'))).toList(),
+              items: _courses
+                  .map((c) => DropdownMenuItem(
+                      value: c['id'] as String,
+                      child: Text(c['title'] as String? ?? 'Untitled')))
+                  .toList(),
               onChanged: (v) async {
                 if (v == null) return;
                 setState(() => _courseId = v);
@@ -1055,7 +1169,11 @@ class _MediaPageState extends State<_MediaPage> {
             const Text('Modul:'),
             DropdownButton<String>(
               value: _moduleId,
-              items: _modules.map((m) => DropdownMenuItem(value: m['id'] as String, child: Text(m['title'] as String? ?? 'Modul'))).toList(),
+              items: _modules
+                  .map((m) => DropdownMenuItem(
+                      value: m['id'] as String,
+                      child: Text(m['title'] as String? ?? 'Modul')))
+                  .toList(),
               onChanged: (v) async {
                 if (v == null) return;
                 setState(() => _moduleId = v);
@@ -1065,7 +1183,11 @@ class _MediaPageState extends State<_MediaPage> {
             const Text('Lektion:'),
             DropdownButton<String>(
               value: _lessonId,
-              items: _lessons.map((l) => DropdownMenuItem(value: l['id'] as String, child: Text(l['title'] as String? ?? 'Lektion'))).toList(),
+              items: _lessons
+                  .map((l) => DropdownMenuItem(
+                      value: l['id'] as String,
+                      child: Text(l['title'] as String? ?? 'Lektion')))
+                  .toList(),
               onChanged: (v) async {
                 if (v == null) return;
                 setState(() => _lessonId = v);
@@ -1093,7 +1215,8 @@ class _MediaPageState extends State<_MediaPage> {
                       child: ListTile(
                         leading: const Icon(Icons.perm_media_rounded),
                         title: Text(m['kind'] as String? ?? 'media'),
-                        subtitle: Text(url, maxLines: 1, overflow: TextOverflow.ellipsis),
+                        subtitle: Text(url,
+                            maxLines: 1, overflow: TextOverflow.ellipsis),
                         trailing: IconButton(
                           tooltip: 'Ta bort',
                           icon: const Icon(Icons.delete_outline_rounded),

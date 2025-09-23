@@ -33,12 +33,14 @@ class _BookingPageState extends State<BookingPage> {
       final res = await Supa.client.schema('app').rpc('get_my_profile');
       final map = (res is Map)
           ? res.cast<String, dynamic>()
-          : (res is List && res.isNotEmpty ? (res.first as Map).cast<String, dynamic>() : null);
+          : (res is List && res.isNotEmpty
+              ? (res.first as Map).cast<String, dynamic>()
+              : null);
       final role = map?['role'] as String?;
       _isTeacher = role == 'teacher' || role == 'admin';
       if (_isTeacher) {
-        final rows = await Supa.client
-            .app.from('teacher_slots')
+        final rows = await Supa.client.app
+            .from('teacher_slots')
             .select('id, starts_at, ends_at, is_booked')
             .eq('teacher_id', u.id)
             .order('starts_at');
@@ -46,8 +48,8 @@ class _BookingPageState extends State<BookingPage> {
             .map((e) => Map<String, dynamic>.from(e as Map))
             .toList();
       }
-      final open = await Supa.client
-          .app.from('teacher_slots')
+      final open = await Supa.client.app
+          .from('teacher_slots')
           .select('id, starts_at, ends_at, teacher_id')
           .eq('is_booked', false)
           .order('starts_at');
@@ -94,7 +96,7 @@ class _BookingPageState extends State<BookingPage> {
       await _load();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Bokning reserverad.')), 
+        const SnackBar(content: Text('Bokning reserverad.')),
       );
     } catch (e) {
       if (!mounted) return;
@@ -131,19 +133,24 @@ class _BookingPageState extends State<BookingPage> {
                       children: [
                         Expanded(
                           child: TextField(
-                            controller: TextEditingController(text: _start.toString()),
+                            controller:
+                                TextEditingController(text: _start.toString()),
                             readOnly: true,
-                            decoration: const InputDecoration(labelText: 'Start (UTC)'),
+                            decoration:
+                                const InputDecoration(labelText: 'Start (UTC)'),
                           ),
                         ),
                         const SizedBox(width: 8),
                         SizedBox(
                           width: 120,
                           child: TextField(
-                            decoration: const InputDecoration(labelText: 'Minuter'),
+                            decoration:
+                                const InputDecoration(labelText: 'Minuter'),
                             keyboardType: TextInputType.number,
-                            controller: TextEditingController(text: _durationMin.toString()),
-                            onSubmitted: (v) => setState(() => _durationMin = int.tryParse(v) ?? 60),
+                            controller: TextEditingController(
+                                text: _durationMin.toString()),
+                            onSubmitted: (v) => setState(
+                                () => _durationMin = int.tryParse(v) ?? 60),
                           ),
                         ),
                       ],
@@ -184,7 +191,8 @@ class _BookingPageState extends State<BookingPage> {
                           leading: const Icon(Icons.event_rounded),
                           title: Text('${s['starts_at']} → ${s['ends_at']}'),
                           trailing: ElevatedButton(
-                            onPressed: _saving ? null : () => _book(s['id'] as String),
+                            onPressed:
+                                _saving ? null : () => _book(s['id'] as String),
                             child: const Text('Boka'),
                           ),
                         )),

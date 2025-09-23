@@ -26,8 +26,8 @@ class _TarotPageState extends State<TarotPage> {
     setState(() => _loading = true);
     final u = Supa.client.auth.currentUser;
     if (u != null) {
-      final rows = await Supa.client
-          .app.from('tarot_requests')
+      final rows = await Supa.client.app
+          .from('tarot_requests')
           .select('id, question, status, created_at')
           .eq('requester_id', u.id)
           .order('created_at', ascending: false);
@@ -91,7 +91,8 @@ class _TarotPageState extends State<TarotPage> {
                         const SizedBox(height: 8),
                         TextField(
                           controller: _q,
-                          decoration: const InputDecoration(labelText: 'Din fråga'),
+                          decoration:
+                              const InputDecoration(labelText: 'Din fråga'),
                           maxLines: 2,
                         ),
                         const SizedBox(height: 8),

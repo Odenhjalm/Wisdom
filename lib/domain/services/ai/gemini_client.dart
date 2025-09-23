@@ -10,7 +10,8 @@ class GeminiClient {
   const GeminiClient();
 
   /// Render a widget tree from a JSON-like map.
-  static Widget render(Map<String, dynamic> node, {void Function(String action, Map<String, dynamic>? payload)? onAction}) {
+  static Widget render(Map<String, dynamic> node,
+      {void Function(String action, Map<String, dynamic>? payload)? onAction}) {
     final type = (node['type'] as String?)?.toLowerCase() ?? 'column';
     final props = (node['props'] as Map?)?.cast<String, dynamic>() ?? const {};
     final children = (node['children'] as List?)?.cast<Map>() ?? const [];
@@ -23,23 +24,31 @@ class GeminiClient {
         );
       case 'button':
         return ElevatedButton(
-          onPressed: () => onAction?.call(props['action'] as String? ?? 'tap', (props['payload'] as Map?)?.cast<String, dynamic>()),
+          onPressed: () => onAction?.call(props['action'] as String? ?? 'tap',
+              (props['payload'] as Map?)?.cast<String, dynamic>()),
           child: Text((props['label'] as String?) ?? 'OK'),
         );
       case 'spacer':
-        return SizedBox(height: _toDouble(props['height'], 8), width: _toDouble(props['width'], 8));
+        return SizedBox(
+            height: _toDouble(props['height'], 8),
+            width: _toDouble(props['width'], 8));
       case 'row':
         return Row(
           mainAxisAlignment: _parseMain(props['mainAxis'] as String?),
           crossAxisAlignment: _parseCross(props['crossAxis'] as String?),
-          children: [for (final c in children) render(c.cast<String, dynamic>(), onAction: onAction)],
+          children: [
+            for (final c in children)
+              render(c.cast<String, dynamic>(), onAction: onAction)
+          ],
         );
       case 'card':
         return Card(
           child: Padding(
             padding: EdgeInsets.all(_toDouble(props['padding'], 12)),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              for (final c in children) render(c.cast<String, dynamic>(), onAction: onAction),
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              for (final c in children)
+                render(c.cast<String, dynamic>(), onAction: onAction),
             ]),
           ),
         );
@@ -48,7 +57,10 @@ class GeminiClient {
         return Column(
           crossAxisAlignment: _parseCross(props['crossAxis'] as String?),
           mainAxisAlignment: _parseMain(props['mainAxis'] as String?),
-          children: [for (final c in children) render(c.cast<String, dynamic>(), onAction: onAction)],
+          children: [
+            for (final c in children)
+              render(c.cast<String, dynamic>(), onAction: onAction)
+          ],
         );
     }
   }

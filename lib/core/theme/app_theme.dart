@@ -28,21 +28,22 @@ final appThemeProvider = Provider<AppThemeData>((ref) {
         surfaceTintColor: Colors.transparent,
         foregroundColor: cs.onSurface,
       ),
-      scaffoldBackgroundColor:
-          b == Brightness.light ? const Color(0xFFF7F7FA) : const Color(0xFF0C0D10),
+      scaffoldBackgroundColor: b == Brightness.light
+          ? const Color(0xFFF7F7FA)
+          : const Color(0xFF0C0D10),
       cardTheme: CardThemeData(
         // Glasliknande kort – svag fyllnad, tydligare kant
         color: b == Brightness.light
-            ? Colors.white.withOpacity(0.10)
-            : const Color(0xFF14161A).withOpacity(0.16),
+            ? Colors.white.withValues(alpha: 0.10)
+            : const Color(0xFF14161A).withValues(alpha: 0.16),
         elevation: 0,
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
           side: BorderSide(
             color: b == Brightness.light
-                ? Colors.white.withOpacity(0.45)
-                : Colors.white.withOpacity(0.40),
+                ? Colors.white.withValues(alpha: 0.45)
+                : Colors.white.withValues(alpha: 0.40),
           ),
         ),
       ),
@@ -68,22 +69,25 @@ final appThemeProvider = Provider<AppThemeData>((ref) {
         style: ElevatedButton.styleFrom(
           elevation: 0,
           padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           foregroundColor: cs.primary,
-          side: BorderSide(color: cs.primary.withOpacity(0.35)),
+          side: BorderSide(color: cs.primary.withValues(alpha: 0.35)),
           padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
           foregroundColor: cs.primary,
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         ),
       ),
       listTileTheme: ListTileThemeData(

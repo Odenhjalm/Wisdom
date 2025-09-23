@@ -43,8 +43,8 @@ class CoursesGrid extends StatelessWidget {
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                         colors: [
-                          Colors.white.withOpacity(.24),
-                          Colors.white.withOpacity(.08),
+                          Colors.white.withValues(alpha: .24),
+                          Colors.white.withValues(alpha: .08),
                         ],
                       ),
                     ),
@@ -55,8 +55,8 @@ class CoursesGrid extends StatelessWidget {
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
                       colors: [
-                        Colors.black.withOpacity(.06),
-                        Colors.black.withOpacity(.28),
+                        Colors.black.withValues(alpha: .06),
+                        Colors.black.withValues(alpha: .28),
                       ],
                     ),
                   ),
@@ -74,7 +74,10 @@ class CoursesGrid extends StatelessWidget {
                           color: Colors.white,
                           fontWeight: FontWeight.w800,
                           shadows: const [
-                            Shadow(color: Colors.black54, blurRadius: 4, offset: Offset(0, 1)),
+                            Shadow(
+                                color: Colors.black54,
+                                blurRadius: 4,
+                                offset: Offset(0, 1)),
                           ],
                         ),
                       ),
@@ -84,7 +87,8 @@ class CoursesGrid extends StatelessWidget {
                           borderRadius: BorderRadius.circular(999),
                           child: LinearProgressIndicator(
                             value: pct,
-                            backgroundColor: Colors.white.withOpacity(.24),
+                            backgroundColor:
+                                Colors.white.withValues(alpha: .24),
                             color: Colors.white,
                             minHeight: 6,
                           ),
@@ -93,15 +97,20 @@ class CoursesGrid extends StatelessWidget {
                       Align(
                         alignment: Alignment.bottomRight,
                         child: ElevatedButton(
-                          onPressed: slug.isEmpty ? null : () => context.push('/course/$slug'),
+                          onPressed: slug.isEmpty
+                              ? null
+                              : () => context.push('/course/$slug'),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.white,
                             foregroundColor: Colors.black,
                             elevation: 0,
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 14, vertical: 10),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12)),
                           ),
-                          child: const Text('Öppna', style: TextStyle(fontWeight: FontWeight.w800)),
+                          child: const Text('Öppna',
+                              style: TextStyle(fontWeight: FontWeight.w800)),
                         ),
                       ),
                     ],

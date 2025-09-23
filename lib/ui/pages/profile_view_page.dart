@@ -72,7 +72,8 @@ class _ProfileViewPageState extends State<ProfileViewPage> {
     final me = Supabase.instance.client.auth.currentUser;
     if (me == null) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Logga in för att följa')));
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Logga in för att följa')));
       return;
     }
     setState(() => _following = !_following);
@@ -90,11 +91,13 @@ class _ProfileViewPageState extends State<ProfileViewPage> {
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const AppScaffold(title: 'Profil', body: Center(child: CircularProgressIndicator()));
+      return const AppScaffold(
+          title: 'Profil', body: Center(child: CircularProgressIndicator()));
     }
     final p = _profile;
     if (p == null) {
-      return const AppScaffold(title: 'Profil', body: Center(child: Text('Profil hittades inte')));
+      return const AppScaffold(
+          title: 'Profil', body: Center(child: Text('Profil hittades inte')));
     }
     final t = Theme.of(context).textTheme;
     final name = (p['display_name'] as String?) ?? 'Användare';
@@ -109,13 +112,16 @@ class _ProfileViewPageState extends State<ProfileViewPage> {
               padding: const EdgeInsets.all(16),
               child: Row(
                 children: [
-                  const CircleAvatar(radius: 28, child: Icon(Icons.person_rounded)),
+                  const CircleAvatar(
+                      radius: 28, child: Icon(Icons.person_rounded)),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(name, style: t.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
+                        Text(name,
+                            style: t.titleLarge
+                                ?.copyWith(fontWeight: FontWeight.w800)),
                         if (bio.isNotEmpty) ...[
                           const SizedBox(height: 2),
                           Text(bio, style: t.bodyMedium),
@@ -126,7 +132,9 @@ class _ProfileViewPageState extends State<ProfileViewPage> {
                   const SizedBox(width: 12),
                   ElevatedButton.icon(
                     onPressed: _toggleFollow,
-                    icon: Icon(_following ? Icons.check_rounded : Icons.person_add_alt_1_rounded),
+                    icon: Icon(_following
+                        ? Icons.check_rounded
+                        : Icons.person_add_alt_1_rounded),
                     label: Text(_following ? 'Följer' : 'Följ'),
                   ),
                 ],
@@ -140,14 +148,19 @@ class _ProfileViewPageState extends State<ProfileViewPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Tjänster', style: t.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
+                  Text('Tjänster',
+                      style:
+                          t.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
                   const SizedBox(height: 8),
-                  if (_services.isEmpty) const Text('Inga tjänster.') else ...[
+                  if (_services.isEmpty)
+                    const Text('Inga tjänster.')
+                  else ...[
                     ..._services.map((s) => ListTile(
                           leading: const Icon(Icons.work_rounded),
                           title: Text(s['title'] as String? ?? 'Tjänst'),
                           subtitle: Text(s['description'] as String? ?? ''),
-                          trailing: Text('${((s['price_cents'] as int?) ?? 0) / 100} kr'),
+                          trailing: Text(
+                              '${((s['price_cents'] as int?) ?? 0) / 100} kr'),
                           onTap: () => context.push('/service/${s['id']}'),
                         )),
                   ],
@@ -162,9 +175,13 @@ class _ProfileViewPageState extends State<ProfileViewPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Meditationer', style: t.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
+                  Text('Meditationer',
+                      style:
+                          t.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
                   const SizedBox(height: 8),
-                  if (_meditations.isEmpty) const Text('Inga meditationer ännu.') else ...[
+                  if (_meditations.isEmpty)
+                    const Text('Inga meditationer ännu.')
+                  else ...[
                     ..._meditations.map((m) => ListTile(
                           leading: const Icon(Icons.graphic_eq_rounded),
                           title: Text(m['title'] as String? ?? 'Meditation'),

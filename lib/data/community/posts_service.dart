@@ -5,8 +5,7 @@ class PostsService {
   final _sb = Supabase.instance.client;
 
   Future<List<Map<String, dynamic>>> feed({int limit = 50}) async {
-    final rows = await _sb
-        .app
+    final rows = await _sb.app
         .from('posts')
         .select('id, author_id, content, media_paths, created_at')
         .order('created_at', ascending: false)
@@ -15,11 +14,11 @@ class PostsService {
         .map((e) => Map<String, dynamic>.from(e as Map))
         .toList();
     // Attach profile
-    final ids = list.map((e) => e['author_id'] as String?).whereType<String>().toList();
+    final ids =
+        list.map((e) => e['author_id'] as String?).whereType<String>().toList();
     if (ids.isNotEmpty) {
       final inList = '(${ids.map((e) => '"$e"').join(',')})';
-      final profs = await _sb
-          .app
+      final profs = await _sb.app
           .from('profiles')
           .select('user_id, display_name, photo_url')
           .filter('user_id', 'in', inList);
@@ -35,17 +34,20 @@ class PostsService {
     return list;
   }
 
-  Future<Map<String, dynamic>> create({required String content, List<String>? mediaPaths}) async {
+  Future<Map<String, dynamic>> create(
+      {required String content, List<String>? mediaPaths}) async {
     final uid = _sb.auth.currentUser?.id;
     if (uid == null) throw Exception('Inte inloggad');
-    final res = await _sb
-        .app
+    final res = await _sb.app
         .from('posts')
-        .insert({'author_id': uid, 'content': content, if (mediaPaths != null) 'media_paths': mediaPaths})
+        .insert({
+          'author_id': uid,
+          'content': content,
+          if (mediaPaths != null) 'media_paths': mediaPaths
+        })
         .select()
         .maybeSingle();
     if (res == null) throw Exception('Misslyckades skapa inlägg');
     return Map<String, dynamic>.from(res as Map);
   }
 }
-

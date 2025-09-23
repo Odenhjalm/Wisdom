@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
+
+import 'go_router_back_button.dart';
 
 /// Baslayout: backknapp (pop eller fallback hem), maxbredd, padding, diskret bakgrund.
 class AppScaffold extends StatelessWidget {
@@ -10,14 +11,19 @@ class AppScaffold extends StatelessWidget {
 
   /// Sätt true där du *inte* vill visa back (t.ex. på Home).
   final bool disableBack;
+
   /// Neutral bakgrund: ingen gradient, ljus/ren yta för t.ex. login.
   final bool neutralBackground;
+
   /// Valfri full-bleed bakgrund (t.ex. bild) som fyller hela skärmen.
   final Widget? background;
+
   /// Låt innehållet/bakgrunden gå bakom appbaren (för herosidor).
   final bool extendBodyBehindAppBar;
+
   /// Gör appbaren helt transparent (använd tillsammans med `extendBodyBehindAppBar`).
   final bool transparentAppBar;
+
   /// Valfri färg för appbarens ikon/text (annars beräknas från temat).
   final Color? appBarForegroundColor;
 
@@ -37,61 +43,38 @@ class AppScaffold extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final router = GoRouter.of(context);
-    final canPop = router.canPop();
+    final theme = Theme.of(context);
     final showBack = !disableBack;
-    final cs = Theme.of(context).colorScheme;
-
-    final fg = appBarForegroundColor ??
-        (transparentAppBar ? Colors.white : Theme.of(context).colorScheme.onSurface);
+    final useTransparentAppBar = transparentAppBar || !neutralBackground;
+    final appBarColor = useTransparentAppBar
+        ? Colors.transparent
+        : theme.scaffoldBackgroundColor;
+    final fg = appBarForegroundColor ?? theme.colorScheme.onSurface;
 
     return Scaffold(
+      backgroundColor: Colors.transparent,
       extendBodyBehindAppBar: extendBodyBehindAppBar,
       appBar: AppBar(
-        backgroundColor: transparentAppBar
-            ? Colors.transparent
-            : Theme.of(context).scaffoldBackgroundColor,
+        backgroundColor: appBarColor,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
         foregroundColor: fg,
         title: Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
-        leading: showBack
-            ? IconButton(
-                icon: const Icon(Icons.arrow_back_rounded),
-                onPressed: () {
-                  if (canPop) {
-                    router.pop();
-                  } else {
-                    context.go('/'); // fallback hem om ingen stack
-                  }
-                },
-              )
+        flexibleSpace: background != null
+            ? IgnorePointer(child: background!)
             : null,
+        leading: showBack ? const GoRouterBackButton() : null,
         actions: actions,
       ),
       floatingActionButton: floatingActionButton,
       body: Stack(
         children: [
-          // Bakgrund
-          Positioned.fill(
-            child: neutralBackground
-                ? Container(color: const Color(0xFFFFFFFF))
-                : (background ?? DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                          cs.primary.withOpacity(0.04),
-                          Colors.transparent,
-                          cs.secondary.withOpacity(0.03),
-                        ],
-                        stops: const [0.0, 0.4, 1.0],
-                      ),
-                    ),
-                  )),
-          ),
-          // innehåll
+          if (neutralBackground)
+            const Positioned.fill(
+              child: ColoredBox(color: Color(0xFFFFFFFF)),
+            )
+          else if (background != null)
+            Positioned.fill(child: background!),
           Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 860),
@@ -114,10 +97,13 @@ class FullBleedBackground extends StatelessWidget {
   final Alignment alignment;
   final double topOpacity;
   final double bottomOpacity;
+
   /// Positivt värde flyttar bilden nedåt (px). Använd för parallax.
   final double yOffset;
+
   /// Skala upp bilden något för att undvika ev. inbyggda kanter i asseten.
   final double scale;
+
   /// Vignette från sidorna (0.0–1.0). 0 = av.
   final double sideVignette;
   const FullBleedBackground({
@@ -160,8 +146,8 @@ class FullBleedBackground extends StatelessWidget {
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
                 colors: [
-                  Colors.black.withOpacity(topOpacity),
-                  Colors.black.withOpacity(bottomOpacity),
+                  Colors.black.withValues(alpha: topOpacity),
+                  Colors.black.withValues(alpha: bottomOpacity),
                 ],
               ),
             ),
@@ -175,10 +161,10 @@ class FullBleedBackground extends StatelessWidget {
                   begin: Alignment.centerLeft,
                   end: Alignment.centerRight,
                   colors: [
-                    Colors.black.withOpacity(sideVignette),
+                    Colors.black.withValues(alpha: sideVignette),
                     Colors.transparent,
                     Colors.transparent,
-                    Colors.black.withOpacity(sideVignette),
+                    Colors.black.withValues(alpha: sideVignette),
                   ],
                   stops: const [0.0, 0.15, 0.85, 1.0],
                 ),

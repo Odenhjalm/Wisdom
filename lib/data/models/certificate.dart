@@ -49,4 +49,3 @@ class Certificate {
         if (badgeUrl != null) 'badge_url': badgeUrl,
       };
 }
-

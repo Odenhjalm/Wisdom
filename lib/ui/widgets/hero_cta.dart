@@ -29,7 +29,7 @@ class HeroCTA extends StatelessWidget {
           onPressed: () => context.push('/course/intro'),
           style: OutlinedButton.styleFrom(
             foregroundColor: Colors.white,
-            side: const BorderSide(color: Colors.white),
+            side: const BorderSide(color: Colors.transparent),
             padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
             textStyle:
                 const TextStyle(fontWeight: FontWeight.w700, fontSize: 16),

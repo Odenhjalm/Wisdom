@@ -15,26 +15,34 @@ class HomeHeroPanel extends StatelessWidget {
           constraints: const BoxConstraints(maxWidth: 980),
           child: Container(
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.12),
+              color: Colors.white.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: Colors.white.withOpacity(0.42)),
+              border: Border.all(color: Colors.transparent),
             ),
             padding: const EdgeInsets.all(18),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  displayName == null ? 'Välkommen tillbaka' : 'Hej ${displayName!}',
+                  displayName == null
+                      ? 'Välkommen tillbaka'
+                      : 'Hej ${displayName!}',
                   style: t.headlineSmall?.copyWith(
                     fontWeight: FontWeight.w800,
                     color: Colors.white,
-                    shadows: const [Shadow(color: Colors.black54, blurRadius: 4, offset: Offset(0, 1))],
+                    shadows: const [
+                      Shadow(
+                          color: Colors.black54,
+                          blurRadius: 4,
+                          offset: Offset(0, 1))
+                    ],
                   ),
                 ),
                 const SizedBox(height: 6),
                 Text(
                   'Fortsätt din resa eller utforska fler introduktioner.',
-                  style: t.bodyLarge?.copyWith(color: Colors.white.withOpacity(.95)),
+                  style: t.bodyLarge
+                      ?.copyWith(color: Colors.white.withValues(alpha: .95)),
                 ),
                 const SizedBox(height: 12),
                 Wrap(
@@ -94,7 +102,7 @@ class _HeroOutlineButton extends StatelessWidget {
       onPressed: onTap,
       style: OutlinedButton.styleFrom(
         foregroundColor: Colors.white,
-        side: const BorderSide(color: Colors.white),
+        side: const BorderSide(color: Colors.transparent),
         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),

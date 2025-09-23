@@ -3,7 +3,8 @@
 // Run: flutterfire configure --project=<your-firebase-project>
 
 import 'package:firebase_core/firebase_core.dart';
-import 'package:flutter/foundation.dart' show defaultTargetPlatform, TargetPlatform, kIsWeb;
+import 'package:flutter/foundation.dart'
+    show defaultTargetPlatform, TargetPlatform, kIsWeb;
 
 class DefaultFirebaseOptions {
   static FirebaseOptions get currentPlatform {
@@ -69,4 +70,3 @@ class DefaultFirebaseOptions {
     projectId: 'dev-placeholder',
   );
 }
-

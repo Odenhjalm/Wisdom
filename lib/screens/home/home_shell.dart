@@ -1,0 +1,286 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+
+import '../../components/top_nav_action_buttons.dart';
+import '../../core/ui/ui_consts.dart';
+import '../../core/utils/context_safe.dart';
+import '../../gate.dart';
+import '../../supabase_client.dart';
+
+class HomeShell extends StatefulWidget {
+  const HomeShell({super.key});
+
+  @override
+  State<HomeShell> createState() => _HomeShellState();
+}
+
+class _HomeShellState extends State<HomeShell> {
+  int _index = 0;
+
+  @override
+  Widget build(BuildContext context) {
+    final pages = <Widget>[
+      const _CoursesTab(),
+      const _ServicesTab(),
+      const _ProfileTab(),
+      const _TeachersTab(),
+    ];
+
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      extendBodyBehindAppBar: true,
+      extendBody: true,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        title: Text(['Kurser', 'Tjänster', 'Min profil', 'Lärare'][_index]),
+        actions: const [TopNavActionButtons()],
+      ),
+      body: SafeArea(
+        top: true,
+        bottom: false,
+        child: IndexedStack(index: _index, children: pages),
+      ),
+      bottomNavigationBar: NavigationBar(
+        backgroundColor: Colors.transparent,
+        surfaceTintColor: Colors.transparent,
+        selectedIndex: _index,
+        onDestinationSelected: (i) => setState(() => _index = i),
+        destinations: const [
+          NavigationDestination(
+            icon: Icon(Icons.menu_book_outlined),
+            selectedIcon: Icon(Icons.menu_book),
+            label: 'Kurser',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.storefront_outlined),
+            selectedIcon: Icon(Icons.storefront),
+            label: 'Tjänster',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.account_circle_outlined),
+            selectedIcon: Icon(Icons.account_circle),
+            label: 'Min profil',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.school_outlined),
+            selectedIcon: Icon(Icons.school),
+            label: 'Lärare',
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TabPlaceholder extends StatelessWidget {
+  final String title;
+  const _TabPlaceholder({required this.title});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Text(
+        title,
+        style: Theme.of(context)
+            .textTheme
+            .headlineSmall
+            ?.copyWith(fontWeight: FontWeight.w700),
+      ),
+    );
+  }
+}
+
+class _ProfileTab extends ConsumerWidget {
+  const _ProfileTab();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final sb = ref.read(supabaseMaybeProvider);
+    if (sb == null) {
+      return Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 500),
+          child: Card(
+            child: Padding(
+              padding: p20,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: const [
+                  Text('Supabase ej konfigurerat.'),
+                  SizedBox(height: 8),
+                  Text('Starta appen med --dart-define=SUPABASE_URL och SUPABASE_ANON_KEY.'),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+    final user = sb.auth.currentUser;
+    if (user == null) {
+      final emailCtrl = TextEditingController();
+      return Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 500),
+          child: Card(
+            child: Padding(
+              padding: p20,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Logga in',
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleLarge
+                        ?.copyWith(fontWeight: FontWeight.w700),
+                  ),
+                  gap12,
+                  TextField(
+                    controller: emailCtrl,
+                    keyboardType: TextInputType.emailAddress,
+                    decoration: const InputDecoration(labelText: 'E-post'),
+                  ),
+                  gap12,
+                  FilledButton(
+                    onPressed: () async {
+                      final email = emailCtrl.text.trim();
+                      if (email.isEmpty) return;
+                      await sb.auth.signInWithOtp(email: email);
+                      if (!context.mounted) return;
+                      context.goSnack('Magisk länk skickad (kontrollera din e-post).');
+                    },
+                    child: const Text('Skicka magisk länk'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 600),
+        child: Card(
+          child: Padding(
+            padding: p20,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Inloggad som',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                gap6,
+                Text(user.email ?? user.id),
+                gap12,
+                FilledButton.icon(
+                  onPressed: () async {
+                    await sb.auth.signOut();
+                    gate.reset();
+                    if (!context.mounted) return;
+                    context.goSnack('Utloggad');
+                    context.go('/landing');
+                  },
+                  icon: const Icon(Icons.logout),
+                  label: const Text('Logga ut'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CoursesTab extends StatelessWidget {
+  const _CoursesTab();
+
+  @override
+  Widget build(BuildContext context) {
+    return const _TabPlaceholder(title: 'Kurser');
+  }
+}
+
+class _ServicesTab extends ConsumerWidget {
+  const _ServicesTab();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final sb = ref.read(supabaseMaybeProvider);
+    final user = sb?.auth.currentUser;
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 500),
+        child: Card(
+          child: Padding(
+            padding: p20,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Tjänster',
+                  style: Theme.of(context)
+                      .textTheme
+                      .titleLarge
+                      ?.copyWith(fontWeight: FontWeight.w700),
+                ),
+                gap8,
+                const Text('Exempel: skapa en order (99 SEK) som stub för betalning.'),
+                gap12,
+                FilledButton(
+                  onPressed: () => context.go('/subscribe'),
+                  child: const Text('Gå till abonnemang'),
+                ),
+                if (user == null)
+                  const Padding(
+                    padding: EdgeInsets.only(top: 8),
+                    child: Text(
+                      'Logga in för att köpa.',
+                      style: TextStyle(color: Colors.black54),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TeachersTab extends StatelessWidget {
+  const _TeachersTab();
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            'Lärare',
+            style: Theme.of(context)
+                .textTheme
+                .headlineSmall
+                ?.copyWith(fontWeight: FontWeight.w700),
+          ),
+          gap12,
+          FilledButton.icon(
+            onPressed: () => context.go('/teacher/editor'),
+            icon: const Icon(Icons.edit),
+            label: const Text('Öppna kurs-editor'),
+          ),
+        ],
+      ),
+    );
+  }
+}

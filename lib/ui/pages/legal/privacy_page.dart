@@ -17,9 +17,12 @@ class PrivacyPage extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Integritetspolicy', style: t.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
+                  Text('Integritetspolicy',
+                      style:
+                          t.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
                   const SizedBox(height: 8),
-                  const Text('Här beskriver vi hur vi samlar in och behandlar personuppgifter. ' 
+                  const Text(
+                      'Här beskriver vi hur vi samlar in och behandlar personuppgifter. '
                       'Denna text är en platshållare – ersätt med juridiskt granskad policy.'),
                 ],
               ),
@@ -30,4 +33,3 @@ class PrivacyPage extends StatelessWidget {
     );
   }
 }
-

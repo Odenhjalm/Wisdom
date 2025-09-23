@@ -90,7 +90,8 @@ class _LessonPageState extends State<LessonPage> {
         if (moduleId != null && global.isNotEmpty && globalIdx >= 0) {
           // Hämta kursId via mod
           // Vi har redan mod ovan (mod), använd dess course_id
-          final courseId = (await _svc.getModule(moduleId))?['course_id'] as String?;
+          final courseId =
+              (await _svc.getModule(moduleId))?['course_id'] as String?;
           if (courseId != null) {
             final pct = (globalIdx + 1) / global.length;
             // ignore: unawaited_futures
@@ -161,13 +162,17 @@ class _LessonPageState extends State<LessonPage> {
           Row(
             children: [
               ElevatedButton.icon(
-                onPressed: _prevId == null ? null : () => context.go('/lesson/${_prevId!}') ,
+                onPressed: _prevId == null
+                    ? null
+                    : () => context.go('/lesson/${_prevId!}'),
                 icon: const Icon(Icons.chevron_left_rounded),
                 label: const Text('Föregående'),
               ),
               const SizedBox(width: 8),
               ElevatedButton.icon(
-                onPressed: _nextId == null ? null : () => context.go('/lesson/${_nextId!}') ,
+                onPressed: _nextId == null
+                    ? null
+                    : () => context.go('/lesson/${_nextId!}'),
                 icon: const Icon(Icons.chevron_right_rounded),
                 label: const Text('Nästa'),
               ),

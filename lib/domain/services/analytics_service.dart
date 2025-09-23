@@ -25,14 +25,16 @@ class AnalyticsService {
     await fa.setUserProperty(name: name, value: value);
   }
 
-  Future<void> logEvent(String name, {Map<String, Object?> parameters = const {}}) async {
+  Future<void> logEvent(String name,
+      {Map<String, Object?> parameters = const {}}) async {
     final fa = _fa;
     if (fa == null) return;
     // Firebase requires non-null values in parameters
     final filtered = <String, Object>{};
     parameters.forEach((key, value) {
-      if (value != null) filtered[key] = value as Object;
+      if (value != null) filtered[key] = value;
     });
-    await fa.logEvent(name: name, parameters: filtered.isEmpty ? null : filtered);
+    await fa.logEvent(
+        name: name, parameters: filtered.isEmpty ? null : filtered);
   }
 }

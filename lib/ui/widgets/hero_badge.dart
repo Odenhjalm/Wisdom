@@ -15,9 +15,9 @@ class HeroBadge extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(.12),
+            color: Colors.white.withValues(alpha: .12),
             borderRadius: BorderRadius.circular(999),
-            border: Border.all(color: Colors.white.withOpacity(.22)),
+            border: Border.all(color: Colors.transparent),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,

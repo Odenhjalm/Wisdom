@@ -16,7 +16,8 @@ class ProgressService {
     return double.tryParse(v) ?? 0.0;
   }
 
-  Future<Map<String, double>> getProgressForCourses(List<String> courseIds) async {
+  Future<Map<String, double>> getProgressForCourses(
+      List<String> courseIds) async {
     final out = <String, double>{};
     for (final id in courseIds) {
       out[id] = await getProgress(id);
@@ -24,4 +25,3 @@ class ProgressService {
     return out;
   }
 }
-

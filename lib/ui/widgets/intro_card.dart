@@ -22,9 +22,9 @@ class IntroCard extends StatelessWidget {
       borderRadius: BorderRadius.circular(18),
       child: Ink(
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(.12),
+          color: Colors.white.withValues(alpha: .12),
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: Colors.white.withOpacity(.26)),
+          border: Border.all(color: Colors.transparent),
         ),
         padding: const EdgeInsets.all(16),
         child: Row(
@@ -33,7 +33,7 @@ class IntroCard extends StatelessWidget {
               height: 48,
               width: 48,
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(.16),
+                color: Colors.white.withValues(alpha: .16),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(icon, color: Colors.white, size: 28),

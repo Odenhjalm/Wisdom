@@ -49,10 +49,11 @@ class _MessagesPageState extends State<MessagesPage> {
           event: PostgresChangeEvent.insert,
           schema: 'app',
           table: 'messages',
-          filter: PostgresChangeFilter.eq('channel', _channel),
           callback: (payload) {
             final row = (payload.newRecord as Map?)?.cast<String, dynamic>();
             if (row == null) return;
+            // Manual filter for SDKs lacking typed/string filter APIs
+            if (row['channel'] != _channel) return;
             if (!mounted) return;
             setState(() => _messages = [..._messages, row]);
           },
@@ -103,12 +104,17 @@ class _MessagesPageState extends State<MessagesPage> {
                       final m = _messages[i];
                       final mine = m['sender_id'] == uid;
                       return Align(
-                        alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
+                        alignment:
+                            mine ? Alignment.centerRight : Alignment.centerLeft,
                         child: Container(
-                          margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          margin: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 6),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 8),
                           decoration: BoxDecoration(
-                            color: mine ? Colors.blueAccent.withOpacity(.15) : Colors.grey.withOpacity(.2),
+                            color: mine
+                                ? Colors.blueAccent.withValues(alpha: .15)
+                                : Colors.grey.withValues(alpha: .2),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Text(m['content'] as String? ?? ''),
@@ -125,14 +131,18 @@ class _MessagesPageState extends State<MessagesPage> {
                 Expanded(
                   child: TextField(
                     controller: _input,
-                    decoration: const InputDecoration(hintText: 'Skriv ett meddelande...'),
+                    decoration: const InputDecoration(
+                        hintText: 'Skriv ett meddelande...'),
                   ),
                 ),
                 const SizedBox(width: 8),
                 ElevatedButton(
                   onPressed: _sending ? null : _send,
                   child: _sending
-                      ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                      ? const SizedBox(
+                          height: 18,
+                          width: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2))
                       : const Text('Skicka'),
                 ),
               ],

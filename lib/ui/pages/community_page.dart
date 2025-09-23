@@ -41,13 +41,15 @@ class _CommunityPageState extends State<CommunityPage> {
     final rows = await _svc.listTeachers();
     // fetch verified certificate counts + specialties fallback
     try {
-      final ids = rows.map((e) => e['user_id'] as String?).whereType<String>().toList();
+      final ids =
+          rows.map((e) => e['user_id'] as String?).whereType<String>().toList();
       _certCount = await _svc.listVerifiedCertCount(ids);
       final specMap = await _svc.listVerifiedCertSpecialties(ids);
       // merge specialties from certs if directory specials are empty
       for (final t in rows) {
         final id = t['user_id'] as String?;
-        final dirSpecs = (t['specialties'] as List?)?.cast<String>() ?? const [];
+        final dirSpecs =
+            (t['specialties'] as List?)?.cast<String>() ?? const [];
         if ((dirSpecs.isEmpty) && id != null && specMap.containsKey(id)) {
           t['specialties'] = specMap[id];
         }
@@ -71,7 +73,7 @@ class _CommunityPageState extends State<CommunityPage> {
         final name = (prof?['display_name'] as String?)?.toLowerCase() ?? '';
         final head = (t['headline'] as String?)?.toLowerCase() ?? '';
         final specs = ((t['specialties'] as List?)?.cast<String>() ?? const [])
-            .join(' ') 
+            .join(' ')
             .toLowerCase();
         return name.contains(q) || head.contains(q) || specs.contains(q);
       });
@@ -86,15 +88,23 @@ class _CommunityPageState extends State<CommunityPage> {
     switch (_sort) {
       case 'name':
         out.sort((a, b) {
-          final an = (((a['profile'] as Map?)?.cast<String, dynamic>())?['display_name'] as String? ?? '').toLowerCase();
-          final bn = (((b['profile'] as Map?)?.cast<String, dynamic>())?['display_name'] as String? ?? '').toLowerCase();
+          final an = (((a['profile'] as Map?)
+                      ?.cast<String, dynamic>())?['display_name'] as String? ??
+                  '')
+              .toLowerCase();
+          final bn = (((b['profile'] as Map?)
+                      ?.cast<String, dynamic>())?['display_name'] as String? ??
+                  '')
+              .toLowerCase();
           return an.compareTo(bn);
         });
         break;
       case 'newest':
         out.sort((a, b) {
-          final ad = DateTime.tryParse((a['created_at'] as String?) ?? '') ?? DateTime.fromMillisecondsSinceEpoch(0);
-          final bd = DateTime.tryParse((b['created_at'] as String?) ?? '') ?? DateTime.fromMillisecondsSinceEpoch(0);
+          final ad = DateTime.tryParse((a['created_at'] as String?) ?? '') ??
+              DateTime.fromMillisecondsSinceEpoch(0);
+          final bd = DateTime.tryParse((b['created_at'] as String?) ?? '') ??
+              DateTime.fromMillisecondsSinceEpoch(0);
           return bd.compareTo(ad);
         });
         break;
@@ -118,7 +128,6 @@ class _CommunityPageState extends State<CommunityPage> {
 
   @override
   Widget build(BuildContext context) {
-    final t = Theme.of(context).textTheme;
     final items = _filtered();
     return AppScaffold(
       title: 'Community',
@@ -135,9 +144,9 @@ class _CommunityPageState extends State<CommunityPage> {
                         TextField(
                           controller: _q,
                           decoration: const InputDecoration(
-                            prefixIcon: Icon(Icons.search_rounded),
-                            hintText: 'Sök lärare, specialitet eller rubrik...'
-                          ),
+                              prefixIcon: Icon(Icons.search_rounded),
+                              hintText:
+                                  'Sök lärare, specialitet eller rubrik...'),
                           onChanged: (v) => setState(() => _query = v),
                         ),
                         const SizedBox(height: 10),
@@ -148,11 +157,15 @@ class _CommunityPageState extends State<CommunityPage> {
                             DropdownButton<String>(
                               value: _sort,
                               items: const [
-                                DropdownMenuItem(value: 'rating', child: Text('Betyg')),
-                                DropdownMenuItem(value: 'name', child: Text('Namn')),
-                                DropdownMenuItem(value: 'newest', child: Text('Nyast')),
+                                DropdownMenuItem(
+                                    value: 'rating', child: Text('Betyg')),
+                                DropdownMenuItem(
+                                    value: 'name', child: Text('Namn')),
+                                DropdownMenuItem(
+                                    value: 'newest', child: Text('Nyast')),
                               ],
-                              onChanged: (v) => setState(() => _sort = v ?? 'rating'),
+                              onChanged: (v) =>
+                                  setState(() => _sort = v ?? 'rating'),
                             ),
                           ],
                         ),
@@ -177,7 +190,8 @@ class _CommunityPageState extends State<CommunityPage> {
                                   )),
                               if (_selectedSpecs.isNotEmpty)
                                 TextButton.icon(
-                                  onPressed: () => setState(() => _selectedSpecs.clear()),
+                                  onPressed: () =>
+                                      setState(() => _selectedSpecs.clear()),
                                   icon: const Icon(Icons.clear_all_rounded),
                                   label: const Text('Rensa filter'),
                                 ),
@@ -233,7 +247,9 @@ class _TeacherCard extends StatelessWidget {
           children: [
             CircleAvatar(
               radius: 26,
-              backgroundImage: photo != null && photo.isNotEmpty ? NetworkImage(photo) : null,
+              backgroundImage: photo != null && photo.isNotEmpty
+                  ? NetworkImage(photo)
+                  : null,
               child: (photo == null || photo.isEmpty)
                   ? const Icon(Icons.person_rounded)
                   : null,
@@ -243,7 +259,9 @@ class _TeacherCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(display, style: t.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
+                  Text(display,
+                      style:
+                          t.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
                   if (headline.isNotEmpty) ...[
                     const SizedBox(height: 2),
                     Text(headline, style: t.bodyMedium),
@@ -257,18 +275,23 @@ class _TeacherCard extends StatelessWidget {
                       const Spacer(),
                       if (certCount > 0)
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
-                            color: Colors.green.withOpacity(.12),
+                            color: Colors.green.withValues(alpha: .12),
                             borderRadius: BorderRadius.circular(999),
-                            border: Border.all(color: Colors.green.withOpacity(.35)),
+                            border: Border.all(
+                                color: Colors.green.withValues(alpha: .35)),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(Icons.verified_rounded, size: 16, color: Colors.lightGreen),
+                              const Icon(Icons.verified_rounded,
+                                  size: 16, color: Colors.lightGreen),
                               const SizedBox(width: 4),
-                              Text('$certCount cert', style: t.labelSmall?.copyWith(color: Colors.green[200])),
+                              Text('$certCount cert',
+                                  style: t.labelSmall
+                                      ?.copyWith(color: Colors.green[200])),
                             ],
                           ),
                         ),
@@ -296,7 +319,8 @@ class _TeacherCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 6),
                 OutlinedButton(
-                  onPressed: () => context.push('/messages/dm/${data['user_id']}'),
+                  onPressed: () =>
+                      context.push('/messages/dm/${data['user_id']}'),
                   child: const Text('Meddela'),
                 ),
               ],
@@ -319,9 +343,13 @@ class _Stars extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: List.generate(5, (i) {
-        if (i < full) return const Icon(Icons.star_rounded, color: Colors.amber, size: 18);
-        if (i == full && half) return const Icon(Icons.star_half_rounded, color: Colors.amber, size: 18);
-        return const Icon(Icons.star_border_rounded, color: Colors.amber, size: 18);
+        if (i < full)
+          return const Icon(Icons.star_rounded, color: Colors.amber, size: 18);
+        if (i == full && half)
+          return const Icon(Icons.star_half_rounded,
+              color: Colors.amber, size: 18);
+        return const Icon(Icons.star_border_rounded,
+            color: Colors.amber, size: 18);
       }),
     );
   }

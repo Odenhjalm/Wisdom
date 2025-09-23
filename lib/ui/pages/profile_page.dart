@@ -3,6 +3,7 @@ import 'package:andlig_app/ui/widgets/app_scaffold.dart';
 import 'package:andlig_app/data/supabase/supabase_client.dart';
 import 'package:andlig_app/data/auth_profile_service.dart';
 import 'package:go_router/go_router.dart';
+import 'package:andlig_app/gate.dart';
 import 'package:andlig_app/core/supabase_ext.dart';
 import 'package:andlig_app/data/certificates_service.dart';
 import 'package:andlig_app/data/models/certificate.dart';
@@ -102,7 +103,11 @@ class _ProfilePageState extends State<ProfilePage> {
 
   Future<void> _signOut() async {
     await _svc.signOut();
+    gate.reset();
     if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Utloggad')),
+    );
     context.go('/landing');
   }
 
@@ -141,7 +146,10 @@ class _ProfilePageState extends State<ProfilePage> {
                   children: [
                     Text(
                       'Logga in eller skapa konto',
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+                      style: Theme.of(context)
+                          .textTheme
+                          .titleLarge
+                          ?.copyWith(fontWeight: FontWeight.w800),
                     ),
                     const SizedBox(height: 12),
                     TextField(
@@ -166,9 +174,14 @@ class _ProfilePageState extends State<ProfilePage> {
                         ElevatedButton.icon(
                           onPressed: _busy ? null : _signInUp,
                           icon: _busy
-                              ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                              ? const SizedBox(
+                                  height: 18,
+                                  width: 18,
+                                  child:
+                                      CircularProgressIndicator(strokeWidth: 2))
                               : const Icon(Icons.login_rounded),
-                          label: Text(_busy ? 'Loggar in…' : 'Logga in / Skapa konto'),
+                          label: Text(
+                              _busy ? 'Loggar in…' : 'Logga in / Skapa konto'),
                         ),
                         const SizedBox(width: 12),
                         TextButton(
@@ -234,14 +247,20 @@ class _ProfilePageState extends State<ProfilePage> {
                 ],
               ),
               const SizedBox(height: 12),
-              Divider(color: Colors.white.withOpacity(.1)),
+              Divider(color: Colors.white.withValues(alpha: .1)),
               const SizedBox(height: 12),
-              Text('Certifikat', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
+              Text('Certifikat',
+                  style: Theme.of(context)
+                      .textTheme
+                      .titleMedium
+                      ?.copyWith(fontWeight: FontWeight.w800)),
               const SizedBox(height: 8),
               if (_certs.isEmpty)
                 Row(
                   children: [
-                    const Expanded(child: Text('Inga certifikat ännu. Lägg till ditt första för att låsa upp communityn.')),
+                    const Expanded(
+                        child: Text(
+                            'Inga certifikat ännu. Lägg till ditt första för att låsa upp communityn.')),
                     ElevatedButton.icon(
                       onPressed: _addCertificate,
                       icon: const Icon(Icons.add_rounded),
@@ -251,7 +270,8 @@ class _ProfilePageState extends State<ProfilePage> {
                 )
               else ...[
                 ..._certs.map((c) => ListTile(
-                      leading: const Icon(Icons.verified_rounded, color: Colors.lightGreen),
+                      leading: const Icon(Icons.verified_rounded,
+                          color: Colors.lightGreen),
                       title: Text(c.title),
                       subtitle: Text([
                         if ((c.issuer ?? '').isNotEmpty) c.issuer,
@@ -314,8 +334,12 @@ class _AddCertificateDialogState extends State<_AddCertificateDialog> {
         issuer: _issuer.text.trim().isEmpty ? null : _issuer.text.trim(),
         issuedAt: issued,
         specialties: specs,
-        credentialId: _credentialId.text.trim().isEmpty ? null : _credentialId.text.trim(),
-        credentialUrl: _credentialUrl.text.trim().isEmpty ? null : _credentialUrl.text.trim(),
+        credentialId: _credentialId.text.trim().isEmpty
+            ? null
+            : _credentialId.text.trim(),
+        credentialUrl: _credentialUrl.text.trim().isEmpty
+            ? null
+            : _credentialUrl.text.trim(),
       ));
       if (!mounted) return;
       Navigator.of(context).pop(true);
@@ -333,28 +357,52 @@ class _AddCertificateDialogState extends State<_AddCertificateDialog> {
   Widget build(BuildContext context) {
     final t = Theme.of(context).textTheme;
     return AlertDialog(
-      title: Text('Nytt certifikat', style: t.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
+      title: Text('Nytt certifikat',
+          style: t.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            TextField(controller: _title, decoration: const InputDecoration(labelText: 'Titel *', hintText: 'Ex: Reiki Master Level II')),
+            TextField(
+                controller: _title,
+                decoration: const InputDecoration(
+                    labelText: 'Titel *',
+                    hintText: 'Ex: Reiki Master Level II')),
             const SizedBox(height: 8),
-            TextField(controller: _issuer, decoration: const InputDecoration(labelText: 'Utfärdare', hintText: 'Ex: Svenska Reiki Akademin')),
+            TextField(
+                controller: _issuer,
+                decoration: const InputDecoration(
+                    labelText: 'Utfärdare',
+                    hintText: 'Ex: Svenska Reiki Akademin')),
             const SizedBox(height: 8),
-            TextField(controller: _issuedAt, decoration: const InputDecoration(labelText: 'Utfärdat (YYYY-MM-DD)')),
+            TextField(
+                controller: _issuedAt,
+                decoration:
+                    const InputDecoration(labelText: 'Utfärdat (YYYY-MM-DD)')),
             const SizedBox(height: 8),
-            TextField(controller: _specialties, decoration: const InputDecoration(labelText: 'Specialiteter (kommaseparerat)', hintText: 't.ex. Reiki, Healing, Ritual')),
+            TextField(
+                controller: _specialties,
+                decoration: const InputDecoration(
+                    labelText: 'Specialiteter (kommaseparerat)',
+                    hintText: 't.ex. Reiki, Healing, Ritual')),
             const SizedBox(height: 8),
-            TextField(controller: _credentialId, decoration: const InputDecoration(labelText: 'Credential ID')),
+            TextField(
+                controller: _credentialId,
+                decoration: const InputDecoration(labelText: 'Credential ID')),
             const SizedBox(height: 8),
-            TextField(controller: _credentialUrl, decoration: const InputDecoration(labelText: 'Credential URL')),
+            TextField(
+                controller: _credentialUrl,
+                decoration: const InputDecoration(labelText: 'Credential URL')),
           ],
         ),
       ),
       actions: [
-        TextButton(onPressed: _saving ? null : () => Navigator.of(context).pop(false), child: const Text('Avbryt')),
-        ElevatedButton(onPressed: _saving ? null : _save, child: Text(_saving ? 'Sparar…' : 'Spara')),
+        TextButton(
+            onPressed: _saving ? null : () => Navigator.of(context).pop(false),
+            child: const Text('Avbryt')),
+        ElevatedButton(
+            onPressed: _saving ? null : _save,
+            child: Text(_saving ? 'Sparar…' : 'Spara')),
       ],
     );
   }

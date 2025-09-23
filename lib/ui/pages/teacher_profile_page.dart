@@ -55,29 +55,34 @@ class _TeacherProfilePageState extends State<TeacherProfilePage> {
     if (id == null || price <= 0) return;
     setState(() => _buying = true);
     try {
-      final order = await _svc.startServiceOrder(serviceId: id, amountCents: price);
+      final order =
+          await _svc.startServiceOrder(serviceId: id, amountCents: price);
       final url = await _orders.createCheckoutSession(
         orderId: order['id'] as String,
         amountCents: price,
-        successUrl: 'https://andlig.app/payment/success?order_id=${order['id']}',
+        successUrl:
+            'https://andlig.app/payment/success?order_id=${order['id']}',
         cancelUrl: 'https://andlig.app/payment/cancel?order_id=${order['id']}',
       );
       if (url != null) await launchUrlString(url);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Kunde inte initiera köp: $e')));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Kunde inte initiera köp: $e')));
     } finally {
       if (mounted) setState(() => _buying = false);
     }
   }
 
-  String _publicUrl(String path) => Supa.client.storage.from('media').getPublicUrl(path);
+  String _publicUrl(String path) =>
+      Supa.client.storage.from('media').getPublicUrl(path);
 
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context).textTheme;
     if (_loading) {
-      return const AppScaffold(title: 'Lärare', body: Center(child: CircularProgressIndicator()));
+      return const AppScaffold(
+          title: 'Lärare', body: Center(child: CircularProgressIndicator()));
     }
     final prof = (_teacher?['profile'] as Map?)?.cast<String, dynamic>();
     final display = prof?['display_name'] as String? ?? 'Lärare';
@@ -90,10 +95,11 @@ class _TeacherProfilePageState extends State<TeacherProfilePage> {
           Card(
             child: ListTile(
               leading: const Icon(Icons.person_rounded),
-              title: Text(display, style: t.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
+              title: Text(display,
+                  style: t.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
               subtitle: Text(headline),
               trailing: OutlinedButton(
-                onPressed: () => context.push('/messages/dm/${widget.userId}') ,
+                onPressed: () => context.push('/messages/dm/${widget.userId}'),
                 child: const Text('Meddelande'),
               ),
             ),
@@ -105,13 +111,16 @@ class _TeacherProfilePageState extends State<TeacherProfilePage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Certifikat', style: t.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
+                  Text('Certifikat',
+                      style:
+                          t.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
                   const SizedBox(height: 8),
                   if (_certs.isEmpty)
                     const Text('Inga certifikat publicerade ännu.')
                   else
                     ..._certs.map((c) => ListTile(
-                          leading: const Icon(Icons.verified_rounded, color: Colors.lightGreen),
+                          leading: const Icon(Icons.verified_rounded,
+                              color: Colors.lightGreen),
                           title: Text(c.title),
                           subtitle: Text([
                             if ((c.issuer ?? '').isNotEmpty) c.issuer,
@@ -130,9 +139,13 @@ class _TeacherProfilePageState extends State<TeacherProfilePage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Tjänster', style: t.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
+                  Text('Tjänster',
+                      style:
+                          t.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
                   const SizedBox(height: 8),
-                  if (_services.isEmpty) const Text('Inga tjänster ännu.') else ...[
+                  if (_services.isEmpty)
+                    const Text('Inga tjänster ännu.')
+                  else ...[
                     ..._services.map((s) => ListTile(
                           leading: const Icon(Icons.work_rounded),
                           title: Text(s['title'] as String? ?? 'Tjänst'),
@@ -140,8 +153,13 @@ class _TeacherProfilePageState extends State<TeacherProfilePage> {
                           trailing: ElevatedButton(
                             onPressed: _buying ? null : () => _buyService(s),
                             child: _buying
-                                ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                                : Text('Boka/köp ${(s['price_cents'] ?? 0) / 100} kr'),
+                                ? const SizedBox(
+                                    height: 18,
+                                    width: 18,
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2))
+                                : Text(
+                                    'Boka/köp ${(s['price_cents'] ?? 0) / 100} kr'),
                           ),
                         )),
                   ],
@@ -156,9 +174,13 @@ class _TeacherProfilePageState extends State<TeacherProfilePage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Meditationer', style: t.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
+                  Text('Meditationer',
+                      style:
+                          t.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
                   const SizedBox(height: 8),
-                  if (_meditations.isEmpty) const Text('Inga meditationer ännu.') else ...[
+                  if (_meditations.isEmpty)
+                    const Text('Inga meditationer ännu.')
+                  else ...[
                     ..._meditations.map((m) => _MeditationTile(
                           title: m['title'] as String? ?? 'Meditation',
                           description: m['description'] as String? ?? '',
@@ -181,7 +203,11 @@ class _MeditationTile extends StatefulWidget {
   final String description;
   final String url;
   final int durationSeconds;
-  const _MeditationTile({required this.title, required this.description, required this.url, required this.durationSeconds});
+  const _MeditationTile(
+      {required this.title,
+      required this.description,
+      required this.url,
+      required this.durationSeconds});
 
   @override
   State<_MeditationTile> createState() => _MeditationTileState();
@@ -219,15 +245,20 @@ class _MeditationTileState extends State<_MeditationTile> {
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context).textTheme;
-    final total = _dur.inMilliseconds > 0 ? _dur : Duration(seconds: widget.durationSeconds);
-    final progress = total.inMilliseconds > 0 ? _pos.inMilliseconds / total.inMilliseconds : 0.0;
+    final total = _dur.inMilliseconds > 0
+        ? _dur
+        : Duration(seconds: widget.durationSeconds);
+    final progress = total.inMilliseconds > 0
+        ? _pos.inMilliseconds / total.inMilliseconds
+        : 0.0;
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(widget.title, style: t.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+            Text(widget.title,
+                style: t.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
             if (widget.description.isNotEmpty) ...[
               const SizedBox(height: 4),
               Text(widget.description, style: t.bodySmall),
@@ -236,7 +267,9 @@ class _MeditationTileState extends State<_MeditationTile> {
             Row(
               children: [
                 IconButton(
-                  icon: Icon(_state == PlayerState.playing ? Icons.pause_rounded : Icons.play_arrow_rounded),
+                  icon: Icon(_state == PlayerState.playing
+                      ? Icons.pause_rounded
+                      : Icons.play_arrow_rounded),
                   onPressed: _toggle,
                 ),
                 Expanded(

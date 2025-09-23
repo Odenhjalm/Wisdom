@@ -25,8 +25,8 @@ class HeroBackground extends StatelessWidget {
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
               colors: [
-                Colors.black.withOpacity(0.20 * opacity),
-                Colors.black.withOpacity(0.45 * opacity),
+                Colors.black.withValues(alpha: 0.20 * opacity),
+                Colors.black.withValues(alpha: 0.45 * opacity),
               ],
             ),
           ),

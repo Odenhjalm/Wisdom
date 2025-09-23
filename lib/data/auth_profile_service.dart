@@ -1,5 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'package:andlig_app/core/supabase_ext.dart';
+
 final _sb = Supabase.instance.client;
 
 class AuthProfileService {
@@ -23,11 +25,25 @@ class AuthProfileService {
   }
 
   Future<void> _ensureProfile(User user) async {
-    // Använd RPC för att undvika schema-header-problem vid login
-    await _sb.schema('app').rpc('ensure_profile', params: {
-      'p_email': user.email,
-      'p_display_name': user.email?.split('@').first ?? 'Användare',
-    });
+    final displayName = user.email?.split('@').first ?? 'Användare';
+    final payload = {
+      'user_id': user.id,
+      'email': user.email,
+      'display_name': displayName,
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+    };
+
+    try {
+      await _sb.app
+          .from('profiles')
+          .upsert(payload, onConflict: 'user_id', ignoreDuplicates: false);
+    } on PostgrestException {
+      // Fallback till RPC om tabellåtkomst saknas i miljön
+      await _sb.schema('app').rpc('ensure_profile', params: {
+        'p_email': user.email,
+        'p_display_name': displayName,
+      });
+    }
   }
 
   Future<Map<String, dynamic>?> getMyProfile() async {
@@ -36,7 +52,9 @@ class AuthProfileService {
     final res = await _sb.schema('app').rpc('get_my_profile');
     if (res == null) return null;
     if (res is Map) return res.cast<String, dynamic>();
-    if (res is List && res.isNotEmpty) return Map<String, dynamic>.from(res.first as Map);
+    if (res is List && res.isNotEmpty) {
+      return Map<String, dynamic>.from(res.first as Map);
+    }
     return null;
   }
 

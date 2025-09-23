@@ -15,15 +15,16 @@ class ReviewsService {
         .toList();
   }
 
-  Future<void> add({required String serviceId, required int rating, String? comment}) async {
+  Future<void> add(
+      {required String serviceId, required int rating, String? comment}) async {
     final uid = _sb.auth.currentUser?.id;
     if (uid == null) throw Exception('Inte inloggad');
     await _sb.app.from('reviews').insert({
       'service_id': serviceId,
       'reviewer_id': uid,
       'rating': rating.clamp(1, 5),
-      if (comment != null && comment.trim().isNotEmpty) 'comment': comment.trim(),
+      if (comment != null && comment.trim().isNotEmpty)
+        'comment': comment.trim(),
     });
   }
 }
-

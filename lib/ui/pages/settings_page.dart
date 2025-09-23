@@ -9,41 +9,50 @@ class SettingsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Future<void> _export() async {
+    Future<void> exportData() async {
       final sb = Supabase.instance.client;
+      final messenger = ScaffoldMessenger.of(context);
       try {
         final res = await sb.rpc('app.export_user_data');
         final json = (res == null) ? '{}' : res.toString();
         await Clipboard.setData(ClipboardData(text: json));
-        // ignore: use_build_context_synchronously
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Data exporterad till urklipp')));
+        messenger.showSnackBar(
+            const SnackBar(content: Text('Data exporterad till urklipp')));
       } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Kunde inte exportera: $e')));
+        messenger
+            .showSnackBar(SnackBar(content: Text('Kunde inte exportera: $e')));
       }
     }
 
-    Future<void> _delete() async {
+    Future<void> deleteAccount() async {
       final sb = Supabase.instance.client;
       final u = sb.auth.currentUser;
       if (u == null) return;
+      final messenger = ScaffoldMessenger.of(context);
       final ok = await showDialog<bool>(
         context: context,
         builder: (_) => AlertDialog(
           title: const Text('Radera konto?'),
-          content: const Text('Detta raderar din appdata permanent (ej auth-konto). Är du säker?'),
+          content: const Text(
+              'Detta raderar din appdata permanent (ej auth-konto). Är du säker?'),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Avbryt')),
-            ElevatedButton(onPressed: () => Navigator.pop(context, true), child: const Text('Radera')),
+            TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Avbryt')),
+            ElevatedButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('Radera')),
           ],
         ),
       );
       if (ok != true) return;
       try {
         await sb.rpc('app.delete_user_data', params: {'p_user': u.id});
-        // ignore: use_build_context_synchronously
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Data raderad.')));
+        messenger.showSnackBar(
+            const SnackBar(content: Text('Data raderad.')));
       } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Kunde inte radera: $e')));
+        messenger
+            .showSnackBar(SnackBar(content: Text('Kunde inte radera: $e')));
       }
     }
 
@@ -61,12 +70,12 @@ class SettingsPage extends StatelessWidget {
               runSpacing: 12,
               children: [
                 ElevatedButton.icon(
-                  onPressed: _export,
+                  onPressed: exportData,
                   icon: const Icon(Icons.download_rounded),
                   label: const Text('Exportera min data'),
                 ),
                 OutlinedButton.icon(
-                  onPressed: _delete,
+                  onPressed: deleteAccount,
                   icon: const Icon(Icons.delete_forever_rounded),
                   label: const Text('Radera mitt konto (data)'),
                 ),
