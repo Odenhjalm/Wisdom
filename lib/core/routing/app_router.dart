@@ -5,36 +5,59 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../../data/supabase/supabase_client.dart';
-import '../../features/auth/forgot_password_page.dart';
-import '../../features/auth/login_page.dart';
-import '../../features/auth/new_password_page.dart';
-import '../../features/auth/signup_page.dart';
-import '../../screens/courses/course_intro.dart';
-import '../../screens/courses/quiz_take.dart';
-import '../../screens/home/home_shell.dart';
-import '../../screens/landing/landing_page.dart';
-import '../../screens/messages/chat_page.dart';
-import '../../screens/profile/profile_edit.dart';
-import '../../screens/subscribe/subscribe_screen.dart';
-import '../../screens/teacher/course_editor.dart';
-import '../../screens/teacher/teacher_home.dart';
-import '../../ui/pages/admin_page.dart';
-import '../../ui/pages/booking_page.dart';
-import '../../ui/pages/community_page.dart';
-import '../../ui/pages/course_intro_redirect_page.dart';
-import '../../ui/pages/course_page.dart';
-import '../../ui/pages/lesson_page.dart';
-import '../../ui/pages/messages_page.dart';
-import '../../ui/pages/profile_page.dart' as ui;
-import '../../ui/pages/profile_view_page.dart';
-import '../../ui/pages/service_detail_page.dart';
-import '../../ui/pages/settings_page.dart';
-import '../../ui/pages/studio_page.dart';
-import '../../ui/pages/tarot_page.dart';
-import '../../ui/pages/teacher_profile_page.dart';
-import '../../ui/pages/legal/privacy_page.dart';
-import '../../ui/pages/legal/terms_page.dart';
+import 'package:visdom/data/supabase/supabase_client.dart';
+import 'package:visdom/features/auth/presentation/auth_callback_page.dart';
+import 'package:visdom/features/auth/presentation/forgot_password_page.dart';
+import 'package:visdom/features/auth/presentation/login_page.dart';
+import 'package:visdom/features/auth/presentation/new_password_page.dart';
+import 'package:visdom/features/auth/presentation/settings_page.dart';
+import 'package:visdom/features/auth/presentation/signup_page.dart';
+import 'package:visdom/features/community/presentation/admin_page.dart';
+import 'package:visdom/features/community/presentation/community_page.dart';
+import 'package:visdom/features/community/presentation/home_shell.dart';
+import 'package:visdom/features/community/presentation/profile_edit_page.dart';
+import 'package:visdom/features/community/presentation/profile_page.dart'
+    as community_profile;
+import 'package:visdom/features/community/presentation/profile_view_page.dart';
+import 'package:visdom/features/community/presentation/service_detail_page.dart';
+import 'package:visdom/features/community/presentation/tarot_page.dart';
+import 'package:visdom/features/community/presentation/teacher_profile_page.dart';
+import 'package:visdom/features/courses/presentation/course_intro_page.dart';
+import 'package:visdom/features/courses/presentation/course_intro_redirect_page.dart';
+import 'package:visdom/features/courses/presentation/course_page.dart';
+import 'package:visdom/features/courses/presentation/lesson_page.dart';
+import 'package:visdom/features/courses/presentation/quiz_take_page.dart';
+import 'package:visdom/features/landing/presentation/landing_page.dart';
+import 'package:visdom/features/landing/presentation/legal/privacy_page.dart';
+import 'package:visdom/features/landing/presentation/legal/terms_page.dart';
+import 'package:visdom/features/messages/presentation/chat_page.dart';
+import 'package:visdom/features/messages/presentation/messages_page.dart';
+import 'package:visdom/features/payments/presentation/booking_page.dart';
+import 'package:visdom/features/payments/presentation/subscribe_screen.dart';
+import 'package:visdom/features/studio/presentation/course_editor_page.dart';
+import 'package:visdom/features/studio/presentation/studio_page.dart';
+import 'package:visdom/features/studio/presentation/teacher_home_page.dart';
+
+class AuthState {
+  const AuthState(this.session);
+
+  final Session? session;
+
+  bool get isAuthenticated => session != null;
+}
+
+final _authStateStreamProvider = StreamProvider<AuthState>((ref) async* {
+  final client = Supa.client.auth;
+  yield AuthState(client.currentSession);
+  yield* client.onAuthStateChange.map((event) => AuthState(event.session));
+});
+
+final sessionProvider = Provider<AuthState>((ref) {
+  return ref.watch(_authStateStreamProvider).maybeWhen(
+        data: (auth) => auth,
+        orElse: () => const AuthState(null),
+      );
+});
 
 class GoRouterRefreshStream extends ChangeNotifier {
   late final StreamSubscription<dynamic> _sub;
@@ -50,13 +73,37 @@ class GoRouterRefreshStream extends ChangeNotifier {
   }
 }
 
-final authStateChangesProvider = StreamProvider.autoDispose(
-  (ref) => Supa.client.auth.onAuthStateChange,
-);
+class AuthGuard {
+  const AuthGuard(this.publicPaths);
+
+  final Set<String> publicPaths;
+
+  String? redirect(AuthState authState, String path) {
+    if (!authState.isAuthenticated && !publicPaths.contains(path)) {
+      return '/login';
+    }
+
+    if (authState.isAuthenticated &&
+        (path == '/login' || path == '/signup' || path == '/landing')) {
+      return '/';
+    }
+
+    return null;
+  }
+}
+
+const _publicPaths = <String>{
+  '/login',
+  '/signup',
+  '/forgot-password',
+  '/new-password',
+  '/auth-callback',
+  '/landing',
+};
 
 final userRoleProvider = FutureProvider<String?>((ref) async {
-  ref.watch(authStateChangesProvider);
-  final user = Supa.client.auth.currentUser;
+  final authState = ref.watch(sessionProvider);
+  final user = authState.session?.user;
   if (user == null) return null;
 
   final res = await Supa.client.schema('app').rpc('get_my_profile');
@@ -124,34 +171,16 @@ final userRoleProvider = FutureProvider<String?>((ref) async {
 final appRouterProvider = Provider<GoRouter>((ref) {
   final role =
       ref.watch(userRoleProvider).maybeWhen(data: (r) => r, orElse: () => null);
+  final authState = ref.watch(sessionProvider);
+  const guard = AuthGuard(_publicPaths);
   final refreshListenable = GoRouterRefreshStream(
     Supa.client.auth.onAuthStateChange.map((event) => event.event),
   );
-  final router = GoRouter(
-    initialLocation: '/login',
+
+  return GoRouter(
+    initialLocation: '/landing',
     refreshListenable: refreshListenable,
-    redirect: (context, state) {
-      final session = Supa.client.auth.currentSession;
-      final loggedIn = session != null;
-      final path = state.uri.path;
-      const publicPaths = {
-        '/login',
-        '/signup',
-        '/forgot-password',
-        '/new-password',
-        '/landing',
-      };
-
-      if (!loggedIn && !publicPaths.contains(path)) {
-        return '/login';
-      }
-
-      if (loggedIn && (path == '/login' || path == '/signup')) {
-        return '/';
-      }
-
-      return null;
-    },
+    redirect: (context, state) => guard.redirect(authState, state.uri.path),
     routes: [
       GoRoute(
         path: '/login',
@@ -167,6 +196,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: '/forgot-password',
         name: 'forgot-password',
         builder: (context, state) => const ForgotPasswordPage(),
+      ),
+      GoRoute(
+        path: '/auth-callback',
+        name: 'auth-callback',
+        builder: (context, state) => AuthCallbackPage(state: state),
       ),
       GoRoute(
         path: '/new-password',
@@ -331,7 +365,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/profile',
         name: 'profile',
-        builder: (context, state) => const ui.ProfilePage(),
+        builder: (context, state) => const community_profile.ProfilePage(),
       ),
       GoRoute(
         path: '/settings',
@@ -354,43 +388,4 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       body: Center(child: Text('Sidan hittades inte: ${state.error}')),
     ),
   );
-
-  final sub = Supa.client.auth.onAuthStateChange.listen((data) {
-    if (data.event == AuthChangeEvent.passwordRecovery) {
-      router.go('/new-password');
-    }
-  });
-
-  ref.onDispose(sub.cancel);
-
-  // ---------------------------------------------------------------------------
-  // Deeplink/URL-scheme (BYT VID BEHOV)
-  // TODO: Säkerställ att redirectURL matchar din Supabase-konfiguration.
-  // Supabase Dashboard → Auth → URL Configuration:
-  //   Lägg till andligapp://auth-callback som tillåten redirect.
-  // Android (android/app/src/main/AndroidManifest.xml):
-  //   <intent-filter>
-  //     <action android:name="android.intent.action.VIEW" />
-  //     <category android:name="android.intent.category.DEFAULT" />
-  //     <category android:name="android.intent.category.BROWSABLE" />
-  //     <data android:scheme="andligapp" android:host="auth-callback" />
-  //   </intent-filter>
-  // iOS (ios/Runner/Info.plist):
-  //   <key>CFBundleURLTypes</key>
-  //   <array>
-  //     <dict>
-  //       <key>CFBundleURLSchemes</key>
-  //       <array>
-  //         <string>andligapp</string>
-  //       </array>
-  //       <key>CFBundleURLName</key>
-  //       <string>auth-callback</string>
-  //     </dict>
-  //   </array>
-  // Notera: På webben används SITE_URL (https), men i mobil används app-schemat.
-  // Counterpart: resetPasswordForEmail(..., redirectTo: 'andligapp://auth-callback')
-  //   måste matcha samma värde.
-  // ---------------------------------------------------------------------------
-
-  return router;
 });

@@ -1,17 +1,31 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
-import 'theme.dart';
+import 'package:visdom/core/env/env_state.dart';
+
+import 'shared/theme/light_theme.dart';
 import 'supabase_client.dart';
-import 'ui/background_layer.dart';
+import 'shared/widgets/background_layer.dart';
 import 'core/routing/app_router.dart';
-import 'core/theme/controls.dart';
+import 'shared/theme/controls.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // Ladda .env (innehåller SUPABASE_URL och SUPABASE_ANON_KEY)
-  await initSupabase();
-  runApp(const ProviderScope(child: VisdomApp()));
+  try {
+    await dotenv.load(fileName: '.env');
+  } catch (_) {
+    // Filen är valfri; saknas den så förlitar vi oss på --dart-define eller runtime vars.
+  }
+  final envInfo = await initSupabase();
+  runApp(
+    ProviderScope(
+      overrides: [
+        envInfoProvider.overrideWith((ref) => envInfo),
+      ],
+      child: const VisdomApp(),
+    ),
+  );
 }
 
 class VisdomApp extends ConsumerWidget {

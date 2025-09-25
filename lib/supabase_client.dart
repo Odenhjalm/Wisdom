@@ -5,13 +5,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
+import 'core/auth/oauth_redirect.dart';
+import 'core/env/env_state.dart';
+
 import 'gate.dart';
 
 bool _initialized = false;
 String? _authRedirect;
 bool _gateOpen = false;
+EnvInfo _envInfo = envInfoOk;
 
-const String kAppRedirect = 'andligapp://login-callback';
+const String kAppRedirect = 'visdom://auth-callback';
 
 const String _supabaseUrl =
     String.fromEnvironment('SUPABASE_URL', defaultValue: '');
@@ -24,8 +28,10 @@ const String _supabaseRedirectDefine =
 
 String? get supabaseRedirectUrl => _authRedirect;
 
-Future<void> initSupabase() async {
-  if (_initialized) return;
+EnvInfo get currentEnvInfo => _envInfo;
+
+Future<EnvInfo> initSupabase() async {
+  if (_initialized) return _envInfo;
 
   var url = _supabaseUrl.trim();
   var anon = _supabaseAnon.trim().isNotEmpty
@@ -46,9 +52,13 @@ Future<void> initSupabase() async {
     redirect = (dotenv.env['SUPABASE_AUTH_REDIRECT'] ?? redirect).trim();
   }
 
-  if (url.isEmpty || anon.isEmpty) {
-    throw StateError(
-        'Supabase credentials saknas. Ange SUPABASE_URL och SUPABASE_ANON_KEY.');
+  final missingKeys = <String>[];
+  if (url.isEmpty) missingKeys.add('SUPABASE_URL');
+  if (anon.isEmpty) missingKeys.add('SUPABASE_ANON_KEY');
+
+  if (missingKeys.isNotEmpty) {
+    _envInfo = EnvInfo(status: EnvStatus.missing, missingKeys: missingKeys);
+    return _envInfo;
   }
 
   final resolvedRedirect = _resolveRedirect(redirect);
@@ -67,6 +77,7 @@ Future<void> initSupabase() async {
 
   _authRedirect = resolvedRedirect;
   _initialized = true;
+  _envInfo = envInfoOk;
   final client = Supabase.instance.client;
   final existingSession = client.auth.currentSession;
   final initialUser = existingSession?.user.id ?? 'null';
@@ -85,7 +96,6 @@ Future<void> initSupabase() async {
         _openGate('signedIn', userId: userId);
         break;
       case AuthChangeEvent.signedOut:
-      case AuthChangeEvent.userDeleted:
         _closeGate(event.name);
         break;
       case AuthChangeEvent.tokenRefreshed:
@@ -93,20 +103,57 @@ Future<void> initSupabase() async {
         _logGateState();
         break;
       default:
-        _logGateState();
+        if (event.name == 'userDeleted') {
+          _closeGate(event.name);
+        } else {
+          _logGateState();
+        }
         break;
     }
   });
   debugPrint('Supabase init completed');
+
+  return _envInfo;
 }
 
 String _resolveRedirect(String redirect) {
-  if (redirect.isNotEmpty) return redirect;
+  if (redirect.isNotEmpty) {
+    return redirect;
+  }
+  final helper = _maybeOauthRedirect();
+  if (helper != null && helper.isNotEmpty) {
+    return helper;
+  }
+  return _fallbackRedirect();
+}
+
+String supabaseAuthRedirect({Uri? webUri}) {
+  final resolved = _authRedirect;
+  if (resolved != null && resolved.isNotEmpty) {
+    return resolved;
+  }
+  final helper = _maybeOauthRedirect();
+  if (helper != null && helper.isNotEmpty) {
+    return helper;
+  }
+  return _fallbackRedirect(webUri: webUri);
+}
+
+String _fallbackRedirect({Uri? webUri}) {
   if (kIsWeb) {
-    final origin = Uri.base.replace(queryParameters: const {}).origin;
-    return '$origin/auth/callback';
+    final base = (webUri ?? Uri.base);
+    final origin = base.origin;
+    return '$origin/auth-callback';
   }
   return kAppRedirect;
+}
+
+String? _maybeOauthRedirect() {
+  try {
+    return oauthRedirect();
+  } catch (_) {
+    return null;
+  }
 }
 
 final sessionStreamProvider = StreamProvider<Session?>((ref) async* {

@@ -16,6 +16,7 @@ android/app/build/
 # Env / nycklar
 .env
 .env.*
+android/key.properties
 *.pem
 *.key
 *.p8

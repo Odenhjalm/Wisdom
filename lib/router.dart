@@ -1,19 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import 'screens/landing/landing_page.dart';
-import 'screens/courses/course_intro.dart';
-import 'screens/courses/quiz_take.dart';
-import 'screens/home/home_shell.dart';
-import 'screens/teacher/course_editor.dart';
-import 'screens/teacher/teacher_home.dart';
-import 'screens/subscribe/subscribe_screen.dart';
-import 'screens/auth/login.dart';
-import 'screens/auth/signup.dart';
-import 'screens/profile/profile_edit.dart';
+import 'package:visdom/features/landing/presentation/landing_page.dart';
+import 'package:visdom/features/courses/presentation/course_intro_page.dart';
+import 'package:visdom/features/courses/presentation/quiz_take_page.dart';
+import 'package:visdom/features/community/presentation/home_shell.dart';
+import 'package:visdom/features/studio/presentation/course_editor_page.dart';
+import 'package:visdom/features/studio/presentation/teacher_home_page.dart';
+import 'package:visdom/features/payments/presentation/subscribe_screen.dart';
+import 'package:visdom/features/auth/presentation/login_page.dart';
+import 'package:visdom/features/auth/presentation/signup_page.dart';
+import 'package:visdom/features/community/presentation/profile_edit_page.dart';
 import 'gate.dart';
 import 'supabase_client.dart';
-import 'screens/messages/chat_page.dart';
+import 'package:visdom/features/messages/presentation/chat_page.dart';
 
 final GoRouter appRouter = GoRouter(
   initialLocation: '/',
@@ -29,7 +29,10 @@ final GoRouter appRouter = GoRouter(
     }
 
     if (loggedIn &&
-        (loc == '/login' || loc == '/signup' || loc == '/' || loc == '/landing')) {
+        (loc == '/login' ||
+            loc == '/signup' ||
+            loc == '/' ||
+            loc == '/landing')) {
       return '/home';
     }
 

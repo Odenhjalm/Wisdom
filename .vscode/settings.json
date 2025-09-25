@@ -1,0 +1,12 @@
+{
+    // VS Code's terminal will prefer the repo SDK
+    "terminal.integrated.env.linux": {
+        "PATH": "${workspaceFolder}/.flutter-sdk/bin:${env:PATH}"
+    },
+    // Point Dart/Flutter extension to the repo SDK (absolute path to avoid var expansion issues)
+    "dart.flutterSdkPath": "/home/oden/apps/Visdom/.flutter-sdk",
+    "dart.sdkPath": "/home/oden/apps/Visdom/.flutter-sdk/bin/cache/dart-sdk",
+    "editor.formatOnSave": true,
+    "dart.runPubGetOnPubspecChanges": true,
+    "problems.showCurrentInStatus": true
+}
