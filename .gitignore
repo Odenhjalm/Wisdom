@@ -33,3 +33,5 @@ android/key.properties
 .metadata
 *.iml
 EOF
+
+checklist_supabase.md
