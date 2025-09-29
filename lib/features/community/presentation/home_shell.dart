@@ -2,11 +2,21 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import 'package:visdom/shared/widgets/top_nav_action_buttons.dart';
-import 'package:visdom/shared/theme/ui_consts.dart';
-import 'package:visdom/shared/utils/snack.dart';
-import 'package:visdom/gate.dart';
-import 'package:visdom/supabase_client.dart';
+import 'package:wisdom/shared/widgets/top_nav_action_buttons.dart';
+import 'package:wisdom/shared/theme/ui_consts.dart';
+import 'package:wisdom/shared/utils/snack.dart';
+import 'package:wisdom/gate.dart';
+import 'package:wisdom/supabase_client.dart';
+import 'package:wisdom/shared/utils/context_safe.dart';
+
+const _wisdomBrandGradient = LinearGradient(
+  colors: [
+    Color(0xFF63C7D6),
+    Color(0xFF9B87EB),
+  ],
+  begin: Alignment.topLeft,
+  end: Alignment.bottomRight,
+);
 
 class HomeShell extends StatefulWidget {
   const HomeShell({super.key});
@@ -27,6 +37,12 @@ class _HomeShellState extends State<HomeShell> {
       const _TeachersTab(),
     ];
 
+    final sectionTitle = ['Kurser', 'Tjänster', 'Min profil', 'Lärare'][_index];
+    final mediaQuery = MediaQuery.of(context);
+    final devicePixelRatio = mediaQuery.devicePixelRatio;
+    const logoHeight = 128.0;
+    final logoCacheWidth = (logoHeight * devicePixelRatio).round();
+
     return Scaffold(
       backgroundColor: Colors.transparent,
       extendBodyBehindAppBar: true,
@@ -35,7 +51,49 @@ class _HomeShellState extends State<HomeShell> {
         backgroundColor: Colors.transparent,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
-        title: Text(['Kurser', 'Tjänster', 'Min profil', 'Lärare'][_index]),
+        toolbarHeight: 108,
+        leadingWidth: logoHeight + 60,
+        titleSpacing: 0,
+        leading: Padding(
+          padding: const EdgeInsets.only(left: 16),
+          child: Image.asset(
+            'assets/loggo_clea.png',
+            height: logoHeight,
+            fit: BoxFit.contain,
+            filterQuality: FilterQuality.high,
+            cacheWidth: logoCacheWidth,
+          ),
+        ),
+        title: Row(
+          children: [
+            ShaderMask(
+              shaderCallback: (bounds) =>
+                  _wisdomBrandGradient.createShader(bounds),
+              blendMode: BlendMode.srcIn,
+              child: Text(
+                'Wisdom',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: .2,
+                    ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Container(
+              width: 1,
+              height: 18,
+              color: Colors.white.withOpacity(0.25),
+            ),
+            const SizedBox(width: 12),
+            Text(
+              sectionTitle,
+              style: Theme.of(context)
+                  .textTheme
+                  .titleMedium
+                  ?.copyWith(color: Colors.white, fontWeight: FontWeight.w600),
+            ),
+          ],
+        ),
         actions: const [TopNavActionButtons()],
       ),
       body: SafeArea(
@@ -147,19 +205,20 @@ class _ProfileTab extends ConsumerWidget {
                     decoration: const InputDecoration(labelText: 'E-post'),
                   ),
                   gap12,
-          FilledButton(
-            onPressed: () async {
-              final email = emailCtrl.text.trim();
-              if (email.isEmpty) return;
-              await sb.auth.signInWithOtp(email: email);
-              if (!context.mounted) return;
-              showSnack(
-                context,
-                'Magisk länk skickad (kontrollera din e-post).',
-              );
-            },
-            child: const Text('Skicka magisk länk'),
-          ),
+                  FilledButton(
+                    onPressed: () async {
+                      final email = emailCtrl.text.trim();
+                      if (email.isEmpty) return;
+                      await sb.auth.signInWithOtp(email: email);
+                      context.ifMounted(
+                        (c) => showSnack(
+                          c,
+                          'Magisk länk skickad (kontrollera din e-post).',
+                        ),
+                      );
+                    },
+                    child: const Text('Skicka magisk länk'),
+                  ),
                 ],
               ),
             ),
@@ -185,14 +244,15 @@ class _ProfileTab extends ConsumerWidget {
                 gap6,
                 Text(user.email ?? user.id),
                 gap12,
-              FilledButton.icon(
-                onPressed: () async {
-                  await sb.auth.signOut();
-                  gate.reset();
-                  if (!context.mounted) return;
-                  showSnack(context, 'Utloggad');
-                  context.go('/landing');
-                },
+                FilledButton.icon(
+                  onPressed: () async {
+                    await sb.auth.signOut();
+                    gate.reset();
+                    context.ifMounted((c) {
+                      showSnack(c, 'Utloggad');
+                      c.go('/landing');
+                    });
+                  },
                   icon: const Icon(Icons.logout),
                   label: const Text('Logga ut'),
                 ),

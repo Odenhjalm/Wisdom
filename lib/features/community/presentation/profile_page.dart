@@ -3,12 +3,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import 'package:visdom/core/errors/app_failure.dart';
-import 'package:visdom/core/supabase_ext.dart';
-import 'package:visdom/features/community/application/community_providers.dart';
-import 'package:visdom/gate.dart';
-import 'package:visdom/shared/utils/snack.dart';
-import 'package:visdom/shared/widgets/app_scaffold.dart';
+import 'package:wisdom/core/errors/app_failure.dart';
+import 'package:wisdom/core/supabase_ext.dart';
+import 'package:wisdom/features/community/application/community_providers.dart';
+import 'package:wisdom/gate.dart';
+import 'package:wisdom/shared/utils/snack.dart';
+import 'package:wisdom/shared/widgets/app_scaffold.dart';
+import 'package:wisdom/shared/utils/context_safe.dart';
 
 class ProfilePage extends ConsumerStatefulWidget {
   const ProfilePage({super.key});
@@ -63,7 +64,9 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
               Card(
                 child: ListTile(
                   leading: const Icon(Icons.person),
-                  title: Text(profile['display_name'] as String? ?? user.email ?? user.id),
+                  title: Text(profile['display_name'] as String? ??
+                      user.email ??
+                      user.id),
                   subtitle: Text(profile['bio'] as String? ?? ''),
                   trailing: FilledButton(
                     onPressed: _signOut,
@@ -76,7 +79,8 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                 child: ListTile(
                   leading: const Icon(Icons.workspace_premium_rounded),
                   title: const Text('Ansök som lärare'),
-                  subtitle: const Text('Publicera ceremonier, sessioner och läsningar.'),
+                  subtitle: const Text(
+                      'Publicera ceremonier, sessioner och läsningar.'),
                   trailing: OutlinedButton(
                     onPressed: _applyAsTeacher,
                     child: const Text('Ansök'),
@@ -110,7 +114,8 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                                 ?.copyWith(fontWeight: FontWeight.w800)),
                         const SizedBox(height: 8),
                         if (certs.isEmpty)
-                          const Text('Du har inte publicerat några certifikat ännu.')
+                          const Text(
+                              'Du har inte publicerat några certifikat ännu.')
                         else
                           ...certs.map(
                             (c) => ListTile(
@@ -157,15 +162,20 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     final u = client.auth.currentUser;
     if (u == null) return;
     try {
-      await client.app.from('teacher_requests').upsert({
-        'user_id': u.id,
-        'message': 'Ansökan efter certifikat(er) från profil',
-      });
-      if (!context.mounted) return;
-      showSnack(context, 'Ansökan inskickad. Tack!');
+      await client.app.from('certificates').upsert(
+        {
+          'user_id': u.id,
+          'title': 'Läraransökan',
+          'status': 'pending',
+          'notes': 'Ansökan efter certifikat(er) från profil',
+        },
+        onConflict: 'user_id,title',
+      );
+      context.ifMounted((c) => showSnack(c, 'Ansökan inskickad. Tack!'));
     } catch (error) {
-      if (!context.mounted) return;
-      showSnack(context, 'Kunde inte skicka: ${_friendlyError(error)}');
+      context.ifMounted(
+        (c) => showSnack(c, 'Kunde inte skicka: ${_friendlyError(error)}'),
+      );
     }
   }
 
@@ -178,11 +188,14 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
       final repo = ref.read(authProfileRepositoryProvider);
       await repo.signInOrSignUp(email: email, password: pw);
       ref.invalidate(myProfileProvider);
-      if (!context.mounted) return;
-      context.go('/home');
+      context.ifMounted((c) => c.go('/home'));
     } catch (error) {
-      if (!context.mounted) return;
-      showSnack(context, 'Inloggning misslyckades: ${_friendlyError(error)}');
+      context.ifMounted(
+        (c) => showSnack(
+          c,
+          'Inloggning misslyckades: ${_friendlyError(error)}',
+        ),
+      );
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -193,9 +206,10 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     await repo.signOut();
     gate.reset();
     ref.invalidate(myProfileProvider);
-    if (!context.mounted) return;
-    showSnack(context, 'Utloggad');
-    context.go('/landing');
+    context.ifMounted((c) {
+      showSnack(c, 'Utloggad');
+      c.go('/landing');
+    });
   }
 
   String _friendlyError(Object error) {
@@ -236,8 +250,7 @@ class _LoginCard extends StatelessWidget {
                 children: [
                   Text(
                     'Logga in eller skapa konto',
-                    style:
-                        t.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+                    style: t.titleLarge?.copyWith(fontWeight: FontWeight.w800),
                   ),
                   const SizedBox(height: 12),
                   TextField(
@@ -355,11 +368,11 @@ class _AddCertificateDialogState extends State<_AddCertificateDialog> {
                       if (_issuedAt != null)
                         'issued_at': _issuedAt!.toIso8601String(),
                     });
-                    if (!context.mounted) return;
-                    Navigator.of(context).pop(true);
+                    context.ifMounted((c) => Navigator.of(c).pop(true));
                   } catch (_) {
-                    if (!context.mounted) return;
-                    showSnack(context, 'Kunde inte spara certifikat.');
+                    context.ifMounted(
+                      (c) => showSnack(c, 'Kunde inte spara certifikat.'),
+                    );
                   } finally {
                     if (mounted) setState(() => _saving = false);
                   }

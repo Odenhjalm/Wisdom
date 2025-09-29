@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:visdom/shared/theme/typography.dart';
+import 'package:wisdom/shared/theme/typography.dart';
 
 class AppThemeData {
   final ThemeData light;
@@ -8,8 +8,11 @@ class AppThemeData {
   AppThemeData(this.light, this.dark);
 }
 
-ColorScheme _scheme(Brightness b) =>
-    ColorScheme.fromSeed(seedColor: const Color(0xFF6B62FF), brightness: b);
+ColorScheme _scheme(Brightness b) => ColorScheme.fromSeed(
+      seedColor: const Color(0xFF9B8CFF),
+      secondary: const Color(0xFF4FC3F7),
+      brightness: b,
+    );
 
 final appThemeProvider = Provider<AppThemeData>((ref) {
   final textLight = AppTypography.textTheme(brightness: Brightness.light);

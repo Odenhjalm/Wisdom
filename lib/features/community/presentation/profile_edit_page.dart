@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import 'package:visdom/shared/widgets/top_nav_action_buttons.dart';
-import 'package:visdom/supabase_client.dart';
-import 'package:visdom/shared/widgets/go_router_back_button.dart';
-import 'package:visdom/shared/utils/snack.dart';
+import 'package:wisdom/shared/widgets/top_nav_action_buttons.dart';
+import 'package:wisdom/supabase_client.dart';
+import 'package:wisdom/shared/widgets/go_router_back_button.dart';
+import 'package:wisdom/shared/utils/snack.dart';
 
 class ProfileEditScreen extends ConsumerStatefulWidget {
   const ProfileEditScreen({super.key});

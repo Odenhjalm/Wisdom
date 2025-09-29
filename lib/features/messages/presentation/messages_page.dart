@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:visdom/data/supabase/supabase_client.dart';
-import 'package:visdom/features/community/data/messages_repository.dart';
-import 'package:visdom/shared/utils/snack.dart';
-import 'package:visdom/shared/widgets/app_scaffold.dart';
+import 'package:wisdom/shared/utils/context_safe.dart';
+import 'package:wisdom/data/supabase/supabase_client.dart';
+import 'package:wisdom/features/community/data/messages_repository.dart';
+import 'package:wisdom/shared/utils/snack.dart';
+import 'package:wisdom/shared/widgets/app_scaffold.dart';
 
 class MessagesPage extends StatefulWidget {
   final String kind; // 'dm' eller 'service'
@@ -71,7 +72,7 @@ class _MessagesPageState extends State<MessagesPage> {
       _input.clear();
       await _load();
     } catch (e) {
-      showSnack(context, 'Kunde inte skicka: $e');
+      context.ifMounted((c) => showSnack(c, 'Kunde inte skicka: $e'));
     } finally {
       if (mounted) setState(() => _sending = false);
     }

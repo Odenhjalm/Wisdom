@@ -2,15 +2,15 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:visdom/core/errors/app_failure.dart';
-import 'package:visdom/core/supabase_ext.dart';
-import 'package:visdom/features/auth/data/auth_profile_repository.dart';
-import 'package:visdom/features/community/data/community_repository.dart';
-import 'package:visdom/features/community/data/posts_repository.dart';
-import 'package:visdom/features/studio/data/certificates_repository.dart';
-import 'package:visdom/data/models/certificate.dart';
-import 'package:visdom/supabase_client.dart';
-import 'package:visdom/features/community/data/meditations_repository.dart';
+import 'package:wisdom/core/errors/app_failure.dart';
+import 'package:wisdom/core/supabase_ext.dart';
+import 'package:wisdom/features/auth/data/auth_profile_repository.dart';
+import 'package:wisdom/features/community/data/community_repository.dart';
+import 'package:wisdom/features/community/data/posts_repository.dart';
+import 'package:wisdom/features/studio/data/certificates_repository.dart';
+import 'package:wisdom/data/models/certificate.dart';
+import 'package:wisdom/supabase_client.dart';
+import 'package:wisdom/features/community/data/meditations_repository.dart';
 
 final communityRepositoryProvider = Provider<CommunityRepository>((ref) {
   final client = ref.watch(supabaseMaybeProvider);
@@ -149,7 +149,7 @@ final adminDashboardProvider = AutoDisposeFutureProvider<AdminDashboardState>((r
     } else if (profileRes is List && profileRes.isNotEmpty) {
       profile = (profileRes.first as Map).cast<String, dynamic>();
     }
-    final isAdmin = profile?['role'] == 'admin';
+    final isAdmin = profile?['is_admin'] == true || profile?['role'] == 'admin';
     if (!isAdmin) {
       return const AdminDashboardState(
         isAdmin: false,
@@ -158,17 +158,40 @@ final adminDashboardProvider = AutoDisposeFutureProvider<AdminDashboardState>((r
       );
     }
     final requestsRes = await client.app
-        .from('teacher_requests')
-        .select('user_id, message, status, created_at')
+        .from('certificates')
+        .select('user_id, title, status, notes, created_at, updated_at')
+        .eq('title', 'Läraransökan')
         .order('created_at', ascending: false);
+    final approvalsRes = await client.app
+        .from('teacher_approvals')
+        .select('user_id, approved_by, approved_at');
     final certRes = await client.app
         .from('certificates')
-        .select('id, user_id, title, issuer, issued_at, verified')
+        .select('id, user_id, title, status, notes, created_at, updated_at')
         .order('created_at', ascending: false)
         .limit(200);
+
+    final approvalsByUser = <String, Map<String, dynamic>>{};
+    for (final row in (approvalsRes as List? ?? [])) {
+      final map = Map<String, dynamic>.from(row as Map);
+      final userId = map['user_id'] as String?;
+      if (userId != null) {
+        approvalsByUser[userId] = map;
+      }
+    }
+
     final requests = (requestsRes as List? ?? [])
         .map((e) => Map<String, dynamic>.from(e as Map))
+        .map((req) {
+          final userId = req['user_id'] as String?;
+          final approval = userId != null ? approvalsByUser[userId] : null;
+          return {
+            ...req,
+            if (approval != null) 'approval': approval,
+          };
+        })
         .toList();
+
     final certs = (certRes as List? ?? [])
         .map((e) => Map<String, dynamic>.from(e as Map))
         .toList();
@@ -206,7 +229,7 @@ final profileViewProvider = AutoDisposeFutureProvider.family<ProfileViewState, S
       final profRes = await client
           .schema('app')
           .from('profiles')
-          .select('user_id, display_name, photo_url, bio, role')
+          .select('user_id, display_name, photo_url, bio, role, role_v2, is_admin')
           .eq('user_id', userId)
           .maybeSingle();
       final profile = (profRes as Map?)?.cast<String, dynamic>();

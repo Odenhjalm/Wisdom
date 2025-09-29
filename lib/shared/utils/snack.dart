@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'package:visdom/shared/utils/context_safe.dart';
+import 'package:wisdom/shared/utils/context_safe.dart';
 
 void showSnack(
   BuildContext context,

@@ -4,13 +4,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher_string.dart';
 
-import 'package:visdom/core/errors/app_failure.dart';
-import 'package:visdom/data/models/certificate.dart';
-import 'package:visdom/data/supabase/supabase_client.dart';
-import 'package:visdom/domain/services/payments/payments_service.dart';
-import 'package:visdom/features/community/application/community_providers.dart';
-import 'package:visdom/shared/utils/snack.dart';
-import 'package:visdom/shared/widgets/app_scaffold.dart';
+import 'package:wisdom/core/errors/app_failure.dart';
+import 'package:wisdom/data/models/certificate.dart';
+import 'package:wisdom/data/supabase/supabase_client.dart';
+import 'package:wisdom/domain/services/payments/payments_service.dart';
+import 'package:wisdom/features/community/application/community_providers.dart';
+import 'package:wisdom/shared/utils/snack.dart';
+import 'package:wisdom/shared/widgets/app_scaffold.dart';
 
 class TeacherProfilePage extends ConsumerStatefulWidget {
   const TeacherProfilePage({super.key, required this.userId});

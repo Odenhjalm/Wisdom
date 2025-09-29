@@ -1,4 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:wisdom/data/models/profile.dart';
 
 class AuthService {
   AuthService({SupabaseClient? client})
@@ -57,17 +58,17 @@ class AuthService {
     }
 
     try {
-      final profile = await _client
+      final profileMap = await _client
           .schema('app')
           .from('profiles')
-          .select('role')
+          .select('user_id, role, role_v2, is_admin')
           .eq('user_id', user.id)
           .maybeSingle();
-      final role = profile is Map<String, dynamic> && profile['role'] is String
-          ? profile['role'] as String
-          : null;
-      if (role == 'teacher' || role == 'admin') {
-        return true;
+      if (profileMap is Map<String, dynamic>) {
+        final profile = Profile.fromJson(profileMap);
+        if (profile.isAdmin || profile.isTeacher) {
+          return true;
+        }
       }
     } on PostgrestException {
       // ignore

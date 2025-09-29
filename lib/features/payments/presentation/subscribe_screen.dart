@@ -2,12 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import 'package:visdom/shared/theme/ui_consts.dart';
-import 'package:visdom/shared/utils/context_safe.dart';
-import 'package:visdom/shared/utils/snack.dart';
-import 'package:visdom/features/payments/application/payments_providers.dart';
-import 'package:visdom/supabase_client.dart';
-import 'package:visdom/shared/widgets/go_router_back_button.dart';
+import 'package:wisdom/shared/theme/ui_consts.dart';
+import 'package:wisdom/shared/utils/context_safe.dart';
+import 'package:wisdom/shared/utils/snack.dart';
+import 'package:wisdom/features/payments/application/payments_providers.dart';
+import 'package:wisdom/supabase_client.dart';
+import 'package:wisdom/shared/widgets/go_router_back_button.dart';
 
 class SubscribeScreen extends ConsumerStatefulWidget {
   const SubscribeScreen({super.key});
@@ -76,8 +76,7 @@ class _SubscribeScreenState extends ConsumerState<SubscribeScreen> {
     if (user == null) {
       final redirect = Uri.encodeComponent(
           '/subscribe?plan=$plan&code=${_codeCtrl.text.trim()}');
-      if (!context.mounted) return;
-      context.push('/login?redirect=$redirect');
+      context.ifMounted((c) => c.push('/login?redirect=$redirect'));
       return;
     }
     setState(() {
@@ -90,8 +89,7 @@ class _SubscribeScreenState extends ConsumerState<SubscribeScreen> {
         'p_code': _codeCtrl.text.trim(),
       });
       if (res is Map && (res['ok'] == true)) {
-        if (!context.mounted) return;
-        context.go('/home');
+        context.ifMounted((c) => c.go('/home'));
       } else {
         setState(() => _error = 'Kunde inte aktivera.');
       }

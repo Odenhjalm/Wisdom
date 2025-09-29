@@ -1,5 +1,5 @@
-import 'package:visdom/data/supabase/supabase_client.dart';
-import 'package:visdom/data/models/profile.dart';
+import 'package:wisdom/data/supabase/supabase_client.dart';
+import 'package:wisdom/data/models/profile.dart';
 
 class ProfileRepository {
   Future<Profile?> getMe() async {

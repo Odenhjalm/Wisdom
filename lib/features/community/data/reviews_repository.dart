@@ -1,5 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:visdom/core/supabase_ext.dart';
+import 'package:wisdom/core/supabase_ext.dart';
 
 class ReviewsRepository {
   final _sb = Supabase.instance.client;

@@ -39,7 +39,7 @@ begin
         select 1
         from app.profiles p
         where p.user_id = auth.uid()
-          and p.role = 'admin'
+          and coalesce(p.is_admin, false) = true
       ) then
         perform set_config('row_security', v_old_rowsec, true);
         return true;
@@ -93,7 +93,7 @@ begin
         select 1
         from app.profiles p
         where p.user_id = auth.uid()
-          and p.role in ('teacher', 'admin')
+          and (p.role_v2 = 'teacher' or coalesce(p.is_admin, false) = true)
       ) then
         perform set_config('row_security', v_old_rowsec, true);
         return true;
@@ -119,7 +119,7 @@ set search_path = app, public
 as $$
 declare
   v_claim text;
-  v_profile_role app.role_type;
+  v_profile_role text;
   v_old_rowsec text;
 begin
   v_claim := auth.jwt() -> 'app_metadata' ->> 'role';
@@ -138,7 +138,7 @@ begin
     v_old_rowsec := coalesce(current_setting('row_security', true), 'on');
     perform set_config('row_security', 'off', true);
     begin
-      select p.role into v_profile_role
+      select p.role_v2::text into v_profile_role
       from app.profiles p
       where p.user_id = auth.uid();
     exception
@@ -148,7 +148,11 @@ begin
     end;
     perform set_config('row_security', v_old_rowsec, true);
     if v_profile_role is not null then
-      return v_profile_role;
+      if v_profile_role = 'teacher' then
+        return 'teacher';
+      else
+        return 'user';
+      end if;
     end if;
   end if;
 

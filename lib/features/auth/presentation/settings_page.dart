@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
-import 'package:visdom/shared/utils/snack.dart';
-import 'package:visdom/shared/widgets/app_scaffold.dart';
+import 'package:wisdom/shared/utils/snack.dart';
+import 'package:wisdom/shared/widgets/app_scaffold.dart';
+import 'package:wisdom/shared/utils/context_safe.dart';
 
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
@@ -16,9 +17,11 @@ class SettingsPage extends StatelessWidget {
         final res = await sb.rpc('app.export_user_data');
         final json = (res == null) ? '{}' : res.toString();
         await Clipboard.setData(ClipboardData(text: json));
-        showSnack(context, 'Data exporterad till urklipp');
+        context.ifMounted(
+          (c) => showSnack(c, 'Data exporterad till urklipp'),
+        );
       } catch (e) {
-        showSnack(context, 'Kunde inte exportera: $e');
+        context.ifMounted((c) => showSnack(c, 'Kunde inte exportera: $e'));
       }
     }
 
@@ -45,9 +48,11 @@ class SettingsPage extends StatelessWidget {
       if (ok != true) return;
       try {
         await sb.rpc('app.delete_user_data', params: {'p_user': u.id});
-        showSnack(context, 'Data raderad.');
+        context.ifMounted((c) => showSnack(c, 'Data raderad.'));
       } catch (e) {
-        showSnack(context, 'Kunde inte radera: $e');
+        context.ifMounted(
+          (c) => showSnack(c, 'Kunde inte radera: $e'),
+        );
       }
     }
 

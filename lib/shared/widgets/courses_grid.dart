@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import 'package:visdom/features/courses/data/courses_repository.dart';
+import 'package:wisdom/features/courses/data/courses_repository.dart';
 
 class CoursesGrid extends StatelessWidget {
   final List<CourseSummary> courses;

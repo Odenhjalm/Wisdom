@@ -2,10 +2,10 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:visdom/core/errors/app_failure.dart';
-import 'package:visdom/features/courses/data/courses_repository.dart';
-import 'package:visdom/features/courses/data/progress_repository.dart';
-import 'package:visdom/supabase_client.dart';
+import 'package:wisdom/core/errors/app_failure.dart';
+import 'package:wisdom/features/courses/data/courses_repository.dart';
+import 'package:wisdom/features/courses/data/progress_repository.dart';
+import 'package:wisdom/supabase_client.dart';
 
 final coursesRepositoryProvider = Provider<CoursesRepository>((ref) {
   final client = ref.watch(supabaseMaybeProvider);

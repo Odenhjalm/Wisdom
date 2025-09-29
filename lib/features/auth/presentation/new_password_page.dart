@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:visdom/shared/utils/context_safe.dart';
-import 'package:visdom/shared/utils/snack.dart';
+import 'package:wisdom/shared/utils/context_safe.dart';
+import 'package:wisdom/shared/utils/snack.dart';
 
 class NewPasswordPage extends StatefulWidget {
   const NewPasswordPage({super.key});
@@ -119,16 +119,17 @@ class _NewPasswordPageState extends State<NewPasswordPage> {
       );
       // Tips: vid behov kan du förnya sessionen
       // await Supabase.instance.client.auth.refreshSession();
-      if (!mounted) return;
-      showSnack(context, 'Lösenord uppdaterat.');
-      context.ifMounted((c) => c.go('/'));
+      context.ifMounted((c) {
+        showSnack(c, 'Lösenord uppdaterat.');
+        c.go('/');
+      });
       // context.go('/login'); // Använd denna rad om du vill skicka tillbaka till login.
     } on AuthException catch (e) {
-      if (!mounted) return;
-      _showError(context, e.message);
+      context.ifMounted((c) => _showError(c, e.message));
     } catch (e) {
-      if (!mounted) return;
-      _showError(context, 'Något gick fel. Försök igen.');
+      context.ifMounted(
+        (c) => _showError(c, 'Något gick fel. Försök igen.'),
+      );
     } finally {
       if (mounted) setState(() => _busy = false);
     }

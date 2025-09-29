@@ -2,11 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import 'package:visdom/core/auth/oauth_redirect.dart';
-import 'package:visdom/shared/theme/ui_consts.dart';
-import 'package:visdom/shared/utils/snack.dart';
+import 'package:wisdom/core/auth/oauth_redirect.dart';
+import 'package:wisdom/shared/theme/ui_consts.dart';
+import 'package:wisdom/shared/utils/snack.dart';
 
-import 'package:visdom/gate.dart';
+import 'package:wisdom/gate.dart';
+import 'package:wisdom/shared/utils/context_safe.dart';
 
 class SignupPage extends StatefulWidget {
   const SignupPage({super.key});
@@ -141,20 +142,24 @@ class _SignupPageState extends State<SignupPage> {
       );
       if (response.session != null) {
         gate.allow();
-        if (!context.mounted) return;
-        showSnack(context, 'Konto skapat. Inloggad som $email');
-        context.go('/');
+        context.ifMounted((c) {
+          showSnack(c, 'Konto skapat. Inloggad som $email');
+          c.go('/');
+        });
       } else {
-        if (!context.mounted) return;
-        showSnack(
-            context, 'Vi har skickat en bekräftelselänk till din e-post.');
+        context.ifMounted(
+          (c) => showSnack(
+            c,
+            'Vi har skickat en bekräftelselänk till din e-post.',
+          ),
+        );
       }
     } on AuthException catch (e) {
-      if (!context.mounted) return;
-      showSnack(context, e.message);
+      context.ifMounted((c) => showSnack(c, e.message));
     } catch (e) {
-      if (!context.mounted) return;
-      showSnack(context, 'Något gick fel. Försök igen.');
+      context.ifMounted(
+        (c) => showSnack(c, 'Något gick fel. Försök igen.'),
+      );
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -174,14 +179,13 @@ class _SignupPageState extends State<SignupPage> {
         email: email,
         emailRedirectTo: redirectTo,
       );
-      if (!context.mounted) return;
-      showSnack(context, 'Magisk länk skickad.');
+      context.ifMounted((c) => showSnack(c, 'Magisk länk skickad.'));
     } on AuthException catch (e) {
-      if (!context.mounted) return;
-      showSnack(context, e.message);
+      context.ifMounted((c) => showSnack(c, e.message));
     } catch (e) {
-      if (!context.mounted) return;
-      showSnack(context, 'Något gick fel. Försök igen.');
+      context.ifMounted(
+        (c) => showSnack(c, 'Något gick fel. Försök igen.'),
+      );
     } finally {
       if (mounted) setState(() => _busy = false);
     }

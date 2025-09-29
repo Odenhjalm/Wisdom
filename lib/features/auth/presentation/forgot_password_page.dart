@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import 'package:visdom/core/auth/oauth_redirect.dart';
-import 'package:visdom/shared/theme/ui_consts.dart';
-import 'package:visdom/shared/utils/snack.dart';
+import 'package:wisdom/core/auth/oauth_redirect.dart';
+import 'package:wisdom/shared/theme/ui_consts.dart';
+import 'package:wisdom/shared/utils/snack.dart';
+import 'package:wisdom/shared/widgets/gradient_text.dart';
+import 'package:wisdom/shared/utils/context_safe.dart';
 
 class ForgotPasswordPage extends StatefulWidget {
   const ForgotPasswordPage({super.key});
@@ -26,6 +28,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
 
   @override
   Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
     return Scaffold(
       body: SafeArea(
         child: Center(
@@ -84,7 +87,10 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                           TextButton(
                             onPressed:
                                 _busy ? null : () => context.go('/login'),
-                            child: const Text('Tillbaka till logga in'),
+                            child: GradientText(
+                              'Tillbaka till logga in',
+                              style: textTheme.bodyMedium ?? const TextStyle(),
+                            ),
                           ),
                         ],
                       ),
@@ -112,15 +118,16 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
         email,
         redirectTo: redirectTo,
       );
-      if (!context.mounted) return;
-      showSnack(context, 'Om adressen finns skickas en länk nu.');
-      context.go('/login');
+      context.ifMounted((c) {
+        showSnack(c, 'Om adressen finns skickas en länk nu.');
+        c.go('/login');
+      });
     } on AuthException catch (e) {
-      if (!context.mounted) return;
-      showSnack(context, e.message);
+      context.ifMounted((c) => showSnack(c, e.message));
     } catch (e) {
-      if (!context.mounted) return;
-      showSnack(context, 'Något gick fel. Försök igen.');
+      context.ifMounted(
+        (c) => showSnack(c, 'Något gick fel. Försök igen.'),
+      );
     } finally {
       if (mounted) setState(() => _busy = false);
     }

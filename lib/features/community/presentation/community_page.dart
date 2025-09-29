@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import 'package:visdom/core/errors/app_failure.dart';
-import 'package:visdom/features/community/application/community_providers.dart';
-import 'package:visdom/shared/widgets/app_scaffold.dart';
+import 'package:wisdom/core/errors/app_failure.dart';
+import 'package:wisdom/features/community/application/community_providers.dart';
+import 'package:wisdom/shared/widgets/app_scaffold.dart';
 
 class CommunityPage extends ConsumerStatefulWidget {
   const CommunityPage({super.key});

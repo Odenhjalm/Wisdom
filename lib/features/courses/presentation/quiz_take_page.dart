@@ -4,14 +4,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import 'package:visdom/core/errors/app_failure.dart';
-import 'package:visdom/features/courses/application/course_providers.dart';
-import 'package:visdom/features/courses/data/courses_repository.dart';
-import 'package:visdom/shared/theme/ui_consts.dart';
-import 'package:visdom/shared/utils/context_safe.dart';
-import 'package:visdom/shared/utils/snack.dart';
-import 'package:visdom/supabase_client.dart';
-import 'package:visdom/shared/widgets/go_router_back_button.dart';
+import 'package:wisdom/core/errors/app_failure.dart';
+import 'package:wisdom/features/courses/application/course_providers.dart';
+import 'package:wisdom/features/courses/data/courses_repository.dart';
+import 'package:wisdom/shared/theme/ui_consts.dart';
+import 'package:wisdom/shared/utils/context_safe.dart';
+import 'package:wisdom/shared/utils/snack.dart';
+import 'package:wisdom/supabase_client.dart';
+import 'package:wisdom/shared/widgets/go_router_back_button.dart';
 
 class QuizTakePage extends ConsumerStatefulWidget {
   const QuizTakePage({super.key});
@@ -42,12 +42,15 @@ class _QuizTakePageState extends ConsumerState<QuizTakePage> {
             final message = passed
                 ? 'Godkänt! Ditt certifikat är utfärdat.'
                 : 'Resultat sparat. Fortsätt öva!';
-            if (!context.mounted) return;
-            showSnack(context, message);
+            context.ifMounted((c) => showSnack(c, message));
           },
           error: (error, _) {
-            if (!context.mounted) return;
-            showSnack(context, 'Kunde inte lämna in: ${_friendlyError(error)}');
+            context.ifMounted(
+              (c) => showSnack(
+                c,
+                'Kunde inte lämna in: ${_friendlyError(error)}',
+              ),
+            );
           },
           loading: () {},
         );
@@ -125,8 +128,9 @@ class _QuizTakePageState extends ConsumerState<QuizTakePage> {
     }
     if (sb.auth.currentUser == null) {
       final redirect = '/course-quiz?quizId=$_quizId';
-      if (!context.mounted) return;
-      context.go('/login?redirect=${Uri.encodeComponent(redirect)}');
+      context.ifMounted(
+        (c) => c.go('/login?redirect=${Uri.encodeComponent(redirect)}'),
+      );
       return;
     }
     await ref.read(quizSubmissionProvider(_quizId).notifier).submit(_answers);

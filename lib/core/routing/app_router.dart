@@ -4,39 +4,41 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:wisdom/data/models/profile.dart';
+import 'package:wisdom/data/repositories/profile_repository.dart';
 
-import 'package:visdom/data/supabase/supabase_client.dart';
-import 'package:visdom/features/auth/presentation/auth_callback_page.dart';
-import 'package:visdom/features/auth/presentation/forgot_password_page.dart';
-import 'package:visdom/features/auth/presentation/login_page.dart';
-import 'package:visdom/features/auth/presentation/new_password_page.dart';
-import 'package:visdom/features/auth/presentation/settings_page.dart';
-import 'package:visdom/features/auth/presentation/signup_page.dart';
-import 'package:visdom/features/community/presentation/admin_page.dart';
-import 'package:visdom/features/community/presentation/community_page.dart';
-import 'package:visdom/features/community/presentation/home_shell.dart';
-import 'package:visdom/features/community/presentation/profile_edit_page.dart';
-import 'package:visdom/features/community/presentation/profile_page.dart'
+import 'package:wisdom/data/supabase/supabase_client.dart';
+import 'package:wisdom/features/auth/presentation/auth_callback_page.dart';
+import 'package:wisdom/features/auth/presentation/forgot_password_page.dart';
+import 'package:wisdom/features/auth/presentation/login_page.dart';
+import 'package:wisdom/features/auth/presentation/new_password_page.dart';
+import 'package:wisdom/features/auth/presentation/settings_page.dart';
+import 'package:wisdom/features/auth/presentation/signup_page.dart';
+import 'package:wisdom/features/community/presentation/admin_page.dart';
+import 'package:wisdom/features/community/presentation/community_page.dart';
+import 'package:wisdom/features/community/presentation/home_shell.dart';
+import 'package:wisdom/features/community/presentation/profile_edit_page.dart';
+import 'package:wisdom/features/community/presentation/profile_page.dart'
     as community_profile;
-import 'package:visdom/features/community/presentation/profile_view_page.dart';
-import 'package:visdom/features/community/presentation/service_detail_page.dart';
-import 'package:visdom/features/community/presentation/tarot_page.dart';
-import 'package:visdom/features/community/presentation/teacher_profile_page.dart';
-import 'package:visdom/features/courses/presentation/course_intro_page.dart';
-import 'package:visdom/features/courses/presentation/course_intro_redirect_page.dart';
-import 'package:visdom/features/courses/presentation/course_page.dart';
-import 'package:visdom/features/courses/presentation/lesson_page.dart';
-import 'package:visdom/features/courses/presentation/quiz_take_page.dart';
-import 'package:visdom/features/landing/presentation/landing_page.dart';
-import 'package:visdom/features/landing/presentation/legal/privacy_page.dart';
-import 'package:visdom/features/landing/presentation/legal/terms_page.dart';
-import 'package:visdom/features/messages/presentation/chat_page.dart';
-import 'package:visdom/features/messages/presentation/messages_page.dart';
-import 'package:visdom/features/payments/presentation/booking_page.dart';
-import 'package:visdom/features/payments/presentation/subscribe_screen.dart';
-import 'package:visdom/features/studio/presentation/course_editor_page.dart';
-import 'package:visdom/features/studio/presentation/studio_page.dart';
-import 'package:visdom/features/studio/presentation/teacher_home_page.dart';
+import 'package:wisdom/features/community/presentation/profile_view_page.dart';
+import 'package:wisdom/features/community/presentation/service_detail_page.dart';
+import 'package:wisdom/features/community/presentation/tarot_page.dart';
+import 'package:wisdom/features/community/presentation/teacher_profile_page.dart';
+import 'package:wisdom/features/courses/presentation/course_intro_page.dart';
+import 'package:wisdom/features/courses/presentation/course_intro_redirect_page.dart';
+import 'package:wisdom/features/courses/presentation/course_page.dart';
+import 'package:wisdom/features/courses/presentation/lesson_page.dart';
+import 'package:wisdom/features/courses/presentation/quiz_take_page.dart';
+import 'package:wisdom/features/landing/presentation/landing_page.dart';
+import 'package:wisdom/features/landing/presentation/legal/privacy_page.dart';
+import 'package:wisdom/features/landing/presentation/legal/terms_page.dart';
+import 'package:wisdom/features/messages/presentation/chat_page.dart';
+import 'package:wisdom/features/messages/presentation/messages_page.dart';
+import 'package:wisdom/features/payments/presentation/booking_page.dart';
+import 'package:wisdom/features/payments/presentation/subscribe_screen.dart';
+import 'package:wisdom/features/studio/presentation/course_editor_page.dart';
+import 'package:wisdom/features/studio/presentation/studio_page.dart';
+import 'package:wisdom/features/studio/presentation/teacher_home_page.dart';
 
 class AuthState {
   const AuthState(this.session);
@@ -101,23 +103,15 @@ const _publicPaths = <String>{
   '/landing',
 };
 
-final userRoleProvider = FutureProvider<String?>((ref) async {
+final userProfileProvider = FutureProvider<Profile?>((ref) async {
   final authState = ref.watch(sessionProvider);
   final user = authState.session?.user;
   if (user == null) return null;
 
-  final res = await Supa.client.schema('app').rpc('get_my_profile');
-  String? role;
-  if (res is Map && res['role'] is String) {
-    role = res['role'] as String;
-  } else if (res is List && res.isNotEmpty) {
-    final m = (res.first as Map);
-    final r = m['role'];
-    if (r is String) role = r;
-  }
+  final profile = await ProfileRepository().getMe();
 
-  if (role == 'teacher' || role == 'admin') {
-    return role;
+  if (profile != null && (profile.isAdmin || profile.isTeacher)) {
+    return profile;
   }
 
   Future<Map<String, dynamic>?> fetchPermissions() async {
@@ -161,16 +155,18 @@ final userRoleProvider = FutureProvider<String?>((ref) async {
     final canEdit = perms['can_edit_courses'] == true;
     final canPublish = perms['can_publish'] == true;
     if (canEdit || canPublish) {
-      return 'teacher';
+      return profile?.copyWith(userRole: UserRole.teacher, isAdmin: false);
     }
   }
 
-  return role;
+  return profile;
 });
 
 final appRouterProvider = Provider<GoRouter>((ref) {
-  final role =
-      ref.watch(userRoleProvider).maybeWhen(data: (r) => r, orElse: () => null);
+  final profile = ref.watch(userProfileProvider).maybeWhen(
+        data: (p) => p,
+        orElse: () => null,
+      );
   final authState = ref.watch(sessionProvider);
   const guard = AuthGuard(_publicPaths);
   final refreshListenable = GoRouterRefreshStream(
@@ -346,8 +342,8 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: '/studio',
         name: 'studio',
         redirect: (_, __) {
-          if (role == null) return null;
-          if (role != 'teacher' && role != 'admin') return '/profile';
+          if (profile == null) return null;
+          if (!profile.isTeacher && !profile.isAdmin) return '/profile';
           return null;
         },
         builder: (context, state) => const StudioPage(),
@@ -356,8 +352,8 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: '/admin',
         name: 'admin',
         redirect: (_, __) {
-          if (role == null) return null;
-          if (role != 'admin') return '/profile';
+          if (profile == null) return null;
+          if (!profile.isAdmin) return '/profile';
           return null;
         },
         builder: (context, state) => const AdminPage(),

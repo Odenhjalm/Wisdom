@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide AuthState;
 
-import 'package:visdom/core/routing/app_router.dart';
+import 'package:wisdom/core/routing/app_router.dart';
 
 Session _fakeSession() {
   return Session.fromJson({

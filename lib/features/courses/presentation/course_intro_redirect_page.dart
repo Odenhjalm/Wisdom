@@ -2,9 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import 'package:visdom/core/errors/app_failure.dart';
-import 'package:visdom/features/courses/application/course_providers.dart';
-import 'package:visdom/features/courses/data/courses_repository.dart';
+import 'package:wisdom/core/errors/app_failure.dart';
+import 'package:wisdom/features/courses/application/course_providers.dart';
+import 'package:wisdom/features/courses/data/courses_repository.dart';
+import 'package:wisdom/shared/utils/context_safe.dart';
 
 /// Laddar första fria introduktionskursen och navigerar vidare till dess slug.
 class CourseIntroRedirectPage extends ConsumerStatefulWidget {
@@ -38,19 +39,18 @@ class _CourseIntroRedirectPageState
         if (_navigated) return;
         _navigated = true;
         final slug = course?.slug;
-        if (!context.mounted) return;
-        if (slug != null && slug.isNotEmpty) {
-          context.go('/course/$slug');
-        } else {
-          context.go('/');
-        }
+        context.ifMounted((c) {
+          if (slug != null && slug.isNotEmpty) {
+            c.go('/course/$slug');
+          } else {
+            c.go('/');
+          }
+        });
       },
       error: (_, __) {
         if (_navigated) return;
         _navigated = true;
-        if (context.mounted) {
-          context.go('/');
-        }
+        context.ifMounted((c) => c.go('/'));
       },
       loading: () {},
     );

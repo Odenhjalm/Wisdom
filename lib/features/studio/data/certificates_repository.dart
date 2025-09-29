@@ -1,7 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import 'package:visdom/core/supabase_ext.dart';
-import 'package:visdom/data/models/certificate.dart';
+import 'package:wisdom/core/supabase_ext.dart';
+import 'package:wisdom/data/models/certificate.dart';
 
 class CertificatesRepository {
   final _sb = Supabase.instance.client;

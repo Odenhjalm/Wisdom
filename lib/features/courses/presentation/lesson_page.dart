@@ -5,11 +5,11 @@ import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import 'package:visdom/core/errors/app_failure.dart';
-import 'package:visdom/data/supabase/supabase_client.dart';
-import 'package:visdom/features/courses/application/course_providers.dart';
-import 'package:visdom/features/courses/data/courses_repository.dart';
-import 'package:visdom/shared/widgets/app_scaffold.dart';
+import 'package:wisdom/core/errors/app_failure.dart';
+import 'package:wisdom/data/supabase/supabase_client.dart';
+import 'package:wisdom/features/courses/application/course_providers.dart';
+import 'package:wisdom/features/courses/data/courses_repository.dart';
+import 'package:wisdom/shared/widgets/app_scaffold.dart';
 
 class LessonPage extends ConsumerStatefulWidget {
   const LessonPage({super.key, required this.lessonId});

@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
-const String _defaultAppRedirect = 'visdom://auth-callback';
+const String _defaultAppRedirect = 'wisdom://auth-callback';
 
 String? _cleanValue(String? value) {
   final trimmed = value?.trim();

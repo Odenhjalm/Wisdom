@@ -2,13 +2,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import 'package:visdom/core/env/env_state.dart';
-import 'package:visdom/core/routing/app_router.dart';
-import 'package:visdom/features/landing/presentation/landing_page.dart';
-import 'package:visdom/main.dart';
+import 'package:wisdom/core/env/env_state.dart';
+import 'package:wisdom/core/routing/app_router.dart';
+import 'package:wisdom/features/landing/presentation/landing_page.dart';
+import 'package:wisdom/main.dart';
 
 void main() {
-  testWidgets('VisdomApp shows landing hero', (tester) async {
+  testWidgets('WisdomApp shows landing hero', (tester) async {
     final router = GoRouter(
       initialLocation: '/',
       routes: [
@@ -27,7 +27,7 @@ void main() {
           envInfoProvider.overrideWith((ref) => envInfoOk),
           appRouterProvider.overrideWithValue(router),
         ],
-        child: const VisdomApp(),
+        child: const WisdomApp(),
       ),
     );
 

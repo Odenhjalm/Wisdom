@@ -2,12 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import 'package:visdom/core/errors/app_failure.dart';
-import 'package:visdom/features/courses/application/course_providers.dart';
-import 'package:visdom/gate.dart';
-import 'package:visdom/shared/widgets/course_video.dart';
-import 'package:visdom/shared/widgets/go_router_back_button.dart';
-import 'package:visdom/shared/widgets/top_nav_action_buttons.dart';
+import 'package:wisdom/core/errors/app_failure.dart';
+import 'package:wisdom/features/courses/application/course_providers.dart';
+import 'package:wisdom/gate.dart';
+import 'package:wisdom/shared/widgets/course_video.dart';
+import 'package:wisdom/shared/widgets/go_router_back_button.dart';
+import 'package:wisdom/shared/widgets/top_nav_action_buttons.dart';
 
 class CourseIntroPage extends ConsumerWidget {
   const CourseIntroPage({super.key});

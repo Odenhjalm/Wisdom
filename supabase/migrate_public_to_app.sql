@@ -4,20 +4,48 @@
 begin;
 
 -- 1) Profiles
-insert into app.profiles (user_id, email, display_name, bio, photo_url, role, created_at, updated_at)
+with profile_src as (
+  select
+    p.id as user_id,
+    coalesce(u.email, ap.email) as email,
+    coalesce(nullif(p.full_name, ''), nullif(p.username, ''), u.email, ap.display_name) as display_name,
+    coalesce(p.bio, ap.bio) as bio,
+    coalesce(p.avatar_url, ap.photo_url) as photo_url,
+    coalesce(ap.is_admin, (ap.role = 'admin')) as existing_admin,
+    coalesce(
+      ap.role_v2::text,
+      case
+        when coalesce(ap.is_admin, (ap.role = 'admin')) then 'teacher'
+        when tp.can_edit_courses then 'teacher'
+        when ap.role = 'teacher' then 'teacher'
+        when ap.role = 'member' then 'professional'
+        else 'user'
+      end
+    ) as role_v2_text,
+    coalesce(p.created_at, ap.created_at, now()) as created_at
+  from public.profiles p
+  left join auth.users u on u.id = p.id
+  left join public.teacher_permissions_compat tp on tp.profile_id = p.id and tp.can_edit_courses = true
+  left join app.profiles ap on ap.user_id = p.id
+)
+insert into app.profiles (user_id, email, display_name, bio, photo_url, role, role_v2, is_admin, created_at, updated_at)
 select
-  p.id,
-  coalesce(u.email, ap.email),
-  coalesce(nullif(p.full_name, ''), nullif(p.username, ''), u.email, ap.display_name),
-  coalesce(p.bio, ap.bio),
-  coalesce(p.avatar_url, ap.photo_url),
-  case when tp.can_edit_courses then 'teacher'::app.role_type else coalesce(ap.role, 'user'::app.role_type) end,
-  coalesce(p.created_at, ap.created_at, now()),
+  src.user_id,
+  src.email,
+  src.display_name,
+  src.bio,
+  src.photo_url,
+  case
+    when src.existing_admin then 'admin'::app.role_type
+    when src.role_v2_text = 'teacher' then 'teacher'::app.role_type
+    when src.role_v2_text = 'professional' then 'member'::app.role_type
+    else 'user'::app.role_type
+  end,
+  src.role_v2_text::app.user_role,
+  src.existing_admin,
+  src.created_at,
   now()
-from public.profiles p
-left join auth.users u on u.id = p.id
-left join public.teacher_permissions_compat tp on tp.profile_id = p.id and tp.can_edit_courses = true
-left join app.profiles ap on ap.user_id = p.id
+from profile_src src
 on conflict (user_id) do update
 set
   email = excluded.email,
@@ -25,6 +53,8 @@ set
   bio = excluded.bio,
   photo_url = excluded.photo_url,
   role = excluded.role,
+  role_v2 = excluded.role_v2,
+  is_admin = excluded.is_admin,
   updated_at = excluded.updated_at;
 
 -- 2) Courses

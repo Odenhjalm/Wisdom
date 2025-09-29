@@ -1,4 +1,4 @@
-# Andlig Väg – Social Plattform (Flutter + Supabase)
+# Wisdom – Social Plattform (Flutter + Supabase)
 
 Det här repo:t innehåller en ljus, proffsig social plattform byggd på Flutter + Supabase (`supabase_flutter`).
 

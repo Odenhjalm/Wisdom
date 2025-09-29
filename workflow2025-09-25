@@ -1,0 +1,67 @@
+Planeringsfas
+
+Sammanfatta nuläget (befintliga funktioner, teknikskuld) i nya tasks-filen med stöd av summary2025-09-25:1 och koppla varje punkt till respektive blueprint-del i new _functions.md:5.
+Identifiera gap mellan befintligt Supabase-schema och det kompletta förslaget i new _functions.md:14, markera vad som kräver migration kontra refaktor.
+Prioritera leverabler i tre vågor (foundation, app-integration, polish) och skriv preliminär tidslinje inklusive beroenden.
+Skapa sektion i tasks-filen för risker/antaganden samt ett återkommande “retro & förbättringar”-block som fylls i efter varje iteration.
+Databas & Storage
+
+Granska nuvarande SQL-migreringar och planera hur supabase/init_all.sql från new _functions.md:14 kan brytas ned till idempotenta migrationssteg utan att slå sönder befintlig data.
+Implementera och validera RLS-policys och RPC:er enligt new _functions.md:114-374, inklusive testkörning via Supabase CLI.
+Etablera schema för public_media och protected_media buckets samt dokumentera access-strategin enligt new _functions.md:774.
+Förbered seed-skriptet i supabase/seed/seed.sql (new _functions.md:785) och bestäm när det ska köras i olika miljöer.
+Edge Functions & Stripe
+
+Säkra miljövariablerna och deploy-processen för create_checkout och stripe_webhook enligt new _functions.md:379-480.
+Dokumentera hur service-role-nyckeln hanteras säkert och hur webhook-secret roteras.
+Skapa testplan för Stripe-flödet (lokal CLI, testkort, webhook replay) innan produktionsnycklar används.
+Lägg till checklistan från snabb-listan (new _functions.md:858-871) i tasks-filen som “Go-live Stripe”.
+Appintegration
+
+Implementera Riverpod-roller och accessproviders enligt new _functions.md:383-603 och refaktorisera befintliga guards/router-flöden.
+Infoga paywall-komponenterna och HTTP-helpern (new _functions.md:608-683) samt se över navigationen för webview/launchUrl.
+Bygg CourseAccessGate och CourseDetail-stubben (new _functions.md:685-717) uppkopplad mot kursdata.
+Paketera nya events-flödet (new _functions.md:719-769) och definiera transitions från dagens UI.
+Planera claim-länksflödet och magic-link-autentisering enligt new _functions.md:846-854.
+UI & Upplevelse
+
+Justera landing/home/pro/teacher-flödena efter rutnätet i new _functions.md:825-843, mappa varje skärm till existerande eller nya widgets.
+Kombinera detta med UI-polish och arkitekturinitiativ från summary2025-09-25:181 genom att lägga in design-review och komponentstädning per iteration.
+Säkerställ att snackbars, env-banner och paywall-kommunikation är konsekventa med riktlinjerna i sammanfattningen och nya paywall-komponenter.
+Planera användartester eller intern demo efter varje större UI-del för att samla feedback till förbättringsblocket.
+Kvalitet & Release
+
+Upprätta testbas (widget/router/data) och bygg ut med Stripe/claim-integrationstester, i linje med testluckorna från summary2025-09-25:199.
+Sätt upp CI/CD-workflows (analyze, format, test, Android bundle) och inkludera Stripe-händelsemockning där möjligt.
+Förbered Android-release-uppgifterna från summary2025-09-25:129 parallellt med paywall-lanseringen, inklusive deeplinks för auth/claim.
+Dokumentera rollback-strategi och monitoreringsbehov (loggar, Supabase Dashboard) inför lansering av betalflödet.
+Iteration & Uppföljning
+
+Använd new _functions.md som källspec (lås version), och spegla status/avvikelser i tasks-filen så att framtida uppdateringar blir spårbara.
+Avsätt tid efter varje våg för reflektion: vad fungerade, vad behöver förbättras, vilka nya möjligheter har upptäckts.
+Planera uppdatering av roadmap (funktioner från README i summary2025-09-25:141) efter att grundflödet är på plats, med tydlig prioriteringsmodell.
+Definiera hur feedback från partners/användare integreras i nästa iteration så att förbättringsspalten kontinuerligt fylls.
+
+
+Använd den här filen för att notera varje ändring och beskriv vilka punker du arbetat med 
+## 2025-09-25 Codex-session
+- Skapade `tasks2025-09-25.md` med nulägesgenomgång, gapanalys och tre vågor enligt blueprinten.
+- Definierade arbetsströmmar och risk/retro-sektioner för framtida uppdateringar.
+- Kartlade befintligt Supabase-schema och edge functions; dokumenterade gap/strategi i `docs/schema_alignment_2025-09-25.md` för Foundation-fasen.
+- Förberedde Phase A-plan för rollmigreringen i `docs/phase_a_roles_plan.md` inklusive mappning och delsteg.
+- Skapade migrationsutkast `supabase/2025-09-PhaseA_roles.sql` för nya roller, progressionstabeller och auto-upgrade-funktion.
+- Uppdaterade `tasks2025-09-25.md` med status för Phase A-plan och migrationsutkast.
+- Uppdaterade TODO-status i `docs/phase_a_roles_plan.md` efter skapad migration och tasks-uppdatering.
+- Noterade att Phase A-migrationen nu är körd i Supabase och uppdaterade dokument/uppgiftslistor med nästa steg (funktioner, teacher_requests).
+- Inventerade funktioner som fortfarande använder `app.role_type` och dokumenterade i `docs/phase_a_function_audit.md` för vidare refaktor.
+- Tog fram mappningsplan `docs/phase_a_teacher_requests_mapping.md` för att flytta `teacher_requests` till nya certifikatstrukturen.
+- Skissade migreringsskript `supabase/2025-09-PhaseA_teacher_requests.sql` för att flytta `teacher_requests` till nya `certificates`/`teacher_approvals` tabeller.
+- Justerade `supabase/2025-09-PhaseA_teacher_requests.sql` med unik index-skapande och temporär tabell efter körningsfeedback.
+- Uppdaterade `supabase/fix_app_is_teacher_recursion.sql` så admin/teacher-checkar använder `is_admin`/`role_v2` och noterade ändringen i planeringsdokumenten.
+- Reviderade `supabase/migrate_public_to_app.sql` så profil-backfill skriver `role_v2`/`is_admin` och uppdaterade dokument/arbetslista därefter.
+- Dokumenterade Flutter-uppföljning för nya roller i `docs/phase_a_flutter_updates.md` (modell/guards-uppdateringar).
+- Refaktorerade klienten att läsa nya rollfält (`Profile`-modell, `AuthService`, router, booking/studio) och uppdaterade Flutter-plan/arbetslista.
+- Körde `supabase/2025-09-PhaseA_teacher_requests.sql` och noterade uppföljning i dokumentation/arbetslista.
+- La till verifieringschecklista för teacher-requests migreringen i `docs/phase_a_teacher_requests_verification.md`.
+- Sammanställde nästa-steg-lista i `docs/phase_a_next_actions.md` för verifiering och fortsatta uppgifter.
+- Uppdaterade Studio/Profil/Booking/Admin-flöden att använda `app.certificates`/`teacher_approvals` i stället för `teacher_requests` och noterade ändringarna i planerna.

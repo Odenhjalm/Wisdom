@@ -4,14 +4,33 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:visdom/core/env/env_state.dart';
-import 'package:visdom/data/supabase/supabase_client.dart';
-import 'package:visdom/core/supabase_ext.dart';
-import 'package:visdom/features/community/data/community_repository.dart';
-import 'package:visdom/shared/utils/snack.dart';
-import 'package:visdom/shared/widgets/glass_card.dart';
-import 'package:visdom/shared/widgets/hero_badge.dart';
-import 'package:visdom/shared/widgets/app_scaffold.dart';
+import 'package:wisdom/core/env/env_state.dart';
+import 'package:wisdom/data/supabase/supabase_client.dart';
+import 'package:wisdom/core/supabase_ext.dart';
+import 'package:wisdom/features/community/data/community_repository.dart';
+import 'package:wisdom/shared/utils/snack.dart';
+import 'package:wisdom/shared/widgets/glass_card.dart';
+import 'package:wisdom/shared/widgets/hero_badge.dart';
+import 'package:wisdom/shared/widgets/app_scaffold.dart';
+
+const _wisdomBrandGradient = LinearGradient(
+  colors: [
+    Color(0xFF63C7D6),
+    Color(0xFF9B87EB),
+  ],
+  begin: Alignment.topLeft,
+  end: Alignment.bottomRight,
+);
+
+const _wisdomPrimaryGradient = LinearGradient(
+  colors: [
+    Color(0xFF63C7D6),
+    Color(0xFF8C8EEE),
+    Color(0xFFC79DF6),
+  ],
+  begin: Alignment.topLeft,
+  end: Alignment.bottomRight,
+);
 
 class LandingPage extends ConsumerStatefulWidget {
   const LandingPage({super.key});
@@ -218,21 +237,18 @@ class _LandingPageState extends ConsumerState<LandingPage>
 
   @override
   Widget build(BuildContext context) {
-    final t = Theme.of(context).textTheme;
+    final theme = Theme.of(context);
+    final t = theme.textTheme;
+    final isLightMode = theme.brightness == Brightness.light;
     final envInfo = ref.watch(envInfoProvider);
     final hasEnvIssues = envInfo.hasIssues;
-    final size = MediaQuery.of(context).size;
-    // Subtil parallax – ytterligare förfinad: lite svagare och hårdare cap
+    final mediaQuery = MediaQuery.of(context);
+    final size = mediaQuery.size;
     final f = size.width >= 900 ? 0.20 : 0.14;
     final y = -(_offset.clamp(0.0, 120.0)) * f;
-    // Premium-gradient – något djupare, tydligare separation
-    final topGrad = size.width >= 900 ? 0.40 : 0.44;
-    final bottomGrad = size.width >= 900 ? 0.62 : 0.66;
-    // Skala upp bilden aningen för att garanterat klippa bort ev. vit kant i asset
+    final topScrimOpacity = size.width >= 900 ? 0.30 : 0.34;
     final imgScale =
         size.width >= 1200 ? 1.06 : (size.width >= 900 ? 1.08 : 1.12);
-    // Lägg på diskret sidovignette för att dölja ev. ljusa kanter på extrema aspect ratios
-    final sideVignette = size.width >= 900 ? 0.08 : 0.10;
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -243,87 +259,68 @@ class _LandingPageState extends ConsumerState<LandingPage>
         elevation: 0,
         toolbarHeight: 64,
         titleSpacing: 0,
+        leadingWidth: 180,
         flexibleSpace: ClipRect(
           child: BackdropFilter(
             filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
             child: Container(color: Colors.transparent),
           ),
         ),
+        leading: const _Logo(),
         title: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
+          padding: const EdgeInsets.only(right: 16),
           child: Row(
             children: [
-              // “logo” – glass badge (blur + translucent)
-              ClipRRect(
-                borderRadius: BorderRadius.circular(10),
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-                  child: Container(
-                    height: 36,
-                    width: 36,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                          Colors.white.withValues(alpha: .18),
-                          Colors.white.withValues(alpha: .08),
-                        ],
+              ShaderMask(
+                shaderCallback: (bounds) =>
+                    _wisdomBrandGradient.createShader(bounds),
+                blendMode: BlendMode.srcIn,
+                child: Text(
+                  'Wisdom',
+                  style: t.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: .25,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Flexible(
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    alignment: WrapAlignment.end,
+                    children: [
+                      TextButton(
+                        onPressed: hasEnvIssues
+                            ? null
+                            : () => context.push('/profile'),
+                        style:
+                            TextButton.styleFrom(foregroundColor: Colors.white),
+                        child: const Text('Logga in'),
                       ),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                          color: Colors.white.withValues(alpha: .28)),
-                    ),
-                    child: const Icon(
-                      Icons.self_improvement_rounded,
-                      size: 22,
-                      color: Colors.white,
-                    ),
+                      TextButton(
+                        onPressed: hasEnvIssues
+                            ? null
+                            : () => context.push('/profile'),
+                        style: TextButton.styleFrom(
+                          foregroundColor: Colors.white70,
+                        ),
+                        child: const Text('Skapa konto'),
+                      ),
+                      _PrimaryGradientButton(
+                        label: 'Gratis kurser',
+                        onTap: hasEnvIssues ? null : _openIntroModal,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 18,
+                          vertical: 10,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ),
-              const SizedBox(width: 10),
-              Text(
-                'Visdom',
-                style: t.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w900,
-                  color: Colors.white,
-                  letterSpacing: .25,
-                  shadows: [
-                    Shadow(
-                      color: Colors.black.withValues(alpha: .50),
-                      blurRadius: 6,
-                      offset: const Offset(0, 1),
-                    ),
-                  ],
-                ),
-              ),
-              const Spacer(),
-              TextButton(
-                onPressed: hasEnvIssues ? null : () => context.push('/profile'),
-                style: TextButton.styleFrom(foregroundColor: Colors.white),
-                child: const Text('Logga in'),
-              ),
-              const SizedBox(width: 4),
-              TextButton(
-                onPressed: hasEnvIssues ? null : () => context.push('/profile'),
-                style: TextButton.styleFrom(foregroundColor: Colors.white70),
-                child: const Text('Skapa konto'),
-              ),
-              const SizedBox(width: 8),
-              ElevatedButton(
-                onPressed: hasEnvIssues ? null : _openIntroModal,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF34D399),
-                  foregroundColor: Colors.black,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  textStyle: const TextStyle(fontWeight: FontWeight.w800),
-                ),
-                child: const Text('Gratis kurser'),
               ),
             ],
           ),
@@ -332,14 +329,30 @@ class _LandingPageState extends ConsumerState<LandingPage>
       body: FullBleedBackground(
         image: _bg,
         alignment: Alignment.topCenter,
-        topOpacity: topGrad,
-        bottomOpacity: bottomGrad,
+        topOpacity: topScrimOpacity,
         yOffset: y,
         scale: imgScale,
-        sideVignette: sideVignette,
+        sideVignette: 0,
+        overlayColor: isLightMode
+            ? const Color(0xFFFFE2B8).withValues(alpha: 0.10)
+            : null,
         child: Stack(
           children: [
             const _ParticlesLayer(),
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: IgnorePointer(
+                child: Center(
+                  child: Image.asset(
+                    'assets/loggo_clea.png',
+                    height: 200,
+                    filterQuality: FilterQuality.high,
+                  ),
+                ),
+              ),
+            ),
             SafeArea(
               child: ListView(
                 controller: _scroll,
@@ -400,43 +413,13 @@ class _LandingPageState extends ConsumerState<LandingPage>
                               runSpacing: 12,
                               alignment: WrapAlignment.center,
                               children: [
-                                ElevatedButton(
-                                  onPressed:
-                                      hasEnvIssues ? null : _openIntroModal,
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color(0xFF34D399),
-                                    foregroundColor: Colors.black,
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 22,
-                                      vertical: 14,
-                                    ),
-                                    textStyle: const TextStyle(
-                                      fontWeight: FontWeight.w800,
-                                      fontSize: 16,
-                                    ),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                  ),
-                                  child: const Text('Börja gratis idag'),
+                                _PrimaryGradientButton(
+                                  label: 'Börja gratis idag',
+                                  onTap: hasEnvIssues ? null : _openIntroModal,
                                 ),
-                                OutlinedButton(
-                                  onPressed:
-                                      hasEnvIssues ? null : _openIntroModal,
-                                  style: OutlinedButton.styleFrom(
-                                    foregroundColor: Colors.white,
-                                    side: const BorderSide(
-                                        color: Colors.transparent),
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 22, vertical: 14),
-                                    textStyle: const TextStyle(
-                                        fontWeight: FontWeight.w700,
-                                        fontSize: 16),
-                                    shape: RoundedRectangleBorder(
-                                        borderRadius:
-                                            BorderRadius.circular(12)),
-                                  ),
-                                  child: const Text('Utforska utan konto'),
+                                _GradientOutlineButton(
+                                  label: 'Utforska utan konto',
+                                  onTap: hasEnvIssues ? null : _openIntroModal,
                                 ),
                               ],
                             ),
@@ -666,33 +649,23 @@ class _LandingPageState extends ConsumerState<LandingPage>
                                 const SizedBox(width: 12),
                                 Wrap(
                                   spacing: 10,
+                                  runSpacing: 10,
                                   children: [
-                                    ElevatedButton(
-                                      onPressed: _openIntroModal,
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: Colors.white,
-                                        foregroundColor: Colors.black,
-                                        padding: const EdgeInsets.symmetric(
-                                            horizontal: 18, vertical: 12),
-                                        shape: RoundedRectangleBorder(
-                                            borderRadius:
-                                                BorderRadius.circular(12)),
+                                    _PrimaryGradientButton(
+                                      label: 'Börja gratis',
+                                      onTap: _openIntroModal,
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 18,
+                                        vertical: 12,
                                       ),
-                                      child: const Text('Börja gratis'),
                                     ),
-                                    OutlinedButton(
-                                      onPressed: _openIntroModal,
-                                      style: OutlinedButton.styleFrom(
-                                        foregroundColor: Colors.white,
-                                        side: const BorderSide(
-                                            color: Colors.white),
-                                        padding: const EdgeInsets.symmetric(
-                                            horizontal: 18, vertical: 12),
-                                        shape: RoundedRectangleBorder(
-                                            borderRadius:
-                                                BorderRadius.circular(12)),
+                                    _GradientOutlineButton(
+                                      label: 'Utforska utan konto',
+                                      onTap: _openIntroModal,
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 22,
+                                        vertical: 12,
                                       ),
-                                      child: const Text('Utforska utan konto'),
                                     ),
                                   ],
                                 ),
@@ -713,15 +686,161 @@ class _LandingPageState extends ConsumerState<LandingPage>
   }
 }
 
+class _Logo extends StatelessWidget {
+  const _Logo();
+
+  @override
+  Widget build(BuildContext context) {
+    final dpr = MediaQuery.of(context).devicePixelRatio;
+    const h = 140.0;
+    return Padding(
+      padding: const EdgeInsets.only(left: 16, right: 12),
+      child: Image.asset(
+        'assets/loggo_clea.png',
+        height: h,
+        fit: BoxFit.contain,
+        filterQuality: FilterQuality.high,
+        cacheWidth: (h * dpr).round(),
+      ),
+    );
+  }
+}
+
 /* ---------- Små UI-komponenter i denna fil ---------- */
 
-class _GradientHeadline extends StatelessWidget {
+class _PrimaryGradientButton extends StatelessWidget {
+  const _PrimaryGradientButton({
+    required this.label,
+    required this.onTap,
+    this.padding = const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+  });
+
+  final String label;
+  final VoidCallback? onTap;
+  final EdgeInsetsGeometry padding;
+
+  @override
+  Widget build(BuildContext context) {
+    final borderRadius = BorderRadius.circular(14);
+    Widget result = DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: _wisdomPrimaryGradient,
+        borderRadius: borderRadius,
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF8C8EEE).withAlpha(110),
+            blurRadius: 24,
+            offset: const Offset(0, 12),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: borderRadius,
+          onTap: onTap,
+          child: Padding(
+            padding: padding,
+            child: Text(
+              label,
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: .2,
+                  ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    if (onTap == null) {
+      result = Opacity(opacity: 0.5, child: result);
+    }
+
+    return SizedBox(height: 48, child: result);
+  }
+}
+
+class _GradientOutlineButton extends StatelessWidget {
+  const _GradientOutlineButton({
+    required this.label,
+    required this.onTap,
+    this.padding = const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+  });
+
+  final String label;
+  final VoidCallback? onTap;
+  final EdgeInsetsGeometry padding;
+
+  @override
+  Widget build(BuildContext context) {
+    final borderRadius = BorderRadius.circular(999);
+    final backgroundColor = Colors.white.withValues(alpha: 0.10);
+    final splashColor = Colors.white.withValues(alpha: 0.12);
+    final highlightColor = Colors.white.withValues(alpha: 0.06);
+
+    Widget button = Material(
+      color: backgroundColor,
+      borderRadius: borderRadius,
+      child: InkWell(
+        borderRadius: borderRadius,
+        onTap: onTap,
+        splashColor: splashColor,
+        highlightColor: highlightColor,
+        child: Padding(
+          padding: padding,
+          child: Text(
+            label,
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: .15,
+                ),
+          ),
+        ),
+      ),
+    );
+
+    if (onTap == null) {
+      button = Opacity(opacity: 0.5, child: button);
+    }
+
+    return SizedBox(height: 48, child: button);
+  }
+}
+
+class _GradientHeadline extends StatefulWidget {
   final String leading;
   final String gradientWord;
   const _GradientHeadline({
     required this.leading,
     required this.gradientWord,
   });
+
+  @override
+  State<_GradientHeadline> createState() => _GradientHeadlineState();
+}
+
+class _GradientHeadlineState extends State<_GradientHeadline>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller =
+        AnimationController(vsync: this, duration: const Duration(seconds: 5))
+          ..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -736,14 +855,34 @@ class _GradientHeadline extends StatelessWidget {
       spacing: 10,
       runSpacing: 6,
       children: [
-        Text(leading, textAlign: TextAlign.center, style: base),
-        ShaderMask(
-          shaderCallback: (bounds) => const LinearGradient(
-            colors: [Color(0xFF7C3AED), Color(0xFF06B6D4)],
-          ).createShader(const Rect.fromLTWH(0, 0, 400, 80)),
-          child: Text(gradientWord,
-              textAlign: TextAlign.center,
-              style: base?.copyWith(color: Colors.white)),
+        Text(widget.leading, textAlign: TextAlign.center, style: base),
+        AnimatedBuilder(
+          animation: _controller,
+          builder: (context, child) {
+            return ShaderMask(
+              blendMode: BlendMode.srcIn,
+              shaderCallback: (bounds) {
+                final sweep = bounds.width * 1.5;
+                final start = -bounds.width + sweep * _controller.value;
+                return const LinearGradient(
+                  colors: [
+                    Color(0xFF63C7D6),
+                    Color(0xFFB58FF3),
+                    Color(0xFF63C7D6),
+                  ],
+                  stops: [0.0, 0.5, 1.0],
+                ).createShader(
+                  Rect.fromLTWH(start, 0, sweep, bounds.height),
+                );
+              },
+              child: child,
+            );
+          },
+          child: Text(
+            widget.gradientWord,
+            textAlign: TextAlign.center,
+            style: base?.copyWith(color: Colors.white),
+          ),
         ),
       ],
     );

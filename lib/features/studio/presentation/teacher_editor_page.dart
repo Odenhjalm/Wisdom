@@ -4,12 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import 'package:visdom/shared/widgets/top_nav_action_buttons.dart';
-import 'package:visdom/domain/services/auth_service.dart';
-import 'package:visdom/supabase_client.dart';
-import 'package:visdom/shared/utils/snack.dart';
-import 'package:visdom/shared/widgets/glass_card.dart';
-import 'package:visdom/shared/widgets/go_router_back_button.dart';
+import 'package:wisdom/shared/widgets/top_nav_action_buttons.dart';
+import 'package:wisdom/domain/services/auth_service.dart';
+import 'package:wisdom/supabase_client.dart';
+import 'package:wisdom/shared/utils/snack.dart';
+import 'package:wisdom/shared/widgets/glass_card.dart';
+import 'package:wisdom/shared/widgets/go_router_back_button.dart';
 
 class TeacherEditorPage extends ConsumerStatefulWidget {
   const TeacherEditorPage({super.key});

@@ -1,7 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import 'package:visdom/core/env/env_state.dart';
-import 'package:visdom/supabase_client.dart' as core;
+import 'package:wisdom/core/env/env_state.dart';
+import 'package:wisdom/supabase_client.dart' as core;
 
 class Supa {
   static Future<EnvInfo> init() => core.initSupabase();

@@ -50,6 +50,10 @@ In oauth_redirect.dart, don’t assert-crash on missing env; show snack and keep
 Ensure .gitignore contains .env, android/key.properties.
 Return changed files.
 
+Status (2025-09-25)
+- ✅ Alla use_build_context_synchronously-varningar åtgärdade via `context.ifMounted` och uppdaterade imports.
+- ⚠️ Övrig UI-polish (Expanded/Flexible, const, spacing) återstår.
+
 6) Tester (minst sanity + router + en dataflow)
 Mål
 
@@ -71,7 +75,7 @@ Codex-prompt
 
 Add tests:
 
-test/app_smoke_test.dart: pump VisdomApp, expect landing hero present.
+test/app_smoke_test.dart: pump WisdomApp, expect landing hero present.
 
 test/router_guard_test.dart: mock sessionProvider unauthenticated→expect /login; authenticated→expect /home.
 
@@ -107,7 +111,7 @@ Keystore, key.properties, release-signing.
 
 compileSdk 34, targetSdk 34, minSdk 23/24.
 
-Deep link visdom://auth-callback i manifest.
+Deep link wisdom://auth-callback i manifest.
 
 Acceptans
 
@@ -121,8 +125,7 @@ In android/:
 
 Set compileSdkVersion 34, targetSdkVersion 34, minSdkVersion 23.
 
-Add digital asset links and manifest <intent-filter> for scheme visdom host auth-callback.
+Add digital asset links and manifest <intent-filter> for scheme wisdom host auth-callback.
 
 Ensure signingConfigs.release reads from key.properties.
 Return changed gradle & manifest files.
-

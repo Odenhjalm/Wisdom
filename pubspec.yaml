@@ -1,5 +1,5 @@
-name: visdom
-description: Andlig Väg – Flutter-app
+name: wisdom
+description: Wisdom – Flutter-app
 publish_to: "none"
 version: 0.1.0+1
 
@@ -48,6 +48,7 @@ flutter:
   uses-material-design: true
   assets:
     - assets/images/bakgrund.png
+    - assets/loggo_clea.png
     - assets/icons/
     - assets/images/
     - assets/images/courses/

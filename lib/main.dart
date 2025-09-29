@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
-import 'package:visdom/core/env/env_state.dart';
+import 'package:wisdom/core/env/env_state.dart';
 
 import 'shared/theme/light_theme.dart';
 import 'supabase_client.dart';
@@ -23,20 +23,20 @@ Future<void> main() async {
       overrides: [
         envInfoProvider.overrideWith((ref) => envInfo),
       ],
-      child: const VisdomApp(),
+      child: const WisdomApp(),
     ),
   );
 }
 
-class VisdomApp extends ConsumerWidget {
-  const VisdomApp({super.key});
+class WisdomApp extends ConsumerWidget {
+  const WisdomApp({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(appRouterProvider);
     return MaterialApp.router(
       debugShowCheckedModeBanner: false,
-      title: 'Visdom',
+      title: 'Wisdom',
       theme: buildLightTheme(),
       themeMode: ThemeMode.light,
       routerConfig: router,

@@ -1,19 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import 'package:visdom/features/landing/presentation/landing_page.dart';
-import 'package:visdom/features/courses/presentation/course_intro_page.dart';
-import 'package:visdom/features/courses/presentation/quiz_take_page.dart';
-import 'package:visdom/features/community/presentation/home_shell.dart';
-import 'package:visdom/features/studio/presentation/course_editor_page.dart';
-import 'package:visdom/features/studio/presentation/teacher_home_page.dart';
-import 'package:visdom/features/payments/presentation/subscribe_screen.dart';
-import 'package:visdom/features/auth/presentation/login_page.dart';
-import 'package:visdom/features/auth/presentation/signup_page.dart';
-import 'package:visdom/features/community/presentation/profile_edit_page.dart';
+import 'package:wisdom/features/landing/presentation/landing_page.dart';
+import 'package:wisdom/features/courses/presentation/course_intro_page.dart';
+import 'package:wisdom/features/courses/presentation/quiz_take_page.dart';
+import 'package:wisdom/features/community/presentation/home_shell.dart';
+import 'package:wisdom/features/studio/presentation/course_editor_page.dart';
+import 'package:wisdom/features/studio/presentation/teacher_home_page.dart';
+import 'package:wisdom/features/payments/presentation/subscribe_screen.dart';
+import 'package:wisdom/features/auth/presentation/login_page.dart';
+import 'package:wisdom/features/auth/presentation/signup_page.dart';
+import 'package:wisdom/features/community/presentation/profile_edit_page.dart';
 import 'gate.dart';
 import 'supabase_client.dart';
-import 'package:visdom/features/messages/presentation/chat_page.dart';
+import 'package:wisdom/features/messages/presentation/chat_page.dart';
 
 final GoRouter appRouter = GoRouter(
   initialLocation: '/',

@@ -4,12 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import 'package:visdom/shared/theme/ui_consts.dart';
-import 'package:visdom/shared/utils/context_safe.dart';
-import 'package:visdom/shared/widgets/glass_card.dart';
-import 'package:visdom/features/landing/application/landing_providers.dart';
-import 'package:visdom/shared/widgets/gradient_text.dart';
-import 'package:visdom/shared/widgets/background_layer.dart';
+import 'package:wisdom/shared/theme/ui_consts.dart';
+import 'package:wisdom/shared/utils/context_safe.dart';
+import 'package:wisdom/shared/widgets/glass_card.dart';
+import 'package:wisdom/features/landing/application/landing_providers.dart';
+import 'package:wisdom/shared/widgets/gradient_text.dart';
+import 'package:wisdom/shared/widgets/background_layer.dart';
 
 const String _devConfigHint = 'Konfigurera Supabase i .env om data saknas.';
 
@@ -268,7 +268,7 @@ class _LegacyLandingPageState extends ConsumerState<LegacyLandingPage> {
                                   constraints:
                                       const BoxConstraints(maxWidth: 720),
                                   child: const Text(
-                                    'På Visdom kan du hitta inspirerande kurser, möta lärare och ta del av tjänster som guidar dig framåt – i ditt tempo.',
+                                    'På Wisdom kan du hitta inspirerande kurser, möta lärare och ta del av tjänster som guidar dig framåt – i ditt tempo.',
                                     textAlign: TextAlign.center,
                                     style: TextStyle(
                                         color: Colors.black87, fontSize: 16),
@@ -565,7 +565,7 @@ class _LegacyLandingPageState extends ConsumerState<LegacyLandingPage> {
                             ),
                           ),
                           gap24,
-                          const _SectionTitle('Hur fungerar Visdom?'),
+                          const _SectionTitle('Hur fungerar Wisdom?'),
                           const _HowItWorks(),
                           gap24,
                           const Align(

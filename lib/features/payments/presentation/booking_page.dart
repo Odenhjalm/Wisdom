@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 
-import 'package:visdom/core/supabase_ext.dart';
-import 'package:visdom/data/supabase/supabase_client.dart';
-import 'package:visdom/shared/utils/snack.dart';
-import 'package:visdom/shared/widgets/app_scaffold.dart';
+import 'package:wisdom/core/supabase_ext.dart';
+import 'package:wisdom/data/models/profile.dart';
+import 'package:wisdom/data/supabase/supabase_client.dart';
+import 'package:wisdom/shared/utils/snack.dart';
+import 'package:wisdom/shared/widgets/app_scaffold.dart';
 
 class BookingPage extends StatefulWidget {
   const BookingPage({super.key});
@@ -38,8 +39,9 @@ class _BookingPageState extends State<BookingPage> {
           : (res is List && res.isNotEmpty
               ? (res.first as Map).cast<String, dynamic>()
               : null);
-      final role = map?['role'] as String?;
-      _isTeacher = role == 'teacher' || role == 'admin';
+      final isAdmin = map?['is_admin'] == true;
+      final roleV2 = map?['role_v2'] as String?;
+      _isTeacher = isAdmin || parseUserRole(roleV2) == UserRole.teacher;
       if (_isTeacher) {
         final rows = await Supa.client.app
             .from('teacher_slots')

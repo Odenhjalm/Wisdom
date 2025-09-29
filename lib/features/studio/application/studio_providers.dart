@@ -1,6 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:visdom/supabase_client.dart';
+import 'package:wisdom/supabase_client.dart';
 
 import '../data/certificates_repository.dart';
 import '../data/studio_repository.dart';

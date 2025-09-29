@@ -3,12 +3,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher_string.dart';
 
-import 'package:visdom/core/errors/app_failure.dart';
-import 'package:visdom/domain/services/payments/payments_service.dart';
-import 'package:visdom/features/courses/application/course_providers.dart';
-import 'package:visdom/features/courses/data/courses_repository.dart';
-import 'package:visdom/shared/utils/snack.dart';
-import 'package:visdom/shared/widgets/app_scaffold.dart';
+import 'package:wisdom/core/errors/app_failure.dart';
+import 'package:wisdom/shared/utils/context_safe.dart';
+import 'package:wisdom/domain/services/payments/payments_service.dart';
+import 'package:wisdom/features/courses/application/course_providers.dart';
+import 'package:wisdom/features/courses/data/courses_repository.dart';
+import 'package:wisdom/shared/utils/snack.dart';
+import 'package:wisdom/shared/widgets/app_scaffold.dart';
 
 class CoursePage extends ConsumerStatefulWidget {
   const CoursePage({super.key, required this.slug});
@@ -62,15 +63,15 @@ class _CoursePageState extends ConsumerState<CoursePage> {
     final state = ref.read(enrollProvider(detail.course.id));
     state.when(
       data: (_) {
-        if (context.mounted) {
-          showSnack(context, 'Du är nu anmäld till introduktionen.');
+        context.ifMounted((c) {
+          showSnack(c, 'Du är nu anmäld till introduktionen.');
           ref.invalidate(courseDetailProvider(widget.slug));
-        }
+        });
       },
       error: (error, _) {
-        if (context.mounted) {
-          showSnack(context, 'Kunde inte anmäla: ${_friendlyError(error)}');
-        }
+        context.ifMounted(
+          (c) => showSnack(c, 'Kunde inte anmäla: ${_friendlyError(error)}'),
+        );
       },
       loading: () {},
     );
@@ -83,7 +84,8 @@ class _CoursePageState extends ConsumerState<CoursePage> {
     setState(() => _ordering = true);
     try {
       final pay = PaymentsService();
-      final order = await pay.startCourseOrder(courseId: courseId, amountCents: price);
+      final order =
+          await pay.startCourseOrder(courseId: courseId, amountCents: price);
       if (!mounted) return;
       // Watch realtime updates for the specific order
       try {
@@ -98,21 +100,25 @@ class _CoursePageState extends ConsumerState<CoursePage> {
       final url = await pay.createCheckoutSession(
         orderId: order['id'] as String,
         amountCents: price,
-        successUrl: 'https://andlig.app/payment/success?order_id=${order['id']}',
+        successUrl:
+            'https://andlig.app/payment/success?order_id=${order['id']}',
         cancelUrl: 'https://andlig.app/payment/cancel?order_id=${order['id']}',
         customerEmail: null,
       );
       if (url != null) {
         await launchUrlString(url);
       } else {
-        if (context.mounted) {
-          showSnack(context, 'Kunde inte initiera betalning.');
-        }
+        context.ifMounted(
+          (c) => showSnack(c, 'Kunde inte initiera betalning.'),
+        );
       }
     } catch (error) {
-      if (context.mounted) {
-        showSnack(context, 'Kunde inte skapa order: ${_friendlyError(error)}');
-      }
+      context.ifMounted(
+        (c) => showSnack(
+          c,
+          'Kunde inte skapa order: ${_friendlyError(error)}',
+        ),
+      );
     } finally {
       if (mounted) setState(() => _ordering = false);
     }
@@ -165,7 +171,8 @@ class _CourseContent extends StatelessWidget {
                 children: [
                   Text(
                     course.title,
-                    style: t.headlineMedium?.copyWith(fontWeight: FontWeight.w800),
+                    style:
+                        t.headlineMedium?.copyWith(fontWeight: FontWeight.w800),
                   ),
                   const SizedBox(height: 8),
                   if (course.description != null)
@@ -182,7 +189,8 @@ class _CourseContent extends StatelessWidget {
                             ? const SizedBox(
                                 height: 18,
                                 width: 18,
-                                child: CircularProgressIndicator(strokeWidth: 2),
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2),
                               )
                             : const Text('Starta gratis intro'),
                       ),
@@ -194,9 +202,11 @@ class _CourseContent extends StatelessWidget {
                               ? const SizedBox(
                                   height: 18,
                                   width: 18,
-                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                  child:
+                                      CircularProgressIndicator(strokeWidth: 2),
                                 )
-                              : Text('Köp hela kursen (${priceCents / 100} kr)'),
+                              : Text(
+                                  'Köp hela kursen (${priceCents / 100} kr)'),
                         ),
                     ],
                   ),
@@ -251,7 +261,8 @@ class _CourseContent extends StatelessWidget {
                       const SizedBox(height: 8),
                       ...lessons.map(
                         (lesson) => ListTile(
-                          leading: const Icon(Icons.play_circle_outline_rounded),
+                          leading:
+                              const Icon(Icons.play_circle_outline_rounded),
                           title: Text(lesson.title),
                           subtitle: lesson.isIntro
                               ? const Text('Förhandsvisning')

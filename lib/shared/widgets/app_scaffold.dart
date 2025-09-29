@@ -89,13 +89,12 @@ class AppScaffold extends StatelessWidget {
   }
 }
 
-/// Full-bleed bakgrund med bild i cover-läge och en subtil gradient för läsbarhet.
+/// Full-bleed bakgrund i cover-läge med mjuk toppscrim (och valfri varm overlay).
 class FullBleedBackground extends StatelessWidget {
   final Widget child;
   final ImageProvider image;
   final Alignment alignment;
   final double topOpacity;
-  final double bottomOpacity;
 
   /// Positivt värde flyttar bilden nedåt (px). Använd för parallax.
   final double yOffset;
@@ -105,16 +104,21 @@ class FullBleedBackground extends StatelessWidget {
 
   /// Vignette från sidorna (0.0–1.0). 0 = av.
   final double sideVignette;
+  final Color? overlayColor;
+  final List<Color>? scrimColors;
+  final List<double>? scrimStops;
   const FullBleedBackground({
     super.key,
     required this.child,
     required this.image,
     this.alignment = Alignment.center,
-    this.topOpacity = 0.20,
-    this.bottomOpacity = 0.45,
+    this.topOpacity = 0.26,
     this.yOffset = 0,
     this.scale = 1.0,
     this.sideVignette = 0.0,
+    this.overlayColor,
+    this.scrimColors,
+    this.scrimStops,
   });
 
   @override
@@ -144,14 +148,20 @@ class FullBleedBackground extends StatelessWidget {
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
-                colors: [
-                  Colors.black.withValues(alpha: topOpacity),
-                  Colors.black.withValues(alpha: bottomOpacity),
-                ],
+                colors: scrimColors ??
+                    [
+                      Colors.black.withValues(alpha: topOpacity),
+                      Colors.transparent,
+                    ],
+                stops: scrimStops ?? const [0.0, 0.25],
               ),
             ),
           ),
         ),
+        if (overlayColor != null)
+          Positioned.fill(
+            child: ColoredBox(color: overlayColor!),
+          ),
         if (sideVignette > 0)
           Positioned.fill(
             child: DecoratedBox(

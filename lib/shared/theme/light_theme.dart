@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 
-import 'package:visdom/shared/theme/ui_consts.dart';
+import 'package:wisdom/shared/theme/ui_consts.dart';
 
-const Color kPrimary = Color(0xFF3F6DFF);
-const Color kSecondary = Color(0xFF1BBE8F);
+const Color kPrimary = Color(0xFF9B8CFF);
+const Color kSecondary = Color(0xFF4FC3F7);
 
 ThemeData buildLightTheme() {
   final scheme = ColorScheme.fromSeed(
@@ -12,6 +12,9 @@ ThemeData buildLightTheme() {
     primary: kPrimary,
     secondary: kSecondary,
   );
+
+  final buttonShape =
+      RoundedRectangleBorder(borderRadius: BorderRadius.circular(14));
 
   return ThemeData(
     useMaterial3: true,
@@ -32,13 +35,40 @@ ThemeData buildLightTheme() {
       surfaceTintColor: Colors.white,
       shadowColor: Colors.black.withValues(alpha: 0.08),
     ),
-    filledButtonTheme: const FilledButtonThemeData(
-      style: ButtonStyle(
-        minimumSize: WidgetStatePropertyAll(Size(64, 48)),
-        padding: WidgetStatePropertyAll(px16),
-        shape: WidgetStatePropertyAll(
-          RoundedRectangleBorder(borderRadius: br12),
-        ),
+    filledButtonTheme: FilledButtonThemeData(
+      style: FilledButton.styleFrom(
+        backgroundColor: scheme.primary,
+        foregroundColor: scheme.onPrimary,
+        minimumSize: const Size(64, 48),
+        padding: px16,
+        shape: buttonShape,
+      ),
+    ),
+    elevatedButtonTheme: ElevatedButtonThemeData(
+      style: ElevatedButton.styleFrom(
+        backgroundColor: scheme.primary,
+        foregroundColor: scheme.onPrimary,
+        minimumSize: const Size(64, 48),
+        padding: px16,
+        shape: buttonShape,
+        elevation: 0,
+      ),
+    ),
+    outlinedButtonTheme: OutlinedButtonThemeData(
+      style: OutlinedButton.styleFrom(
+        foregroundColor: scheme.primary,
+        side: BorderSide(color: scheme.primary),
+        minimumSize: const Size(64, 48),
+        padding: px16,
+        shape: buttonShape,
+      ),
+    ),
+    textButtonTheme: TextButtonThemeData(
+      style: TextButton.styleFrom(
+        foregroundColor: scheme.primary,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        textStyle: const TextStyle(fontWeight: FontWeight.w600),
+        shape: buttonShape,
       ),
     ),
     inputDecorationTheme: InputDecorationTheme(
@@ -54,7 +84,7 @@ ThemeData buildLightTheme() {
     navigationBarTheme: NavigationBarThemeData(
       backgroundColor: Colors.transparent,
       surfaceTintColor: Colors.transparent,
-      indicatorColor: kPrimary.withValues(alpha: 0.12),
+      indicatorColor: scheme.primary.withValues(alpha: 0.12),
       labelTextStyle: const WidgetStatePropertyAll(
         TextStyle(fontWeight: FontWeight.w600),
       ),

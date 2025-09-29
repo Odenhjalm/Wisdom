@@ -1,0 +1,215 @@
+Analys av GitHub‑projektet Visdom
+Översikt
+
+Repositoryt Visdom ("Andlig Väg – Social Plattform") är ett Flutter‑projekt som kombinerar UI i Material 3 med Supabase som backend. I projektets README beskrivs appen som en ljus, proffsig social plattform där användare kan dela inlägg, följa varandra, recensera tjänster och ta del av kurser och meditationer
+GitHub
+. Kodbasen är modulär med funktioner grupperade under features/ och shared/ samt ett gemensamt router‑lager (lib/core/routing). Supabase‑klienten initialiseras i main.dart och hålls globalt via Riverpod‑providers
+GitHub
+GitHub
+. SQL‑migrations under lib/data/supabase/init definierar alla tabeller, RLS‑policys och RPC‑funktioner för sociala funktioner som inlägg, följerelationer, recensioner, notiser och meditationer
+GitHub
+. Följande delsystem är implementerade:
+
+Social feed och community
+
+Inlägg (posts) och följerelationer: SQL‑migreringen skapar tabellen app.posts för text‑ och media‑inlägg med RLS‑policys som endast tillåter ägaren eller lärare att skriva/uppdatera inlägg
+GitHub
+. Tabeller för app.follows, app.reviews och app.notifications tillåter användare att följa varandra, recensera tjänster och få notiser
+GitHub
+.
+
+Feed i hemvyn: HomePage (äldre implementation) laddar inloggade användares kurser och hämtar community‑inlägg med hjälp av PostsService, prenumererar på posts-feed via Supabase realtime och tillåter att skapa inlägg i en composer
+GitHub
+GitHub
+. Den publicerade README beskriver att man kan besöka /home efter inloggning, dela inlägg i feeden och se dem i realtid
+GitHub
+.
+
+Följa och social interaktion: app/follows tillåter användare att följa varandra och har RLS‑policys som endast låter ägaren skriva/ta bort följerelationer
+GitHub
+. Inbyggda RPC:er follow och unfollow existerar enligt README men implementeringen ligger i SQL (i social.sql).
+
+Kurser och lärarstudio
+
+Landing och gratis‑introkurser: LandingPage laddar populära kurser och gratis introduktionskurser från Supabase och visar dem i UI
+GitHub
+. Modals öppnar listor av introkurser när användaren klickar på en knapp
+GitHub
+.
+
+Kurser och lektioner: TeacherHomeScreen visar lärarens kurser och låter skapa nya kurser
+GitHub
+. CourseEditorScreen tillåter lärare att skapa/uppdatera kurser och moduler (lektioner), lägga till innehåll, uppladda media och skapa quiz med optimistisk UI
+GitHub
+. Kurs‑moduler kan vara text, video eller quiz.
+
+Certifikatflöde: README nämner att certifikatflödet har byggts tidigare; SQL‑migreringen 20250913_certificates.sql definierar tabeller och RLS för certifikat (lärarstatus) och det finns UI för admin att verifiera dessa
+GitHub
+.
+
+Guardrails och ansökningsprocess: Routern använder GoRouter och en Gate notifier för att dirigera användaren. Oinloggade omdirigeras från privata sidor till /login och lärare får egna rutter (t.ex. /teacher)
+GitHub
+. CourseEditorScreen kontrollerar via AuthService.isTeacher() att endast lärare får komma åt studion; annars blir användaren omdirigerad till /login
+GitHub
+.
+
+Tjänster, meddelanden och andra funktioner
+
+Tjänster (services): SQL‑migreringen lägger till service_id på orders och definierar tabellen app.reviews där användare kan recensera en tjänst med betyg och kommentar
+GitHub
+. README beskriver att /service/:id visar tjänst‑detaljer med köp/bokning via en edge‑funktion samt att användare kan lämna recensioner
+GitHub
+.
+
+Meddelanden (chat): Databasen använder tabellen app.messages (tidigare) och SQL‑migreringen lägger en constraint på channel för olika kanaltyper (global, course, event, service, dm)
+GitHub
+. Routern definierar /messages/:uid och ChatPage låter användare chatta med varandra eller inom en tjänst
+GitHub
+GitHub
+.
+
+Meditationer: Databasen skapar tabellen app.meditations för meditativt ljud; med RLS‑policys för att endast visa publika eller egna meditationer
+GitHub
+. README föreslår en framtida “Studio” för att skapa meditationer
+GitHub
+.
+
+Miljö‑hantering och Supabase‑init: supabase_client.dart laddar variabler från .env eller compile‑time defines, initierar Supabase och registrerar en onAuthStateChange‑lyssnare som öppnar/stänger Gate när användaren loggar in eller ut
+GitHub
+GitHub
+. Global envInfo med status ok eller missing används för att visa banner/snackbar om nycklar saknas
+GitHub
+GitHub
+.
+
+Vad som behöver göras
+
+Utöver den implementerade funktionaliteten finns ett antal öppna arbetsuppgifter och förbättringsområden. Dessa är dels dokumenterade i codex_tasks.md och codex/tasks/EXAMPLES.md, dels i README under “Nästa steg”.
+
+1. UI‑polish och obehindrade bredder
+
+codex_tasks.md beskriver en uppgift att polera UI:n och förhindra fel i layout som orsakas av widgets med oändlig bredd. Alla knappar i Row ska använda Expanded/Flexible istället för width: double.infinity
+GitHub
+. Const‑konstruktorer ska användas där möjligt, oanvända importer tas bort och alla snackbars ska gå via showSnack
+GitHub
+. Dessutom ska man se till att flutter analyze är rent och att inga use_build_context_synchronously finns kvar
+GitHub
+.
+
+2. Säkerhet och miljö (prod‑redo)
+
+För produktion ska man säkerställa att .env endast innehåller publika klientnycklar; service‑role‑nycklar får aldrig ligga i appen
+GitHub
+. main.dart bör ladda .env och om nycklar saknas sätta en global status EnvStatus.missing samt visa banner/snackbar i landing page med instruktioner
+GitHub
+. oauth_redirect.dart ska inte krascha när env saknas utan visa en snackbar och blockera autentiseringsfunktioner
+GitHub
+. .gitignore måste inkludera .env och android/key.properties
+GitHub
+. En checklista för att granska RLS‑policys för alla tabeller som UI skriver till bör göras
+GitHub
+.
+
+3. Tester och kvalitet
+
+Det saknas automatiska tester. Uppgiften 6) Tester kräver minst tre testkategorier: (1) widget smoke‑test där appen startas och landningssidan renderas, (2) router‑tester som bekräftar att skyddade rutter blockeras för utloggade och släpps igenom för inloggade användare, och (3) dataflödestest där en mockad provider returnerar en lista och UI visar korrekt antal rader
+GitHub
+. Tester ska skrivas med flutter_test och mocktail
+GitHub
+.
+
+4. CI/CD
+
+Ett GitHub‑workflow saknas. codex_tasks.md föreslår att man skapar .github/workflows/flutter.yml som kör flutter pub get, dart format --output=none --set-exit-if-changed ., flutter analyze och flutter test för varje push eller pull request
+GitHub
+. Ytterligare en manuellt triggad workflow release-android.yml ska bygga Android‑AppBundle i release‑läge och ladda upp som artefakt
+GitHub
+.
+
+5. Android‑release och signering
+
+För att kunna publicera i Google Play måste projektets gradle‑konfiguration uppdateras: använda compileSdkVersion 34, targetSdkVersion 34 och minSdkVersion 23/24
+GitHub
+. En key.properties ska läsas för signering och AndroidManifest.xml behöver innehålla en wisdom://auth-callback deep‑link
+GitHub
+. Detta arbete täcker även att bygga appen med flutter build appbundle --release och testköra i Play Console
+GitHub
+.
+
+6. Funktionella förbättringar från README
+
+README listar konkreta framtida steg:
+
+Admin‑gränssnittet: UI‑feedback när lärarstatus nekas; databasen kräver redan verifierade certifikat men UI visar inget meddelande
+GitHub
+.
+
+Recensioner på tjänster: lägga till betyg och recensioner på tjänst‑detaljer samt visa aggregerat betyg i listor
+GitHub
+.
+
+Meddelande‑kanaler: skapa en översikt som samlar DM och tjänstemeddelanden och visa olästa‑badges via notifications
+GitHub
+.
+
+Meditationsstudio: bygga en studio‑flik för CRUD av meditationer och uppladdning till media/meditations/…
+GitHub
+.
+
+7. Påbörjade men ej avslutade funktioner
+
+En mapp codex/tasks/EXAMPLES.md innehåller exempeluppgifter:
+
+Free Tier & access‑kontroll: implementera RPC:er free_consumed_count och can_access_course samt guard i GoRouter för att begränsa hur många gratislektioner en användare kan ta
+GitHub
+.
+
+Lärarstudio – grund: bygga /studio med ansökningsvy för icke‑lärare, full CRUD för kurser/moduler/lektioner, rich text för lektioner och media‑upload till public-media/{user.id}
+GitHub
+.
+
+Stripe‑flöde: integrera Stripe med checkout och edge‑webhook; RPC:er start_order() och complete_order() och uppdatera orders‑status till paid
+GitHub
+.
+
+Dessa uppgifter tycks delvis påbörjade i codebasen (t.ex. CourseEditor har CRUD, men rich text och full finish saknas), men det återstår att implementera server‑RPC och UI‑guards.
+
+Förbättringsmöjligheter
+
+Utöver listan ovan finns utrymme att förbättra arkitektur, användarupplevelse och kodkvalitet. Nedan följer några förslag baserade på den nuvarande koden och principerna för en robust Flutter‑app.
+
+Modulär arkitektur och mapprensning. Codebasen blandar äldre andlig_app‑filer med nya wisdom‑moduler. Rensa bort gamla mappar (lib/ui/pages/, lib/data/course_service.dart) och konsolidera allt under features/ och shared/ för tydlighet. Upprätta en klar modulstruktur med separata layers för data/repo, domain, presentation.
+
+Konsekvent pakagnamn. Flera filer importerar andlig_app/…, vilket indikerar att paketnamnet inte har uppdaterats efter bytet till Visdom
+GitHub
+. Detta bör korrigeras i pubspec.yaml och alla importvägar för att undvika förvirring.
+
+Felhantering och användarfeedback. Många async‑metoder fångar generiska catch (_) {} och ignorerar fel. Implementera centraliserad felhantering (t.ex. via Riverpod AsyncValue.guard) och visa meningsfulla fel för användaren.
+
+Ladda tillstånd reaktivt. I LandingPage sker dataladdning i initState och manuell setState. Genom att använda Riverpod FutureProvider eller StateNotifier kan UI automatiskt reagera på dataändringar och man undviker läckor med mounted–kontroller.
+
+Använd Freezed och JsonSerializable för modeller. Dataobjekt som kurser och profiler hanteras som Map istället för typade klasser. Genom att generera modeller får man immutability, enkel serialisering och bättre type‑safety.
+
+Temahantering. Light theme definieras men det saknas dark mode och definierade textstilar. En gemensam ThemeData i shared/theme med definierade text och spacing‑konstanter gör UI enhetligt och underlättar anpassningar.
+
+Internationell anpassning (i18n). Appen är svenskspråkig men strängar är hårdkodade. Genom att införa intl‑paketet och arb‑filer kan man göra appen flerspråkig och enklare att översätta.
+
+Stateful widgets till stateless. Många stateful widgets i UI kunde ersättas med ConsumerWidget + providers, vilket minskar boilerplate och underlättar testning.
+
+Unit‑ och integrationstester. Förutom de tre minimala tester som beskrivs ovan bör man skriva enhetstester för service‑klasser (t.ex. TeacherRepository) och integrationstester som kör flöden (registrering, kursköp). Använd mocktail för Supabase.
+
+Säkerhetsförbättringar. RLS‑policys täcker mycket men reviews_write_owner saknar enforcing av att användaren faktiskt har beställt tjänsten
+GitHub
+. Implementera en trigger eller RPC för att kontrollera att orders.status = 'paid' innan recension skrivs. Dessutom bör meddelanden filtreras baserat på om användaren har behörighet till kanalen.
+
+Prestanda och caching. Supabase‑anrop görs direkt från UI vilket kan orsaka spinners. Introducera caching via Hive eller flutter_secure_storage och hämta data i bakgrunden.
+
+Offline‑stöd och PWA. Flutter web‑stöd är naturligt, men offline‑stöd och “installable PWA” skulle ge mervärde. Använd flutter_pwa och Workbox‑strategier för caching av assets.
+
+Sök och filtrering. Kurser och meditationslistor kan bli många; implementera sök‑ och filterfunktioner med streaming från Supabase samt index i databasen.
+
+Slutsats
+
+Visdom‑projektet har en imponerande grund med social feed, kursstudio, certifikatflöde och Supabase‑integration. Backend‑delen är väl genomtänkt med RLS och RPC:er för säkerhet och funktionalitet. För att nå produktionsnivå behövs dock UI‑polish, miljö‑härdning, automatiska tester, CI/CD och Android‑signering. Dessutom finns flera funktionella områden att bygga ut: admin‑feedback vid avslag, recensioner på tjänster, samlad meddelandeöversikt och en meditationsstudio
+GitHub
+. Genom att rensa upp arkitekturen, införa typed models, förbättra felhantering och bygga ut testsvit och pipeline kan Visdom bli en stabil och mäktig plattform som speglar visionen om en harmonisk och pålitlig social app.

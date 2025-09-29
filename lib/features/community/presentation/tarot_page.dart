@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:visdom/core/errors/app_failure.dart';
-import 'package:visdom/features/community/application/community_providers.dart';
-import 'package:visdom/shared/widgets/app_scaffold.dart';
+import 'package:wisdom/core/errors/app_failure.dart';
+import 'package:wisdom/features/community/application/community_providers.dart';
+import 'package:wisdom/shared/widgets/app_scaffold.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:visdom/core/supabase_ext.dart';
-import 'package:visdom/shared/utils/snack.dart';
+import 'package:wisdom/core/supabase_ext.dart';
+import 'package:wisdom/shared/utils/snack.dart';
+import 'package:wisdom/shared/utils/context_safe.dart';
 
 class TarotPage extends ConsumerStatefulWidget {
   const TarotPage({super.key});
@@ -75,8 +76,7 @@ class _TarotPageState extends ConsumerState<TarotPage> {
                     child: ListTile(
                       leading: const Icon(Icons.auto_awesome_rounded),
                       title: Text(req['question'] as String? ?? ''),
-                      subtitle:
-                          Text('${req['status']} • ${req['created_at']}'),
+                      subtitle: Text('${req['status']} • ${req['created_at']}'),
                     ),
                   );
                 },
@@ -105,11 +105,11 @@ class _TarotPageState extends ConsumerState<TarotPage> {
       });
       _question.clear();
       ref.invalidate(tarotRequestsProvider);
-      if (!context.mounted) return;
-      showSnack(context, 'Förfrågan skickad.');
+      context.ifMounted((c) => showSnack(c, 'Förfrågan skickad.'));
     } catch (error) {
-      if (!context.mounted) return;
-      showSnack(context, 'Kunde inte skicka: ${_friendlyError(error)}');
+      context.ifMounted(
+        (c) => showSnack(c, 'Kunde inte skicka: ${_friendlyError(error)}'),
+      );
     } finally {
       if (mounted) setState(() => _sending = false);
     }

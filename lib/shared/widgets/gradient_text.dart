@@ -1,36 +1,32 @@
 import 'package:flutter/material.dart';
 
-class GradientTextSpan extends WidgetSpan {
-  GradientTextSpan({
-    required String text,
-    required Gradient gradient,
-    TextStyle? style,
-  }) : super(
-          alignment: PlaceholderAlignment.baseline,
-          baseline: TextBaseline.alphabetic,
-          child: _GradientText(
-            text: text,
-            gradient: gradient,
-            style: style,
-          ),
-        );
-}
+/// Simple helper for rendering text with the Wisdom gradient palette.
+class GradientText extends StatelessWidget {
+  const GradientText(
+    this.text, {
+    required this.style,
+    this.gradient,
+    super.key,
+  });
 
-class _GradientText extends StatelessWidget {
   final String text;
-  final Gradient gradient;
-  final TextStyle? style;
+  final TextStyle style;
+  final Gradient? gradient;
 
-  const _GradientText({required this.text, required this.gradient, this.style});
+  static const Gradient _defaultGradient = LinearGradient(
+    colors: [Color(0xFF9B8CFF), Color(0xFF4FC3F7)],
+  );
 
   @override
   Widget build(BuildContext context) {
-    final baseStyle = DefaultTextStyle.of(context).style.merge(style);
+    final resolvedGradient = gradient ?? _defaultGradient;
     return ShaderMask(
-      blendMode: BlendMode.srcIn,
-      shaderCallback: (bounds) => gradient
+      shaderCallback: (bounds) => resolvedGradient
           .createShader(Rect.fromLTWH(0, 0, bounds.width, bounds.height)),
-      child: Text(text, style: baseStyle),
+      child: Text(
+        text,
+        style: style.copyWith(color: Colors.white),
+      ),
     );
   }
 }

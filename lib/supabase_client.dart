@@ -15,7 +15,7 @@ String? _authRedirect;
 bool _gateOpen = false;
 EnvInfo _envInfo = envInfoOk;
 
-const String kAppRedirect = 'visdom://auth-callback';
+const String kAppRedirect = 'wisdom://auth-callback';
 
 const String _supabaseUrl =
     String.fromEnvironment('SUPABASE_URL', defaultValue: '');

@@ -1,16 +1,16 @@
 import 'package:flutter/material.dart';
-import 'package:visdom/shared/widgets/app_scaffold.dart';
-import 'package:visdom/data/repositories/profile_repository.dart';
-import 'package:visdom/data/models/profile.dart';
-import 'package:visdom/data/supabase/supabase_client.dart';
-import 'package:visdom/core/supabase_ext.dart';
-import 'package:visdom/features/studio/data/studio_repository.dart';
+import 'package:wisdom/shared/widgets/app_scaffold.dart';
+import 'package:wisdom/data/repositories/profile_repository.dart';
+import 'package:wisdom/data/models/profile.dart';
+import 'package:wisdom/data/supabase/supabase_client.dart';
+import 'package:wisdom/core/supabase_ext.dart';
+import 'package:wisdom/features/studio/data/studio_repository.dart';
 import 'package:file_selector/file_selector.dart' as fs;
-import 'package:visdom/shared/widgets/hero_background.dart';
-import 'package:visdom/features/studio/data/certificates_repository.dart';
-import 'package:visdom/domain/services/auth_service.dart';
-import 'package:visdom/shared/utils/snack.dart';
-import 'package:visdom/shared/widgets/glass_card.dart';
+import 'package:wisdom/shared/widgets/hero_background.dart';
+import 'package:wisdom/features/studio/data/certificates_repository.dart';
+import 'package:wisdom/domain/services/auth_service.dart';
+import 'package:wisdom/shared/utils/snack.dart';
+import 'package:wisdom/shared/widgets/glass_card.dart';
 
 class StudioPage extends StatefulWidget {
   const StudioPage({super.key});
@@ -63,10 +63,15 @@ class _StudioPageState extends State<StudioPage> {
     if (u == null) return;
     setState(() => _sending = true);
     try {
-      await Supa.client.app.from('teacher_requests').upsert({
-        'user_id': u.id,
-        'message': 'Jag vill bli lärare. (ansökan från app)'
-      });
+      await Supa.client.app.from('certificates').upsert(
+        {
+          'user_id': u.id,
+          'title': 'Läraransökan',
+          'status': 'pending',
+          'notes': 'Jag vill bli lärare. (ansökan från app)',
+        },
+        onConflict: 'user_id,title',
+      );
       if (!mounted) return;
       showSnack(context, 'Ansökan inskickad. Tack!');
     } catch (e) {
@@ -94,8 +99,10 @@ class _StudioPageState extends State<StudioPage> {
       );
     }
 
-    final role = _me?.role ?? 'user';
-    final isTeacher = _hasTeacherAccess || role == 'teacher' || role == 'admin';
+    final profile = _me;
+    final isTeacher = _hasTeacherAccess ||
+        (profile?.isAdmin ?? false) ||
+        (profile?.isTeacher ?? false);
     if (isTeacher) {
       return const _StudioShell();
     }

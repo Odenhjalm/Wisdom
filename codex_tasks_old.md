@@ -78,7 +78,7 @@
 > **MÖNSTERFIX**
 >
 > * I alla filer som använder helpern: säkerställ importen
->   `import 'package:visdom/core/utils/context_safe.dart';`
+>   `import 'package:wisdom/core/utils/context_safe.dart';`
 >   (Ta bort felaktiga varianter som pekar på `andlig_app/...`.)
 > * Ta bort **oanvända** `context_safe.dart`-imports.
 >
@@ -108,7 +108,7 @@
 > **Regler för omskrivning:**
 >
 > 1. Lägg (om saknas) överst:
->    `import 'package:visdom/core/utils/context_safe.dart';`
+>    `import 'package:wisdom/core/utils/context_safe.dart';`
 > 2. Hitta mönster **efter ett `await`** där du anropar *något* som använder `context`, t.ex.:
 >
 >    * `context.go(...)`, `context.push(...)`, `context.pop()`
@@ -137,7 +137,7 @@
 > **MÖNSTERFIX**
 >
 > * I `lib/screens/teacher/course_editor.dart`: ta bort oanvänd import av `../../core/utils/context_safe.dart` om den inte används efter omskrivningen.
-> * I `lib/ui/pages/course_page.dart`: ta bort `import 'package:visdom/core/utils/context_safe.dart';` och ersätt med rätt visdom-import **om** helpern används. Om *inte* används, ta bort importen helt.
+> * I `lib/ui/pages/course_page.dart`: ta bort `import 'package:wisdom/core/utils/context_safe.dart';` och ersätt med rätt Wisdom-import **om** helpern används. Om *inte* används, ta bort importen helt.
 >
 > ---
 >
@@ -209,7 +209,7 @@ Klista in hela prompten till Copilot/Codex i VS Code.
 > 1. Lägg till import överst i filen om saknas:
 >
 >    ```dart
->    import 'package:visdom/core/utils/context_safe.dart';
+>    import 'package:wisdom/core/utils/context_safe.dart';
 >    ```
 > 2. Hitta alla mönster där en **await** följs av ett **context-beroende** anrop (efter await), t.ex.:
 >
@@ -385,7 +385,7 @@ Klista in hela prompten till Copilot/Codex i VS Code.
 >
 > **MÖNSTERFIX** i `forgot_password_page.dart` och `signup_page.dart`:
 >
-> * Lägg till `import 'package:visdom/core/auth/oauth_redirect.dart';` (om saknas).
+> * Lägg till `import 'package:wisdom/core/auth/oauth_redirect.dart';` (om saknas).
 > * Anropa:
 >
 >   ```dart
@@ -568,7 +568,7 @@ class _AuthCallbackPageState extends State<AuthCallbackPage> {
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:visdom/features/auth/auth_callback_page.dart';
+import 'package:wisdom/features/auth/auth_callback_page.dart';
 
 // Dummy pages to keep router compilable; replace with your real pages.
 class HomePage extends StatelessWidget {
@@ -595,7 +595,7 @@ final GoRouter appRouter = GoRouter(
 Fil: lib/features/auth/forgot_password_page.dart
 Byt ut eventuella hårdkodade redirectTo:. Använd:
 
-import 'package:visdom/core/auth/oauth_redirect.dart';
+import 'package:wisdom/core/auth/oauth_redirect.dart';
 ...
 await Supabase.instance.client.auth.resetPasswordForEmail(
   email,
@@ -605,7 +605,7 @@ await Supabase.instance.client.auth.resetPasswordForEmail(
 5) Uppdatera Signup till helpern (om e-postbekräftelse eller magic link används)
 Fil: lib/features/auth/signup_page.dart
 
-import 'package:visdom/core/auth/oauth_redirect.dart';
+import 'package:wisdom/core/auth/oauth_redirect.dart';
 ...
 // Exempel om du skickar magic link eller email confirm manuellt:
 await Supabase.instance.client.auth.signInWithOtp(
@@ -626,7 +626,7 @@ SUPABASE_ANON_KEY=***MASKED***
 
 AUTH_REDIRECT_WEB=http://localhost:5500/auth-callback
 AUTH_REDIRECT_DESKTOP=http://localhost:5500/auth-callback
-AUTH_REDIRECT_APP=visdom://auth-callback
+AUTH_REDIRECT_APP=wisdom://auth-callback
 
 
 
@@ -639,7 +639,7 @@ AUTH_REDIRECT_APP=visdom://auth-callback
   <action android:name="android.intent.action.VIEW"/>
   <category android:name="android.intent.category.DEFAULT"/>
   <category android:name="android.intent.category.BROWSABLE"/>
-  <data android:scheme="visdom" android:host="auth-callback"/>
+  <data android:scheme="wisdom" android:host="auth-callback"/>
 </intent-filter>
 
 
@@ -650,7 +650,7 @@ ios/Runner/Info.plist:
   <dict>
     <key>CFBundleURLSchemes</key>
     <array>
-      <string>visdom</string>
+      <string>wisdom</string>
     </array>
   </dict>
 </array>
@@ -676,7 +676,7 @@ Gör exakt detta:
 
 1) Supabase-anrop:
    - I glömt-lösenord-funktionen, skicka redirectTo:
-     kIsWeb ? 'http://localhost:5500/auth-callback' : 'visdom://auth-callback'
+     kIsWeb ? 'http://localhost:5500/auth-callback' : 'wisdom://auth-callback'
    - Parametrera port via en central konfig (env/dotenv eller const).
 
 2) Auth listener:
@@ -691,8 +691,8 @@ Gör exakt detta:
    - Säkerställ att webbuilden hanterar path `/auth-callback` (go_router).
 
 5) Android/iOS:
-   - AndroidManifest: intent-filter med scheme `visdom`, host `auth-callback`.
-   - iOS Info.plist: CFBundleURLSchemes med `visdom`.
+   - AndroidManifest: intent-filter med scheme `wisdom`, host `auth-callback`.
+   - iOS Info.plist: CFBundleURLSchemes med `wisdom`.
 
 6) Rapportera:
    - Lista filer ändrade.

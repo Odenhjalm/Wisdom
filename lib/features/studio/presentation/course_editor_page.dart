@@ -7,14 +7,14 @@ import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 
-import 'package:visdom/shared/widgets/top_nav_action_buttons.dart';
-import 'package:visdom/shared/theme/ui_consts.dart';
-import 'package:visdom/shared/utils/context_safe.dart';
-import 'package:visdom/shared/utils/snack.dart';
-import 'package:visdom/shared/widgets/glass_card.dart';
-import 'package:visdom/features/studio/data/teacher_repository.dart';
-import 'package:visdom/domain/services/auth_service.dart';
-import 'package:visdom/supabase_client.dart';
+import 'package:wisdom/shared/widgets/top_nav_action_buttons.dart';
+import 'package:wisdom/shared/theme/ui_consts.dart';
+import 'package:wisdom/shared/utils/context_safe.dart';
+import 'package:wisdom/shared/utils/snack.dart';
+import 'package:wisdom/shared/widgets/glass_card.dart';
+import 'package:wisdom/features/studio/data/teacher_repository.dart';
+import 'package:wisdom/domain/services/auth_service.dart';
+import 'package:wisdom/supabase_client.dart';
 
 class CourseEditorScreen extends ConsumerStatefulWidget {
   final String? courseId;

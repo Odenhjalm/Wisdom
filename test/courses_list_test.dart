@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:visdom/features/courses/application/course_providers.dart';
-import 'package:visdom/features/courses/data/courses_repository.dart';
+import 'package:wisdom/features/courses/application/course_providers.dart';
+import 'package:wisdom/features/courses/data/courses_repository.dart';
 
 class _CoursesListView extends ConsumerWidget {
   const _CoursesListView();

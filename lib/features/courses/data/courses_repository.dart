@@ -2,8 +2,8 @@ import 'dart:async';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import 'package:visdom/core/errors/app_failure.dart';
-import 'package:visdom/core/supabase_ext.dart';
+import 'package:wisdom/core/errors/app_failure.dart';
+import 'package:wisdom/core/supabase_ext.dart';
 
 class CoursesRepository {
   CoursesRepository({SupabaseClient? client})

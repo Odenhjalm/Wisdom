@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import 'package:visdom/shared/theme/ui_consts.dart';
-import 'package:visdom/shared/utils/snack.dart';
+import 'package:wisdom/shared/theme/ui_consts.dart';
+import 'package:wisdom/shared/utils/snack.dart';
+import 'package:wisdom/shared/widgets/gradient_text.dart';
+import 'package:wisdom/shared/utils/context_safe.dart';
 
-import 'package:visdom/gate.dart';
+import 'package:wisdom/gate.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -29,6 +31,7 @@ class _LoginPageState extends State<LoginPage> {
 
   @override
   Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
     return Scaffold(
       body: SafeArea(
         child: Center(
@@ -96,13 +99,19 @@ class _LoginPageState extends State<LoginPage> {
                           TextButton(
                             onPressed:
                                 _busy ? null : () => context.go('/signup'),
-                            child: const Text('Skapa konto'),
+                            child: GradientText(
+                              'Skapa konto',
+                              style: textTheme.bodyMedium ?? const TextStyle(),
+                            ),
                           ),
                           TextButton(
                             onPressed: _busy
                                 ? null
                                 : () => context.go('/forgot-password'),
-                            child: const Text('Glömt lösenord?'),
+                            child: GradientText(
+                              'Glömt lösenord?',
+                              style: textTheme.bodyMedium ?? const TextStyle(),
+                            ),
                           ),
                         ],
                       ),
@@ -129,15 +138,16 @@ class _LoginPageState extends State<LoginPage> {
       await Supabase.instance.client.auth
           .signInWithPassword(email: email, password: password);
       gate.allow();
-      if (!context.mounted) return;
-      showSnack(context, 'Inloggad som $email');
-      context.go('/');
+      context.ifMounted((c) {
+        showSnack(c, 'Inloggad som $email');
+        c.go('/');
+      });
     } on AuthException catch (e) {
-      if (!context.mounted) return;
-      showSnack(context, e.message);
+      context.ifMounted((c) => showSnack(c, e.message));
     } catch (e) {
-      if (!context.mounted) return;
-      showSnack(context, 'Något gick fel. Försök igen.');
+      context.ifMounted(
+        (c) => showSnack(c, 'Något gick fel. Försök igen.'),
+      );
     } finally {
       if (mounted) setState(() => _busy = false);
     }

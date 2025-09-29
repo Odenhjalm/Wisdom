@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart' show VoidCallback;
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:visdom/core/supabase_ext.dart';
+import 'package:wisdom/core/supabase_ext.dart';
 
 class PaymentsService {
   final SupabaseClient _sb;

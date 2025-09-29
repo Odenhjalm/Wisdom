@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:visdom/supabase_client.dart';
-import 'package:visdom/shared/widgets/go_router_back_button.dart';
+import 'package:wisdom/supabase_client.dart';
+import 'package:wisdom/shared/widgets/go_router_back_button.dart';
 
 class ChatPage extends ConsumerStatefulWidget {
   const ChatPage({super.key});

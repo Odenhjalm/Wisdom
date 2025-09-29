@@ -5,15 +5,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import 'package:visdom/core/errors/app_failure.dart';
-import 'package:visdom/features/community/application/community_providers.dart';
-import 'package:visdom/features/courses/application/course_providers.dart';
-import 'package:visdom/features/courses/data/courses_repository.dart';
-import 'package:visdom/features/community/data/posts_repository.dart';
-import 'package:visdom/shared/utils/snack.dart';
-import 'package:visdom/shared/widgets/app_scaffold.dart';
-import 'package:visdom/shared/widgets/courses_grid.dart';
-import 'package:visdom/shared/widgets/home_hero_panel.dart';
+import 'package:wisdom/core/errors/app_failure.dart';
+import 'package:wisdom/features/community/application/community_providers.dart';
+import 'package:wisdom/features/courses/application/course_providers.dart';
+import 'package:wisdom/features/courses/data/courses_repository.dart';
+import 'package:wisdom/features/community/data/posts_repository.dart';
+import 'package:wisdom/shared/utils/snack.dart';
+import 'package:wisdom/shared/widgets/app_scaffold.dart';
+import 'package:wisdom/shared/widgets/courses_grid.dart';
+import 'package:wisdom/shared/widgets/home_hero_panel.dart';
+import 'package:wisdom/shared/utils/context_safe.dart';
 
 class HomePage extends ConsumerStatefulWidget {
   const HomePage({super.key});
@@ -77,12 +78,14 @@ class _HomePageState extends ConsumerState<HomePage> {
       extendBodyBehindAppBar: true,
       transparentAppBar: true,
       appBarForegroundColor: Colors.white,
-      background: const FullBleedBackground(
-        image: AssetImage('assets/images/bakgrund.png'),
-        alignment: Alignment.topCenter,
-        topOpacity: 0.35,
-        bottomOpacity: 0.55,
-        child: SizedBox.shrink(),
+      background: FullBleedBackground(
+        image: const AssetImage('assets/images/bakgrund.png'),
+        alignment: Alignment.center,
+        topOpacity: 0.28,
+        overlayColor: Theme.of(context).brightness != Brightness.dark
+            ? const Color(0xFFFFE2B8).withOpacity(0.10)
+            : null,
+        child: const SizedBox.shrink(),
       ),
       actions: [
         IconButton(
@@ -145,14 +148,14 @@ class _HomePageState extends ConsumerState<HomePage> {
       data: (post) {
         _composer.clear();
         ref.invalidate(postsProvider);
-        if (post != null && context.mounted) {
-          showSnack(context, 'Inlägget publicerades.');
+        if (post != null) {
+          context.ifMounted((c) => showSnack(c, 'Inlägget publicerades.'));
         }
       },
       error: (error, _) {
-        if (context.mounted) {
-          showSnack(context, 'Kunde inte publicera: ${_errorText(error)}');
-        }
+        context.ifMounted(
+          (c) => showSnack(c, 'Kunde inte publicera: ${_errorText(error)}'),
+        );
       },
       loading: () {},
     );
@@ -193,15 +196,15 @@ class _ComposerCard extends StatelessWidget {
               controller: controller,
               minLines: 2,
               maxLines: 4,
-              decoration: const InputDecoration(hintText: 'Skriv ett inlägg...'),
+              decoration:
+                  const InputDecoration(hintText: 'Skriv ett inlägg...'),
             ),
             const SizedBox(height: 8),
             Align(
               alignment: Alignment.centerRight,
               child: ElevatedButton(
-                onPressed: isPublishing
-                    ? null
-                    : () => onPublish(controller.text),
+                onPressed:
+                    isPublishing ? null : () => onPublish(controller.text),
                 child: isPublishing
                     ? const SizedBox(
                         height: 18,
@@ -288,8 +291,7 @@ class _FeedCard extends StatelessWidget {
             ...posts.map(
               (post) => ListTile(
                 leading: const Icon(Icons.person_rounded),
-                title:
-                    Text(post.profile?.displayName ?? 'Användare'),
+                title: Text(post.profile?.displayName ?? 'Användare'),
                 subtitle: Text(post.content),
               ),
             ),

@@ -2,33 +2,30 @@ import 'package:flutter/material.dart';
 
 /// Full-viewport background image with a soft, readable overlay.
 /// - Always covers the entire available space (desktop/web/mobile)
-/// - Low-opacity white/mint gradient for text readability
+/// - Subtle neutral scrim for readability (warm lift in light mode)
 /// - Does not capture gestures (content above remains interactive)
 class BackgroundLayer extends StatelessWidget {
   const BackgroundLayer({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isLightMode = theme.brightness != Brightness.dark;
+
     return Stack(
       fit: StackFit.expand,
       children: [
-        // Solid backdrop so no white tone shines through around the image edges.
         const ColoredBox(color: Colors.black),
-        // Base image covers entire viewport
         IgnorePointer(
-          child: Transform.scale(
-            scale: 1.05,
-            child: Image.asset(
-              'assets/images/bakgrund.png',
-              alignment: Alignment.topCenter,
-              fit: BoxFit.cover,
-              gaplessPlayback: true,
-              filterQuality: FilterQuality.medium,
-            ),
+          child: Image.asset(
+            'assets/images/bakgrund.png',
+            alignment: Alignment.center,
+            fit: BoxFit.cover,
+            filterQuality: FilterQuality.high,
+            gaplessPlayback: true,
           ),
         ),
-        // Soft vertical overlay with a hint of mint
-        Positioned.fill(
+        const Positioned.fill(
           child: IgnorePointer(
             child: DecoratedBox(
               decoration: BoxDecoration(
@@ -36,16 +33,23 @@ class BackgroundLayer extends StatelessWidget {
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                   colors: [
-                    Colors.white.withValues(alpha: 0.20),
-                    const Color(0xFF22C55E).withValues(alpha: 0.05),
-                    Colors.white.withValues(alpha: 0.06),
+                    Color(0x42000000),
+                    Colors.transparent,
                   ],
-                  stops: const [0.0, 0.5, 1.0],
+                  stops: [0.0, 0.25],
                 ),
               ),
             ),
           ),
         ),
+        if (isLightMode)
+          Positioned.fill(
+            child: IgnorePointer(
+              child: ColoredBox(
+                color: const Color(0xFFFFE2B8).withValues(alpha: 0.10),
+              ),
+            ),
+          ),
       ],
     );
   }
