@@ -7,7 +7,6 @@ import 'package:wisdom/shared/widgets/app_scaffold.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:wisdom/core/supabase_ext.dart';
 import 'package:wisdom/shared/utils/snack.dart';
-import 'package:wisdom/shared/utils/context_safe.dart';
 
 class TarotPage extends ConsumerStatefulWidget {
   const TarotPage({super.key});
@@ -105,11 +104,11 @@ class _TarotPageState extends ConsumerState<TarotPage> {
       });
       _question.clear();
       ref.invalidate(tarotRequestsProvider);
-      context.ifMounted((c) => showSnack(c, 'Förfrågan skickad.'));
+      if (!mounted || !context.mounted) return;
+      showSnack(context, 'Förfrågan skickad.');
     } catch (error) {
-      context.ifMounted(
-        (c) => showSnack(c, 'Kunde inte skicka: ${_friendlyError(error)}'),
-      );
+      if (!mounted || !context.mounted) return;
+      showSnack(context, 'Kunde inte skicka: ${_friendlyError(error)}');
     } finally {
       if (mounted) setState(() => _sending = false);
     }

@@ -7,11 +7,12 @@ import 'package:go_router/go_router.dart';
 import 'package:wisdom/core/errors/app_failure.dart';
 import 'package:wisdom/features/courses/application/course_providers.dart';
 import 'package:wisdom/features/courses/data/courses_repository.dart';
+import 'package:wisdom/features/courses/presentation/course_access_gate.dart';
 import 'package:wisdom/shared/theme/ui_consts.dart';
-import 'package:wisdom/shared/utils/context_safe.dart';
 import 'package:wisdom/shared/utils/snack.dart';
 import 'package:wisdom/supabase_client.dart';
 import 'package:wisdom/shared/widgets/go_router_back_button.dart';
+import 'package:wisdom/widgets/base_page.dart';
 
 class QuizTakePage extends ConsumerStatefulWidget {
   const QuizTakePage({super.key});
@@ -22,6 +23,7 @@ class QuizTakePage extends ConsumerStatefulWidget {
 
 class _QuizTakePageState extends ConsumerState<QuizTakePage> {
   String _quizId = '';
+  String _courseId = '';
   bool _initialized = false;
   Map<String, dynamic> _answers = {};
 
@@ -31,6 +33,7 @@ class _QuizTakePageState extends ConsumerState<QuizTakePage> {
     if (_initialized) return;
     final qp = GoRouterState.of(context).uri.queryParameters;
     _quizId = qp['quizId'] ?? qp['id'] ?? '';
+    _courseId = qp['courseId'] ?? '';
     _initialized = true;
     ref.listen<AsyncValue<Map<String, dynamic>?>>(
       quizSubmissionProvider(_quizId),
@@ -42,14 +45,14 @@ class _QuizTakePageState extends ConsumerState<QuizTakePage> {
             final message = passed
                 ? 'Godkänt! Ditt certifikat är utfärdat.'
                 : 'Resultat sparat. Fortsätt öva!';
-            context.ifMounted((c) => showSnack(c, message));
+            if (!mounted || !context.mounted) return;
+            showSnack(context, message);
           },
           error: (error, _) {
-            context.ifMounted(
-              (c) => showSnack(
-                c,
-                'Kunde inte lämna in: ${_friendlyError(error)}',
-              ),
+            if (!mounted || !context.mounted) return;
+            showSnack(
+              context,
+              'Kunde inte lämna in: ${_friendlyError(error)}',
             );
           },
           loading: () {},
@@ -67,6 +70,29 @@ class _QuizTakePageState extends ConsumerState<QuizTakePage> {
         ? const AsyncValue<Map<String, dynamic>?>.data(null)
         : ref.watch(quizSubmissionProvider(_quizId));
 
+    Widget content = questions.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (error, _) => Center(child: Text(_friendlyError(error))),
+      data: (items) => _QuizContent(
+        quizId: _quizId,
+        questions: items,
+        answers: _answers,
+        onSetSingle: _setSingle,
+        onToggleMulti: _toggleMulti,
+        onSetBool: _setBool,
+        onSubmit: _submit,
+        submissionState: submissionState,
+      ),
+    );
+
+    if (_courseId.isNotEmpty) {
+      content = CourseAccessGate(
+        courseId: _courseId,
+        loading: const Center(child: CircularProgressIndicator()),
+        child: content,
+      );
+    }
+
     return Scaffold(
       backgroundColor: Colors.transparent,
       extendBodyBehindAppBar: true,
@@ -77,20 +103,10 @@ class _QuizTakePageState extends ConsumerState<QuizTakePage> {
         leading: const GoRouterBackButton(),
         title: const Text('Quiz'),
       ),
-      body: SafeArea(
-        child: questions.when(
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (error, _) => Center(child: Text(_friendlyError(error))),
-          data: (items) => _QuizContent(
-            quizId: _quizId,
-            questions: items,
-            answers: _answers,
-            onSetSingle: _setSingle,
-            onToggleMulti: _toggleMulti,
-            onSetBool: _setBool,
-            onSubmit: _submit,
-            submissionState: submissionState,
-          ),
+      body: BasePage(
+        child: SafeArea(
+          top: false,
+          child: content,
         ),
       ),
     );
@@ -128,9 +144,8 @@ class _QuizTakePageState extends ConsumerState<QuizTakePage> {
     }
     if (sb.auth.currentUser == null) {
       final redirect = '/course-quiz?quizId=$_quizId';
-      context.ifMounted(
-        (c) => c.go('/login?redirect=${Uri.encodeComponent(redirect)}'),
-      );
+      if (!mounted || !context.mounted) return;
+      context.go('/login?redirect=${Uri.encodeComponent(redirect)}');
       return;
     }
     await ref.read(quizSubmissionProvider(_quizId).notifier).submit(_answers);
@@ -201,36 +216,39 @@ class _QuizContent extends StatelessWidget {
                           options: options,
                           value: answers[qid],
                           onChangeSingle: (idx) => onSetSingle(qid, idx),
-                          onChangeMulti: (idx, value) => onToggleMulti(qid, idx, value),
+                          onChangeMulti: (idx, value) =>
+                              onToggleMulti(qid, idx, value),
                           onChangeBool: (value) => onSetBool(qid, value),
                         );
                       },
                     ),
                   ),
                   const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      const Spacer(),
-                      FilledButton.icon(
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: SizedBox(
+                      width: 220,
+                      child: FilledButton.icon(
                         onPressed: submissionState.isLoading ? null : onSubmit,
                         icon: submissionState.isLoading
                             ? const SizedBox(
                                 height: 18,
                                 width: 18,
-                                child: CircularProgressIndicator(strokeWidth: 2),
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2),
                               )
                             : const Icon(Icons.check_circle_outline_rounded),
                         label: const Text('Lämna in'),
                       ),
-                    ],
+                    ),
                   ),
                   if (submissionState.hasError)
                     Padding(
                       padding: const EdgeInsets.only(top: 8),
                       child: Text(
                         _friendlyError(submissionState.error!),
-                        style: t.bodyMedium
-                            ?.copyWith(color: Theme.of(context).colorScheme.error),
+                        style: t.bodyMedium?.copyWith(
+                            color: Theme.of(context).colorScheme.error),
                       ),
                     ),
                 ],
@@ -308,22 +326,27 @@ class _QuestionWidget extends StatelessWidget {
         );
       case 'single':
       default:
-        final intValue = value is int ? value as int : -1;
+        final int? selectedValue = value is int ? value as int : null;
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text('$index. $prompt', style: t.titleMedium),
             gap8,
-            ...List.generate(options.length, (i) {
-              return RadioListTile<int>(
-                value: i,
-                groupValue: intValue,
-                onChanged: (v) {
-                  if (v != null) onChangeSingle(v);
-                },
-                title: Text(options[i]),
-              );
-            }),
+            RadioGroup<int>(
+              groupValue: selectedValue,
+              onChanged: (selected) {
+                if (selected != null) onChangeSingle(selected);
+              },
+              child: Column(
+                children: [
+                  for (var i = 0; i < options.length; i++)
+                    RadioListTile<int>(
+                      value: i,
+                      title: Text(options[i]),
+                    ),
+                ],
+              ),
+            ),
           ],
         );
     }
@@ -354,13 +377,13 @@ class _ResultBanner extends StatelessWidget {
             children: [
               Icon(
                 passed ? Icons.verified_rounded : Icons.info_outline,
-                color: passed ? const Color(0xFF059669) : const Color(0xFFB91C1C),
+                color:
+                    passed ? const Color(0xFF059669) : const Color(0xFFB91C1C),
               ),
               const SizedBox(width: 8),
               Text(
                 passed ? 'Grattis!' : 'Resultat',
-                style:
-                    t.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                style: t.titleMedium?.copyWith(fontWeight: FontWeight.w700),
               ),
             ],
           ),

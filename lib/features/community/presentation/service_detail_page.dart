@@ -80,8 +80,8 @@ class _ServiceDetailPageState extends ConsumerState<ServiceDetailPage> {
                       Row(
                         children: [
                           Text('${price.toStringAsFixed(2)} kr',
-                              style: t.titleMedium?.copyWith(
-                                  fontWeight: FontWeight.w700)),
+                              style: t.titleMedium
+                                  ?.copyWith(fontWeight: FontWeight.w700)),
                           const Spacer(),
                           ElevatedButton(
                             onPressed: _buying ? null : () => _buy(service),

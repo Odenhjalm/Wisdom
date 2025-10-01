@@ -5,7 +5,6 @@ import 'package:go_router/go_router.dart';
 import 'package:wisdom/domain/services/auth_service.dart';
 import 'package:wisdom/gate.dart';
 import 'package:wisdom/supabase_client.dart';
-import 'package:wisdom/shared/utils/context_safe.dart';
 import 'package:wisdom/shared/utils/snack.dart';
 
 class TopNavActionButtons extends ConsumerWidget {
@@ -37,11 +36,12 @@ class TopNavActionButtons extends ConsumerWidget {
           icon: Icon(Icons.home_work_outlined, color: color),
           onPressed: () async {
             final isTeacher = await userIsTeacher(client: sb);
+            if (!context.mounted) return;
             if (!isTeacher) {
-              context.ifMounted((c) => showSnack(c, 'Endast för lärare'));
+              showSnack(context, 'Endast för lärare');
               return;
             }
-            context.ifMounted((c) => c.go('/teacher'));
+            context.go('/teacher');
           },
         ),
         IconButton(

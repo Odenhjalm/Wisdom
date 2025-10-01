@@ -5,11 +5,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:wisdom/shared/theme/ui_consts.dart';
-import 'package:wisdom/shared/utils/context_safe.dart';
 import 'package:wisdom/shared/widgets/glass_card.dart';
 import 'package:wisdom/features/landing/application/landing_providers.dart';
-import 'package:wisdom/shared/widgets/gradient_text.dart';
 import 'package:wisdom/shared/widgets/background_layer.dart';
+import 'package:wisdom/widgets/base_page.dart';
 
 const String _devConfigHint = 'Konfigurera Supabase i .env om data saknas.';
 
@@ -47,114 +46,112 @@ class _LegacyLandingPageState extends ConsumerState<LegacyLandingPage> {
     final state = await ref.read(introCoursesProvider.future);
     final items = state.items;
 
-    await context.ifMounted((c) {
-      return showModalBottomSheet<void>(
-        context: c,
-        backgroundColor: Colors.transparent,
-        builder: (ctx) {
-          return ClipRRect(
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.9),
-                  border: Border(
-                    top:
-                        BorderSide(color: Colors.black.withValues(alpha: 0.05)),
-                  ),
+    if (!context.mounted) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return ClipRRect(
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.9),
+                border: Border(
+                  top: BorderSide(color: Colors.black.withValues(alpha: 0.05)),
                 ),
-                child: SafeArea(
-                  top: false,
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            const Icon(Icons.auto_awesome,
-                                color: Colors.black87),
-                            const SizedBox(width: 8),
-                            const Text(
-                              'Gratis introduktionskurser',
-                              style: TextStyle(
-                                fontWeight: FontWeight.w800,
-                                fontSize: 16,
-                              ),
+              ),
+              child: SafeArea(
+                top: false,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.auto_awesome, color: Colors.black87),
+                          const SizedBox(width: 8),
+                          const Text(
+                            'Gratis introduktionskurser',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 16,
                             ),
-                            const Spacer(),
-                            IconButton(
-                              onPressed: () => Navigator.of(ctx).pop(),
-                              icon: const Icon(Icons.close),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 6),
-                        if (items.isEmpty)
+                          ),
+                          const Spacer(),
+                          IconButton(
+                            onPressed: () => Navigator.of(ctx).pop(),
+                            icon: const Icon(Icons.close),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      if (items.isEmpty)
+                        Padding(
+                          padding: p12,
+                          child: _LandingMessage(
+                            message: state.hasError
+                                ? (state.errorMessage ??
+                                    'Kunde inte hämta introduktionskurser just nu.')
+                                : 'Inga introduktionskurser ännu.',
+                            hint: state.devHint,
+                            center: true,
+                          ),
+                        )
+                      else ...[
+                        if (state.hasError)
                           Padding(
-                            padding: p12,
+                            padding: const EdgeInsets.fromLTRB(12, 6, 12, 6),
                             child: _LandingMessage(
-                              message: state.hasError
-                                  ? (state.errorMessage ??
-                                      'Kunde inte hämta introduktionskurser just nu.')
-                                  : 'Inga introduktionskurser ännu.',
+                              message: state.errorMessage ??
+                                  'Kunde inte hämta introduktionskurser just nu.',
                               hint: state.devHint,
                               center: true,
                             ),
-                          )
-                        else ...[
-                          if (state.hasError)
-                            Padding(
-                              padding: const EdgeInsets.fromLTRB(12, 6, 12, 6),
-                              child: _LandingMessage(
-                                message: state.errorMessage ??
-                                    'Kunde inte hämta introduktionskurser just nu.',
-                                hint: state.devHint,
-                                center: true,
-                              ),
-                            ),
-                          ListView.separated(
-                            shrinkWrap: true,
-                            itemCount: items.length > 5 ? 5 : items.length,
-                            separatorBuilder: (_, __) =>
-                                const Divider(height: 1),
-                            itemBuilder: (_, int index) {
-                              final m = items[index];
-                              final id = (m['id'] ?? '').toString();
-                              final title =
-                                  (m['title'] ?? 'Introduktion').toString();
-                              return ListTile(
-                                leading: const Icon(Icons.play_circle_outline),
-                                title: Text(
-                                  title,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                trailing: const Chip(
-                                  label: Text('Gratis intro'),
-                                  visualDensity: VisualDensity.compact,
-                                ),
-                                onTap: () {
-                                  Navigator.of(ctx).pop();
-                                  context.ifMounted((c2) => c2.go(
-                                      '/course-intro?id=$id&title=${Uri.encodeComponent(title)}'));
-                                },
-                              );
-                            },
                           ),
-                        ],
+                        ListView.separated(
+                          shrinkWrap: true,
+                          itemCount: items.length > 5 ? 5 : items.length,
+                          separatorBuilder: (_, __) => const Divider(height: 1),
+                          itemBuilder: (_, int index) {
+                            final m = items[index];
+                            final id = (m['id'] ?? '').toString();
+                            final title =
+                                (m['title'] ?? 'Introduktion').toString();
+                            return ListTile(
+                              leading: const Icon(Icons.play_circle_outline),
+                              title: Text(
+                                title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              trailing: const Chip(
+                                label: Text('Gratis intro'),
+                                visualDensity: VisualDensity.compact,
+                              ),
+                              onTap: () {
+                                Navigator.of(ctx).pop();
+                                if (!context.mounted) return;
+                                context.go(
+                                  '/course-intro?id=$id&title=${Uri.encodeComponent(title)}',
+                                );
+                              },
+                            );
+                          },
+                        ),
                       ],
-                    ),
+                    ],
                   ),
                 ),
               ),
             ),
-          );
-        },
-      );
-    });
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -195,236 +192,156 @@ class _LegacyLandingPageState extends ConsumerState<LegacyLandingPage> {
     );
 
     return Scaffold(
-      body: Stack(
-        children: [
-          const Positioned.fill(child: BackgroundLayer()),
-          SafeArea(
-            child: Stack(
-              children: [
-                SingleChildScrollView(
-                  controller: _scrollController,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                  child: Center(
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 1200),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 24),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.center,
-                              children: [
-                                const GlassCard(
-                                  padding: EdgeInsets.symmetric(
-                                      horizontal: 14, vertical: 8),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(Icons.auto_awesome,
-                                          color: Colors.black54, size: 18),
-                                      SizedBox(width: 8),
-                                      Text(
-                                        'Kurser, tjänster och lärare – i ett ljust, välkomnande flöde.',
-                                        style: TextStyle(color: Colors.black87),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                gap16,
-                                const SizedBox(height: 2),
-                                RichText(
-                                  textAlign: TextAlign.center,
-                                  text: TextSpan(
-                                    style: TextStyle(
-                                      color: const Color(0xFF0B1526),
-                                      fontSize: titleSize,
-                                      fontWeight: FontWeight.w800,
-                                      height: 1.15,
+      body: BasePage(
+        child: Stack(
+          children: [
+            const Positioned.fill(child: BackgroundLayer()),
+            SafeArea(
+              top: false,
+              child: Stack(
+                children: [
+                  SingleChildScrollView(
+                    controller: _scrollController,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 16),
+                    child: Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 1200),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 24),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: [
+                                  const GlassCard(
+                                    padding: EdgeInsets.symmetric(
+                                        horizontal: 14, vertical: 8),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(Icons.auto_awesome,
+                                            color: Colors.black54, size: 18),
+                                        SizedBox(width: 8),
+                                        Text(
+                                          'Kurser, tjänster och lärare – i ett ljust, välkomnande flöde.',
+                                          style:
+                                              TextStyle(color: Colors.black87),
+                                        ),
+                                      ],
                                     ),
-                                    children: [
-                                      const TextSpan(text: 'Upptäck din '),
-                                      GradientTextSpan(
-                                        text: 'andliga resa',
-                                        gradient: const LinearGradient(
-                                          begin: Alignment.topLeft,
-                                          end: Alignment.bottomRight,
-                                          colors: [
-                                            Color(0xFF22C55E),
-                                            Color(0xFFA855F7)
-                                          ],
-                                        ),
-                                        style: TextStyle(
-                                          fontSize: titleSize * 1.12,
-                                          fontWeight: FontWeight.w900,
-                                        ),
-                                      ),
-                                    ],
                                   ),
-                                ),
-                                gap12,
-                                ConstrainedBox(
-                                  constraints:
-                                      const BoxConstraints(maxWidth: 720),
-                                  child: const Text(
-                                    'På Wisdom kan du hitta inspirerande kurser, möta lärare och ta del av tjänster som guidar dig framåt – i ditt tempo.',
+                                  gap16,
+                                  const SizedBox(height: 2),
+                                  RichText(
                                     textAlign: TextAlign.center,
-                                    style: TextStyle(
-                                        color: Colors.black87, fontSize: 16),
+                                    text: TextSpan(
+                                      style: TextStyle(
+                                        color: const Color(0xFF0B1526),
+                                        fontSize: titleSize,
+                                        fontWeight: FontWeight.w800,
+                                        height: 1.15,
+                                      ),
+                                      children: [
+                                        const TextSpan(text: 'Upptäck din '),
+                                        TextSpan(
+                                          text: 'andliga resa',
+                                          style: TextStyle(
+                                            fontSize: titleSize * 1.12,
+                                            fontWeight: FontWeight.w900,
+                                            foreground: Paint()
+                                              ..shader = const LinearGradient(
+                                                begin: Alignment.topLeft,
+                                                end: Alignment.bottomRight,
+                                                colors: [
+                                                  Color(0xFF22C55E),
+                                                  Color(0xFFA855F7)
+                                                ],
+                                              ).createShader(
+                                                const Rect.fromLTWH(
+                                                    0, 0, 200, 60),
+                                              ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
-                                ),
-                                gap16,
-                                const SizedBox(height: 2),
-                                Wrap(
-                                  spacing: 12,
-                                  runSpacing: 12,
-                                  alignment: WrapAlignment.center,
-                                  children: [
-                                    FilledButton(
-                                      style: primaryAccentStyle,
-                                      onPressed: () => _openIntroModal(context),
-                                      child: const Text(
-                                          'Starta gratis introduktion'),
+                                  gap12,
+                                  ConstrainedBox(
+                                    constraints:
+                                        const BoxConstraints(maxWidth: 720),
+                                    child: const Text(
+                                      'På Wisdom kan du hitta inspirerande kurser, möta lärare och ta del av tjänster som guidar dig framåt – i ditt tempo.',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                          color: Colors.black87, fontSize: 16),
                                     ),
-                                    OutlinedButton(
-                                      style: exploreStyle,
-                                      onPressed: () => _scrollTo(_coursesKey),
-                                      child: const Text('Utforska utan konto'),
-                                    ),
-                                  ],
-                                ),
-                                gap16,
-                                const Wrap(
-                                  spacing: 16,
-                                  runSpacing: 10,
-                                  alignment: WrapAlignment.center,
-                                  children: [
-                                    _StatChip(
-                                        icon: Icons.emoji_events,
-                                        a: 'Över 1000+',
-                                        b: 'nöjda elever'),
-                                    _StatChip(
-                                        icon: Icons.verified,
-                                        a: 'Certifierade',
-                                        b: 'lärare'),
-                                    _StatChip(
-                                        icon: Icons.verified_user,
-                                        a: '30 dagars',
-                                        b: 'garanti'),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                          const _SectionTitle('Populära kurser'),
-                          GlassCard(
-                            key: _coursesKey,
-                            child: Consumer(
-                              builder: (context, ref, _) {
-                                final async = ref.watch(popularCoursesProvider);
-                                return async.when(
-                                  loading: () =>
-                                      const _GlassGridSkeleton(itemHeight: 220),
-                                  error: (_, __) => const Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
+                                  ),
+                                  gap16,
+                                  const SizedBox(height: 2),
+                                  Wrap(
+                                    spacing: 12,
+                                    runSpacing: 12,
+                                    alignment: WrapAlignment.center,
                                     children: [
-                                      _GlassGridSkeleton(itemHeight: 220),
-                                      gap12,
-                                      _LandingMessage(
-                                        message:
-                                            'Kunde inte hämta kurslistan just nu.',
-                                        hint: _devConfigHint,
+                                      FilledButton(
+                                        style: primaryAccentStyle,
+                                        onPressed: () =>
+                                            _openIntroModal(context),
+                                        child: const Text(
+                                            'Starta gratis introduktion'),
+                                      ),
+                                      OutlinedButton(
+                                        style: exploreStyle,
+                                        onPressed: () => _scrollTo(_coursesKey),
+                                        child:
+                                            const Text('Utforska utan konto'),
                                       ),
                                     ],
                                   ),
-                                  data: (state) {
-                                    if (state.hasError) {
-                                      return const Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          _GlassGridSkeleton(itemHeight: 220),
-                                          gap12,
-                                          _LandingMessage(
-                                            message:
-                                                'Kunde inte hämta kurslistan just nu.',
-                                            hint: _devConfigHint,
-                                          ),
-                                        ],
-                                      );
-                                    }
-                                    final items = state.items;
-                                    if (items.isEmpty) {
-                                      return const _LandingMessage(
-                                        message: 'Inga kurser ännu.',
-                                        hint: _devConfigHint,
-                                      );
-                                    }
-                                    return LayoutBuilder(
-                                      builder: (context, constraints) {
-                                        final double w = constraints.maxWidth;
-                                        int cols = 1;
-                                        if (w >= 1200) {
-                                          cols = 4;
-                                        } else if (w >= 900) {
-                                          cols = 3;
-                                        } else if (w >= 600) {
-                                          cols = 2;
-                                        }
-                                        final double width =
-                                            (w - ((cols - 1) * 12)) / cols;
-                                        return Wrap(
-                                          spacing: 12,
-                                          runSpacing: 12,
-                                          children: [
-                                            for (final m in items)
-                                              SizedBox(
-                                                width: width,
-                                                child: _CourseTile(
-                                                  title: '${m['title']}',
-                                                  description:
-                                                      (m['description'] ?? '')
-                                                          as String?,
-                                                  imageUrl: (m['cover_url'] ??
-                                                      '') as String?,
-                                                  isIntro: m['is_free_intro'] ==
-                                                      true,
-                                                  onTap: () => context.go(
-                                                      '/course-intro?id=${m['id']}&title=${Uri.encodeComponent(m['title'] ?? '')}'),
-                                                ),
-                                              ),
-                                          ],
-                                        );
-                                      },
-                                    );
-                                  },
-                                );
-                              },
+                                  gap16,
+                                  const Wrap(
+                                    spacing: 16,
+                                    runSpacing: 10,
+                                    alignment: WrapAlignment.center,
+                                    children: [
+                                      _StatChip(
+                                          icon: Icons.emoji_events,
+                                          a: 'Över 1000+',
+                                          b: 'nöjda elever'),
+                                      _StatChip(
+                                          icon: Icons.verified,
+                                          a: 'Certifierade',
+                                          b: 'lärare'),
+                                      _StatChip(
+                                          icon: Icons.verified_user,
+                                          a: '30 dagars',
+                                          b: 'garanti'),
+                                    ],
+                                  ),
+                                ],
+                              ),
                             ),
-                          ),
-                          gap24,
-                          const _SectionTitle('Lärare'),
-                          GlassCard(
-                            key: _teachersKey,
-                            padding: p12,
-                            child: SizedBox(
-                              height: 180,
+                            const _SectionTitle('Populära kurser'),
+                            GlassCard(
+                              key: _coursesKey,
                               child: Consumer(
                                 builder: (context, ref, _) {
-                                  final async = ref.watch(teachersProvider);
+                                  final async =
+                                      ref.watch(popularCoursesProvider);
                                   return async.when(
-                                    loading: () => const _TeacherSkeletonList(),
+                                    loading: () => const _GlassGridSkeleton(
+                                        itemHeight: 220),
                                     error: (_, __) => const Column(
                                       crossAxisAlignment:
                                           CrossAxisAlignment.start,
                                       children: [
-                                        Expanded(child: _TeacherSkeletonList()),
-                                        gap8,
+                                        _GlassGridSkeleton(itemHeight: 220),
+                                        gap12,
                                         _LandingMessage(
                                           message:
-                                              'Kunde inte hämta lärarlistan just nu.',
+                                              'Kunde inte hämta kurslistan just nu.',
                                           hint: _devConfigHint,
                                         ),
                                       ],
@@ -435,12 +352,11 @@ class _LegacyLandingPageState extends ConsumerState<LegacyLandingPage> {
                                           crossAxisAlignment:
                                               CrossAxisAlignment.start,
                                           children: [
-                                            Expanded(
-                                                child: _TeacherSkeletonList()),
-                                            gap8,
+                                            _GlassGridSkeleton(itemHeight: 220),
+                                            gap12,
                                             _LandingMessage(
                                               message:
-                                                  'Kunde inte hämta lärarlistan just nu.',
+                                                  'Kunde inte hämta kurslistan just nu.',
                                               hint: _devConfigHint,
                                             ),
                                           ],
@@ -448,27 +364,46 @@ class _LegacyLandingPageState extends ConsumerState<LegacyLandingPage> {
                                       }
                                       final items = state.items;
                                       if (items.isEmpty) {
-                                        return const Center(
-                                          child: _LandingMessage(
-                                            message: 'Inga lärare ännu.',
-                                            hint: _devConfigHint,
-                                            center: true,
-                                          ),
+                                        return const _LandingMessage(
+                                          message: 'Inga kurser ännu.',
+                                          hint: _devConfigHint,
                                         );
                                       }
-                                      return ListView.separated(
-                                        scrollDirection: Axis.horizontal,
-                                        itemCount: items.length,
-                                        separatorBuilder: (_, __) =>
-                                            const SizedBox(width: 12),
-                                        itemBuilder: (context, index) {
-                                          final t = items[index];
-                                          return _TeacherPill(
-                                            name: (t['display_name'] ??
-                                                'Lärare') as String,
-                                            avatarUrl: (t['photo_url'] ?? '')
-                                                as String?,
-                                            bio: (t['bio'] ?? '') as String?,
+                                      return LayoutBuilder(
+                                        builder: (context, constraints) {
+                                          final double w = constraints.maxWidth;
+                                          int cols = 1;
+                                          if (w >= 1200) {
+                                            cols = 4;
+                                          } else if (w >= 900) {
+                                            cols = 3;
+                                          } else if (w >= 600) {
+                                            cols = 2;
+                                          }
+                                          final double width =
+                                              (w - ((cols - 1) * 12)) / cols;
+                                          return Wrap(
+                                            spacing: 12,
+                                            runSpacing: 12,
+                                            children: [
+                                              for (final m in items)
+                                                SizedBox(
+                                                  width: width,
+                                                  child: _CourseTile(
+                                                    title: '${m['title']}',
+                                                    description:
+                                                        (m['description'] ?? '')
+                                                            as String?,
+                                                    imageUrl: (m['cover_url'] ??
+                                                        '') as String?,
+                                                    isIntro:
+                                                        m['is_free_intro'] ==
+                                                            true,
+                                                    onTap: () => context.go(
+                                                        '/course-intro?id=${m['id']}&title=${Uri.encodeComponent(m['title'] ?? '')}'),
+                                                  ),
+                                                ),
+                                            ],
                                           );
                                         },
                                       );
@@ -477,167 +412,246 @@ class _LegacyLandingPageState extends ConsumerState<LegacyLandingPage> {
                                 },
                               ),
                             ),
-                          ),
-                          gap24,
-                          const _SectionTitle('Tjänster'),
-                          GlassCard(
-                            key: _servicesKey,
-                            child: Consumer(
-                              builder: (context, ref, _) {
-                                final async = ref.watch(recentServicesProvider);
-                                return async.when(
-                                  loading: () =>
-                                      const _GlassGridSkeleton(itemHeight: 160),
-                                  error: (_, __) => const Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      _GlassGridSkeleton(itemHeight: 160),
-                                      gap12,
-                                      _LandingMessage(
-                                        message:
-                                            'Kunde inte hämta tjänsterna just nu.',
-                                        hint: _devConfigHint,
-                                      ),
-                                    ],
-                                  ),
-                                  data: (state) {
-                                    if (state.hasError) {
-                                      return const Column(
+                            gap24,
+                            const _SectionTitle('Lärare'),
+                            GlassCard(
+                              key: _teachersKey,
+                              padding: p12,
+                              child: SizedBox(
+                                height: 180,
+                                child: Consumer(
+                                  builder: (context, ref, _) {
+                                    final async = ref.watch(teachersProvider);
+                                    return async.when(
+                                      loading: () =>
+                                          const _TeacherSkeletonList(),
+                                      error: (_, __) => const Column(
                                         crossAxisAlignment:
                                             CrossAxisAlignment.start,
                                         children: [
-                                          _GlassGridSkeleton(itemHeight: 160),
-                                          gap12,
+                                          Expanded(
+                                              child: _TeacherSkeletonList()),
+                                          gap8,
                                           _LandingMessage(
                                             message:
-                                                'Kunde inte hämta tjänsterna just nu.',
+                                                'Kunde inte hämta lärarlistan just nu.',
                                             hint: _devConfigHint,
                                           ),
                                         ],
-                                      );
-                                    }
-                                    final items = state.items;
-                                    if (items.isEmpty) {
-                                      return const _LandingMessage(
-                                        message: 'Inga tjänster ännu.',
-                                        hint: _devConfigHint,
-                                      );
-                                    }
-                                    return LayoutBuilder(
-                                      builder: (context, constraints) {
-                                        final double w = constraints.maxWidth;
-                                        int cols = 1;
-                                        if (w >= 1200) {
-                                          cols = 3;
-                                        } else if (w >= 900) {
-                                          cols = 3;
-                                        } else if (w >= 600) {
-                                          cols = 2;
-                                        }
-                                        final double width =
-                                            (w - ((cols - 1) * 12)) / cols;
-                                        return Wrap(
-                                          spacing: 12,
-                                          runSpacing: 12,
-                                          children: [
-                                            for (final s in items)
-                                              SizedBox(
-                                                width: width,
-                                                child: _ServiceTile(
-                                                  title: '${s['title']}',
-                                                  description:
-                                                      (s['description'] ?? '')
-                                                          as String?,
-                                                  area: (s['certified_area'] ??
-                                                      '') as String?,
-                                                  priceCents:
-                                                      s['price_cents'] as int?,
-                                                ),
+                                      ),
+                                      data: (state) {
+                                        if (state.hasError) {
+                                          return const Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Expanded(
+                                                  child:
+                                                      _TeacherSkeletonList()),
+                                              gap8,
+                                              _LandingMessage(
+                                                message:
+                                                    'Kunde inte hämta lärarlistan just nu.',
+                                                hint: _devConfigHint,
                                               ),
-                                          ],
+                                            ],
+                                          );
+                                        }
+                                        final items = state.items;
+                                        if (items.isEmpty) {
+                                          return const Center(
+                                            child: _LandingMessage(
+                                              message: 'Inga lärare ännu.',
+                                              hint: _devConfigHint,
+                                              center: true,
+                                            ),
+                                          );
+                                        }
+                                        return ListView.separated(
+                                          scrollDirection: Axis.horizontal,
+                                          itemCount: items.length,
+                                          separatorBuilder: (_, __) =>
+                                              const SizedBox(width: 12),
+                                          itemBuilder: (context, index) {
+                                            final t = items[index];
+                                            return _TeacherPill(
+                                              name: (t['display_name'] ??
+                                                  'Lärare') as String,
+                                              avatarUrl: (t['photo_url'] ?? '')
+                                                  as String?,
+                                              bio: (t['bio'] ?? '') as String?,
+                                            );
+                                          },
                                         );
                                       },
                                     );
                                   },
-                                );
-                              },
-                            ),
-                          ),
-                          gap24,
-                          const _SectionTitle('Hur fungerar Wisdom?'),
-                          const _HowItWorks(),
-                          gap24,
-                          const Align(
-                            alignment: Alignment.center,
-                            child: GlassCard(
-                              padding: EdgeInsets.symmetric(
-                                  horizontal: 14, vertical: 8),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(Icons.auto_awesome,
-                                      color: Colors.black54, size: 18),
-                                  SizedBox(width: 8),
-                                  Text(
-                                    'Sveriges ledande plattform för andlig utveckling',
-                                    style: TextStyle(color: Colors.black87),
-                                  ),
-                                ],
+                                ),
                               ),
                             ),
-                          ),
-                          gap24,
-                          GlassCard(
-                            child: Padding(
-                              padding: const EdgeInsets.all(14),
-                              child: Row(
-                                children: [
-                                  const Icon(Icons.workspace_premium,
-                                      color: Colors.black87),
-                                  const SizedBox(width: 10),
-                                  const Expanded(
-                                    child: Text(
-                                        'Redo att börja? Skapa konto eller utforska kurser.'),
-                                  ),
-                                  FilledButton(
-                                    onPressed: () => context.go('/signup'),
-                                    child: const Text('Börja gratis idag'),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  TextButton(
-                                    onPressed: () => _scrollTo(_coursesKey),
-                                    child: const Text('Utforska kurser'),
-                                  ),
-                                ],
+                            gap24,
+                            const _SectionTitle('Tjänster'),
+                            GlassCard(
+                              key: _servicesKey,
+                              child: Consumer(
+                                builder: (context, ref, _) {
+                                  final async =
+                                      ref.watch(recentServicesProvider);
+                                  return async.when(
+                                    loading: () => const _GlassGridSkeleton(
+                                        itemHeight: 160),
+                                    error: (_, __) => const Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        _GlassGridSkeleton(itemHeight: 160),
+                                        gap12,
+                                        _LandingMessage(
+                                          message:
+                                              'Kunde inte hämta tjänsterna just nu.',
+                                          hint: _devConfigHint,
+                                        ),
+                                      ],
+                                    ),
+                                    data: (state) {
+                                      if (state.hasError) {
+                                        return const Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            _GlassGridSkeleton(itemHeight: 160),
+                                            gap12,
+                                            _LandingMessage(
+                                              message:
+                                                  'Kunde inte hämta tjänsterna just nu.',
+                                              hint: _devConfigHint,
+                                            ),
+                                          ],
+                                        );
+                                      }
+                                      final items = state.items;
+                                      if (items.isEmpty) {
+                                        return const _LandingMessage(
+                                          message: 'Inga tjänster ännu.',
+                                          hint: _devConfigHint,
+                                        );
+                                      }
+                                      return LayoutBuilder(
+                                        builder: (context, constraints) {
+                                          final double w = constraints.maxWidth;
+                                          int cols = 1;
+                                          if (w >= 1200) {
+                                            cols = 3;
+                                          } else if (w >= 900) {
+                                            cols = 3;
+                                          } else if (w >= 600) {
+                                            cols = 2;
+                                          }
+                                          final double width =
+                                              (w - ((cols - 1) * 12)) / cols;
+                                          return Wrap(
+                                            spacing: 12,
+                                            runSpacing: 12,
+                                            children: [
+                                              for (final s in items)
+                                                SizedBox(
+                                                  width: width,
+                                                  child: _ServiceTile(
+                                                    title: '${s['title']}',
+                                                    description:
+                                                        (s['description'] ?? '')
+                                                            as String?,
+                                                    area:
+                                                        (s['certified_area'] ??
+                                                            '') as String?,
+                                                    priceCents: s['price_cents']
+                                                        as int?,
+                                                  ),
+                                                ),
+                                            ],
+                                          );
+                                        },
+                                      );
+                                    },
+                                  );
+                                },
                               ),
                             ),
-                          ),
-                          gap24,
-                        ],
+                            gap24,
+                            const _SectionTitle('Hur fungerar Wisdom?'),
+                            const _HowItWorks(),
+                            gap24,
+                            const Align(
+                              alignment: Alignment.center,
+                              child: GlassCard(
+                                padding: EdgeInsets.symmetric(
+                                    horizontal: 14, vertical: 8),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.auto_awesome,
+                                        color: Colors.black54, size: 18),
+                                    SizedBox(width: 8),
+                                    Text(
+                                      'Sveriges ledande plattform för andlig utveckling',
+                                      style: TextStyle(color: Colors.black87),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            gap24,
+                            GlassCard(
+                              child: Padding(
+                                padding: const EdgeInsets.all(14),
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.workspace_premium,
+                                        color: Colors.black87),
+                                    const SizedBox(width: 10),
+                                    const Expanded(
+                                      child: Text(
+                                          'Redo att börja? Skapa konto eller utforska kurser.'),
+                                    ),
+                                    FilledButton(
+                                      onPressed: () => context.go('/signup'),
+                                      child: const Text('Börja gratis idag'),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    TextButton(
+                                      onPressed: () => _scrollTo(_coursesKey),
+                                      child: const Text('Utforska kurser'),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            gap24,
+                          ],
+                        ),
                       ),
                     ),
                   ),
-                ),
-                Positioned(
-                  top: 8,
-                  right: 16,
-                  child: GlassCard(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    child: TextButton.icon(
-                      onPressed: () => context.push('/login'),
-                      icon: const Icon(Icons.login,
-                          size: 18, color: Colors.black54),
-                      label: const Text('Logga in'),
-                      style: loginButtonStyle,
+                  Positioned(
+                    top: 8,
+                    right: 16,
+                    child: GlassCard(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 8),
+                      child: TextButton.icon(
+                        onPressed: () => context.push('/login'),
+                        icon: const Icon(Icons.login,
+                            size: 18, color: Colors.black54),
+                        label: const Text('Logga in'),
+                        style: loginButtonStyle,
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

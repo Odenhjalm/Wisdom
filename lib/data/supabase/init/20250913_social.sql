@@ -86,10 +86,40 @@ alter table app.reviews enable row level security;
 drop policy if exists "reviews_read_all" on app.reviews;
 create policy "reviews_read_all" on app.reviews for select using (true);
 
+drop function if exists app.can_review_service(uuid, uuid);
+create or replace function app.can_review_service(
+  p_service_id uuid,
+  p_user_id uuid default auth.uid()
+)
+returns boolean
+language plpgsql
+security definer
+set search_path = app, public
+as $$
+declare
+  v_user uuid := coalesce(p_user_id, auth.uid());
+begin
+  if v_user is null or p_service_id is null then
+    return false;
+  end if;
+
+  return exists (
+    select 1
+      from app.orders o
+     where o.service_id = p_service_id
+       and o.user_id = v_user
+       and o.status = 'paid'
+  );
+end;
+$$;
+
 drop policy if exists "reviews_write_owner" on app.reviews;
-create policy "reviews_write_owner" on app.reviews for insert
-with check (reviewer_id = auth.uid());
--- TODO: Enforce paid order for reviewer via CHECK in trigger/RPC
+drop policy if exists "reviews_write_paid_customer" on app.reviews;
+create policy "reviews_write_paid_customer" on app.reviews for insert
+with check (
+  reviewer_id = auth.uid()
+  and app.can_review_service(service_id, reviewer_id)
+);
 
 drop policy if exists "reviews_update_delete_owner_or_teacher" on app.reviews;
 create policy "reviews_update_delete_owner_or_teacher" on app.reviews for update
@@ -239,4 +269,3 @@ grant execute on function app.follow(uuid) to authenticated;
 grant execute on function app.unfollow(uuid) to authenticated;
 
 commit;
-

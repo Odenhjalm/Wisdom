@@ -28,7 +28,8 @@ final postsRepositoryProvider = Provider<PostsRepository>((ref) {
   return PostsRepository(client: client);
 });
 
-final postsProvider = AutoDisposeFutureProvider<List<CommunityPost>>((ref) async {
+final postsProvider =
+    AutoDisposeFutureProvider<List<CommunityPost>>((ref) async {
   final repo = ref.watch(postsRepositoryProvider);
   return repo.feed(limit: 50);
 });
@@ -73,13 +74,18 @@ final authProfileRepositoryProvider = Provider<AuthProfileRepository>((ref) {
   return AuthProfileRepository();
 });
 
-final myProfileProvider = AutoDisposeFutureProvider<Map<String, dynamic>?>((ref) async {
+final myProfileProvider =
+    AutoDisposeFutureProvider<Map<String, dynamic>?>((ref) async {
   final repo = ref.watch(authProfileRepositoryProvider);
   return repo.getMyProfile();
 });
 
-final myCertificatesProvider = AutoDisposeFutureProvider<List<Certificate>>((ref) async {
-  return CertificatesRepository().myCertificates();
+final myCertificatesProvider =
+    AutoDisposeFutureProvider<List<Certificate>>((ref) async {
+  final certs = await CertificatesRepository().myCertificates();
+  return certs
+      .where((c) => c.title != Certificate.teacherApplicationTitle)
+      .toList(growable: false);
 });
 
 class TeacherProfileState {
@@ -96,14 +102,18 @@ class TeacherProfileState {
   final List<Certificate> certificates;
 }
 
-final teacherProfileProvider = AutoDisposeFutureProvider.family<TeacherProfileState, String>(
+final teacherProfileProvider =
+    AutoDisposeFutureProvider.family<TeacherProfileState, String>(
   (ref, userId) async {
     final repo = ref.watch(communityRepositoryProvider);
     try {
       final teacher = await repo.getTeacher(userId);
       final services = await repo.listServices(userId);
       final meditations = await repo.listMeditations(userId);
-      final certs = await CertificatesRepository().certificatesOf(userId);
+      final certsRaw = await CertificatesRepository().certificatesOf(userId);
+      final certs = certsRaw
+          .where((c) => c.title != Certificate.teacherApplicationTitle)
+          .toList(growable: false);
       return TeacherProfileState(
         teacher: teacher,
         services: services,
@@ -128,7 +138,8 @@ class AdminDashboardState {
   final List<Map<String, dynamic>> certificates;
 }
 
-final adminDashboardProvider = AutoDisposeFutureProvider<AdminDashboardState>((ref) async {
+final adminDashboardProvider =
+    AutoDisposeFutureProvider<AdminDashboardState>((ref) async {
   final client = ref.watch(supabaseMaybeProvider);
   if (client == null) {
     throw ConfigurationFailure(message: 'Supabase ej konfigurerat.');
@@ -183,14 +194,13 @@ final adminDashboardProvider = AutoDisposeFutureProvider<AdminDashboardState>((r
     final requests = (requestsRes as List? ?? [])
         .map((e) => Map<String, dynamic>.from(e as Map))
         .map((req) {
-          final userId = req['user_id'] as String?;
-          final approval = userId != null ? approvalsByUser[userId] : null;
-          return {
-            ...req,
-            if (approval != null) 'approval': approval,
-          };
-        })
-        .toList();
+      final userId = req['user_id'] as String?;
+      final approval = userId != null ? approvalsByUser[userId] : null;
+      return {
+        ...req,
+        if (approval != null) 'approval': approval,
+      };
+    }).toList();
 
     final certs = (certRes as List? ?? [])
         .map((e) => Map<String, dynamic>.from(e as Map))
@@ -219,7 +229,8 @@ class ProfileViewState {
   final List<Map<String, dynamic>> meditations;
 }
 
-final profileViewProvider = AutoDisposeFutureProvider.family<ProfileViewState, String>(
+final profileViewProvider =
+    AutoDisposeFutureProvider.family<ProfileViewState, String>(
   (ref, userId) async {
     final client = ref.watch(supabaseMaybeProvider);
     if (client == null) {
@@ -229,7 +240,8 @@ final profileViewProvider = AutoDisposeFutureProvider.family<ProfileViewState, S
       final profRes = await client
           .schema('app')
           .from('profiles')
-          .select('user_id, display_name, photo_url, bio, role, role_v2, is_admin')
+          .select(
+              'user_id, display_name, photo_url, bio, role, role_v2, is_admin')
           .eq('user_id', userId)
           .maybeSingle();
       final profile = (profRes as Map?)?.cast<String, dynamic>();
@@ -245,9 +257,8 @@ final profileViewProvider = AutoDisposeFutureProvider.family<ProfileViewState, S
             .maybeSingle();
         following = followRes != null;
       }
-      final services = await ref
-          .watch(communityRepositoryProvider)
-          .listServices(userId);
+      final services =
+          await ref.watch(communityRepositoryProvider).listServices(userId);
       final meditations = await MeditationsRepository().byTeacher(userId);
       return ProfileViewState(
         profile: profile,
@@ -271,7 +282,8 @@ class ServiceDetailState {
   final Map<String, dynamic>? provider;
 }
 
-final serviceDetailProvider = AutoDisposeFutureProvider.family<ServiceDetailState, String>(
+final serviceDetailProvider =
+    AutoDisposeFutureProvider.family<ServiceDetailState, String>(
   (ref, serviceId) async {
     final client = ref.watch(supabaseMaybeProvider);
     if (client == null) {
@@ -303,7 +315,8 @@ final serviceDetailProvider = AutoDisposeFutureProvider.family<ServiceDetailStat
   },
 );
 
-final tarotRequestsProvider = AutoDisposeFutureProvider<List<Map<String, dynamic>>>((ref) async {
+final tarotRequestsProvider =
+    AutoDisposeFutureProvider<List<Map<String, dynamic>>>((ref) async {
   final client = ref.watch(supabaseMaybeProvider);
   if (client == null) {
     throw ConfigurationFailure(message: 'Supabase ej konfigurerat.');

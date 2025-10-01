@@ -14,7 +14,8 @@ class TeacherRepository {
     if (uid == null) return [];
     final res = await _app
         .from('courses')
-        .select('id,title,description,created_by,created_at')
+        .select(
+            'id,title,description,slug,price_cents,is_free_intro,is_published,created_by,created_at')
         .eq('created_by', uid)
         .order('created_at', ascending: false);
     return (res as List)
@@ -26,7 +27,7 @@ class TeacherRepository {
     final rows = await _app
         .from('modules')
         .select(
-            'id, course_id, title, position, lessons(id,title,position,is_intro,content_markdown,lesson_media(id,kind,storage_path,position))')
+            'id, course_id, title, position, lessons(id,title,position,is_intro,content_markdown,lesson_media(id,kind,storage_path,storage_bucket,position))')
         .eq('course_id', courseId)
         .order('position');
 

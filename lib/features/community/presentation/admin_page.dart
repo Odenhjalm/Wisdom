@@ -50,26 +50,41 @@ class _AdminPageState extends ConsumerState<AdminPage> {
                   child: ListTile(title: Text('Inga ansökningar just nu.')),
                 )
               else
-                ...state.requests.map(
-                  (r) => Card(
+                ...state.requests.map((r) {
+                  final statusRaw = (r['status'] as String?) ?? 'pending';
+                  final status = statusRaw.toLowerCase();
+                  final approval = r['approval'] as Map<String, dynamic>?;
+                  final subtitleLines = <String>[
+                    "Status: $statusRaw",
+                    if (r['created_at'] != null) "Skapad: ${r['created_at']}",
+                    if (r['updated_at'] != null)
+                      "Uppdaterad: ${r['updated_at']}",
+                    if ((r['notes'] as String?)?.isNotEmpty == true)
+                      r['notes'] as String,
+                    if (approval != null &&
+                        (approval['approved_at'] as String?)?.isNotEmpty ==
+                            true)
+                      "Godkänd: ${approval['approved_at']}",
+                  ]..removeWhere((line) => line.isEmpty);
+                  final isApproved = status == 'verified';
+                  final isRejected = status == 'rejected';
+                  return Card(
                     child: ListTile(
                       leading: const Icon(Icons.person_add_alt_1_rounded),
                       title: Text(r['user_id'] as String? ?? ''),
-                      subtitle: Text(
-                        '${r['status']} • ${r['created_at']}\n${r['message'] ?? ''}',
-                      ),
-                      isThreeLine: true,
+                      subtitle: Text(subtitleLines.join('\n')),
+                      isThreeLine: subtitleLines.length > 1,
                       trailing: Wrap(
                         spacing: 8,
                         children: [
                           ElevatedButton(
-                            onPressed: _busy
+                            onPressed: _busy || isApproved
                                 ? null
                                 : () => _approve(r['user_id'] as String),
                             child: const Text('Godkänn'),
                           ),
                           OutlinedButton(
-                            onPressed: _busy
+                            onPressed: _busy || isRejected
                                 ? null
                                 : () => _reject(r['user_id'] as String),
                             child: const Text('Avslå'),
@@ -77,8 +92,8 @@ class _AdminPageState extends ConsumerState<AdminPage> {
                         ],
                       ),
                     ),
-                  ),
-                ),
+                  );
+                }),
               const SizedBox(height: 18),
               Text('Certifikat (granskning)',
                   style: t.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
@@ -89,45 +104,74 @@ class _AdminPageState extends ConsumerState<AdminPage> {
                 )
               else
                 ...state.certificates.map((c) {
-                  final details = <String>[
-                    c['user_id'] as String? ?? '',
-                    if ((c['issuer'] as String?)?.isNotEmpty == true)
-                      c['issuer'] as String,
-                    if ((c['issued_at'] as String?)?.isNotEmpty == true)
-                      'Utfärdat: ${c['issued_at']}',
-                  ]..removeWhere((e) => e.isEmpty);
+                  final statusRaw = (c['status'] as String?) ?? 'pending';
+                  final status = statusRaw.toLowerCase();
+                  final subtitleLines = <String>[
+                    "Användare: ${c['user_id'] ?? ''}",
+                    "Status: $statusRaw",
+                    if ((c['notes'] as String?)?.isNotEmpty == true)
+                      c['notes'] as String,
+                    if ((c['evidence_url'] as String?)?.isNotEmpty == true)
+                      "Bevis: ${c['evidence_url']}",
+                    if (c['updated_at'] != null)
+                      "Uppdaterad: ${c['updated_at']}",
+                  ]..removeWhere((line) => line.isEmpty);
+
+                  IconData leadingIcon;
+                  Color? iconColor;
+                  switch (status) {
+                    case 'verified':
+                      leadingIcon = Icons.verified_rounded;
+                      iconColor = Colors.lightGreen;
+                      break;
+                    case 'rejected':
+                      leadingIcon = Icons.highlight_off_rounded;
+                      iconColor = Colors.redAccent;
+                      break;
+                    default:
+                      leadingIcon = Icons.hourglass_top_rounded;
+                      iconColor = Colors.orangeAccent;
+                      break;
+                  }
+
                   return Card(
                     child: ListTile(
-                      leading: Icon(
-                        c['verified'] == true
-                            ? Icons.verified_rounded
-                            : Icons.verified_outlined,
-                        color: c['verified'] == true
-                            ? Colors.lightGreen
-                            : null,
-                      ),
+                      leading: Icon(leadingIcon, color: iconColor),
                       title: Text(c['title'] as String? ?? 'Certifikat'),
-                      subtitle: Text(details.join(' • ')),
+                      subtitle: Text(subtitleLines.join('\n')),
+                      isThreeLine: subtitleLines.length > 1,
                       trailing: Wrap(
                         spacing: 8,
                         children: [
-                          if (c['verified'] != true)
+                          if (status != 'verified')
                             ElevatedButton(
                               onPressed: _busy
                                   ? null
-                                  : () =>
-                                      _setCertVerified(c['id'] as String, true),
+                                  : () => _updateCertificateStatus(
+                                        c['id'] as String,
+                                        'verified',
+                                      ),
                               child: const Text('Verifiera'),
                             ),
-                          if (c['verified'] == true)
+                          if (status == 'verified')
                             OutlinedButton(
                               onPressed: _busy
                                   ? null
-                                  : () => _setCertVerified(
+                                  : () => _updateCertificateStatus(
                                         c['id'] as String,
-                                        false,
+                                        'pending',
                                       ),
                               child: const Text('Återkalla'),
+                            ),
+                          if (status != 'rejected')
+                            TextButton(
+                              onPressed: _busy
+                                  ? null
+                                  : () => _updateCertificateStatus(
+                                        c['id'] as String,
+                                        'rejected',
+                                      ),
+                              child: const Text('Avslå'),
                             ),
                         ],
                       ),
@@ -167,13 +211,13 @@ class _AdminPageState extends ConsumerState<AdminPage> {
     }
   }
 
-  Future<void> _setCertVerified(String certId, bool verified) async {
+  Future<void> _updateCertificateStatus(String certId, String status) async {
     setState(() => _busy = true);
     try {
       final client = Supabase.instance.client;
       await client.app
           .from('certificates')
-          .update({'verified': verified}).eq('id', certId);
+          .update({'status': status}).eq('id', certId);
       ref.invalidate(adminDashboardProvider);
     } catch (error) {
       _showError('Misslyckades: ${_friendlyError(error)}');

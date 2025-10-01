@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:wisdom/shared/utils/context_safe.dart';
 import 'package:wisdom/data/supabase/supabase_client.dart';
 import 'package:wisdom/features/community/data/messages_repository.dart';
 import 'package:wisdom/shared/utils/snack.dart';
@@ -72,7 +71,8 @@ class _MessagesPageState extends State<MessagesPage> {
       _input.clear();
       await _load();
     } catch (e) {
-      context.ifMounted((c) => showSnack(c, 'Kunde inte skicka: $e'));
+      if (!mounted || !context.mounted) return;
+      showSnack(context, 'Kunde inte skicka: $e');
     } finally {
       if (mounted) setState(() => _sending = false);
     }

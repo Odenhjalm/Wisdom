@@ -1,0 +1,44 @@
+bucket_id,is_public,file_size_limit,allowed_mime_types
+avatars,t,,
+course-media,t,,
+media,t,,
+private-media,f,,
+public-assets,t,,
+public-media,t,,
+schemaname,tablename,policyname,cmd,roles,permissive,using_expr,with_check_expr
+storage,objects,Authenticated users can upload to their own folder in public-me,INSERT,{public},PERMISSIVE,,((bucket_id = 'public-media'::text) AND ((auth.uid())::text = (storage.foldername(name))[1]))
+storage,objects,Public media is readable by everyone,SELECT,{public},PERMISSIVE,(bucket_id = 'public-media'::text),
+storage,objects,SELECT 1r7zrx6_0,SELECT,{public},PERMISSIVE,(bucket_id = 'media'::text),
+storage,objects,Users can delete their own files in public-media,DELETE,{public},PERMISSIVE,((bucket_id = 'public-media'::text) AND ((auth.uid())::text = (storage.foldername(name))[1])),
+storage,objects,Users can update their own files in public-media,UPDATE,{public},PERMISSIVE,((bucket_id = 'public-media'::text) AND ((auth.uid())::text = (storage.foldername(name))[1])),
+storage,objects,avatars public read,SELECT,{anon,authenticated},PERMISSIVE,(bucket_id = 'avatars'::text),
+storage,objects,avatars user delete,DELETE,{authenticated},PERMISSIVE,((bucket_id = 'avatars'::text) AND (owner = auth.uid())),
+storage,objects,avatars user insert,INSERT,{authenticated},PERMISSIVE,,((bucket_id = 'avatars'::text) AND (owner = auth.uid()))
+storage,objects,avatars user update,UPDATE,{authenticated},PERMISSIVE,((bucket_id = 'avatars'::text) AND (owner = auth.uid())),
+storage,objects,avatars_read,SELECT,{public},PERMISSIVE,(bucket_id = 'avatars'::text),
+storage,objects,avatars_write,ALL,{public},PERMISSIVE,((bucket_id = 'avatars'::text) AND (split_part(name, '/'::text, 1) = (auth.uid())::text)),((bucket_id = 'avatars'::text) AND (split_part(name, '/'::text, 1) = (auth.uid())::text))
+storage,objects,course-media read,SELECT,{public},PERMISSIVE,(bucket_id = 'course-media'::text),
+storage,objects,course-media teacher write,ALL,{public},PERMISSIVE,((bucket_id = 'course-media'::text) AND (EXISTS ( SELECT 1
+   FROM teacher_permissions
+  WHERE (teacher_permissions.user_id = auth.uid())))),((bucket_id = 'course-media'::text) AND (EXISTS ( SELECT 1
+   FROM teacher_permissions
+  WHERE (teacher_permissions.user_id = auth.uid()))))
+storage,objects,course_media_public_read,SELECT,{public},PERMISSIVE,(bucket_id = 'course-media'::text),
+storage,objects,course_media_read,SELECT,{public},PERMISSIVE,((bucket_id = 'course-media'::text) AND (EXISTS ( SELECT 1
+   FROM app.courses c
+  WHERE (((c.id)::text = split_part(objects.name, '/'::text, 1)) AND ((c.is_published = true) OR (c.created_by = auth.uid())))))),
+storage,objects,course_media_teacher_write,ALL,{authenticated},PERMISSIVE,((bucket_id = 'course-media'::text) AND user_is_teacher()),((bucket_id = 'course-media'::text) AND user_is_teacher())
+storage,objects,course_media_write,INSERT,{public},PERMISSIVE,,((bucket_id = 'course-media'::text) AND (EXISTS ( SELECT 1
+   FROM app.courses c
+  WHERE (((c.id)::text = split_part(objects.name, '/'::text, 1)) AND (c.created_by = auth.uid())))))
+storage,objects,media_teacher_update,UPDATE,{public},PERMISSIVE,((bucket_id = 'media'::text) AND app.is_teacher()),((bucket_id = 'media'::text) AND app.is_teacher())
+storage,objects,media_teacher_write,INSERT,{public},PERMISSIVE,,((bucket_id = 'media'::text) AND app.is_teacher())
+storage,objects,public read media,SELECT,{anon,authenticated},PERMISSIVE,(bucket_id = 'media'::text),
+storage,objects,public-assets admin write,ALL,{public},PERMISSIVE,((bucket_id = 'public-assets'::text) AND (EXISTS ( SELECT 1
+   FROM auth.users
+  WHERE ((users.id = auth.uid()) AND ((users.raw_app_meta_data ->> 'role'::text) = 'admin'::text))))),((bucket_id = 'public-assets'::text) AND (EXISTS ( SELECT 1
+   FROM auth.users
+  WHERE ((users.id = auth.uid()) AND ((users.raw_app_meta_data ->> 'role'::text) = 'admin'::text)))))
+storage,objects,public-assets read,SELECT,{public},PERMISSIVE,(bucket_id = 'public-assets'::text),
+storage,objects,public_assets_read,SELECT,{public},PERMISSIVE,(bucket_id = 'public-assets'::text),
+storage,objects,update to authenticated 1prfdz4_0,UPDATE,{authenticated},PERMISSIVE,((bucket_id = 'media'::text) AND app.is_teacher_uid(auth.uid())),

@@ -57,14 +57,14 @@ class _TeacherProfilePageState extends ConsumerState<TeacherProfilePage> {
                   leading: const Icon(Icons.person_rounded),
                   title: Text(
                     display,
-                    style:
-                        Theme.of(context).textTheme.titleLarge?.copyWith(
-                              fontWeight: FontWeight.w700,
-                            ),
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
                   ),
                   subtitle: Text(headline),
                   trailing: OutlinedButton(
-                    onPressed: () => context.push('/messages/dm/${widget.userId}'),
+                    onPressed: () =>
+                        context.push('/messages/dm/${widget.userId}'),
                     child: const Text('Meddelande'),
                   ),
                 ),
@@ -149,21 +149,56 @@ class _CertificatesCard extends StatelessWidget {
               const Text('Inga certifikat publicerade ännu.')
             else
               ...certs.map(
-                (c) => ListTile(
-                  leading: const Icon(Icons.verified_rounded,
-                      color: Colors.lightGreen),
-                  title: Text(c.title),
-                  subtitle: Text([
-                    if ((c.issuer ?? '').isNotEmpty) c.issuer,
-                    if (c.issuedAt != null)
-                      'Utfärdat: ${c.issuedAt!.toLocal().toString().split(' ').first}',
-                  ].whereType<String>().join(' • ')),
-                ),
+                (c) {
+                  final details = <String>[
+                    'Status: ${_statusLabel(c)}',
+                    if ((c.notes ?? '').trim().isNotEmpty) c.notes!.trim(),
+                    if ((c.evidenceUrl ?? '').trim().isNotEmpty)
+                      'Bevis: ${c.evidenceUrl!.trim()}',
+                  ];
+                  return ListTile(
+                    leading: Icon(
+                      _statusIcon(c),
+                      color: _statusColor(c),
+                    ),
+                    title: Text(c.title),
+                    subtitle: Text(details.join('\n')),
+                    isThreeLine: (c.notes ?? '').trim().isNotEmpty ||
+                        (c.evidenceUrl ?? '').trim().isNotEmpty,
+                  );
+                },
               ),
           ],
         ),
       ),
     );
+  }
+
+  IconData _statusIcon(Certificate certificate) {
+    if (certificate.isVerified) return Icons.verified_rounded;
+    if (certificate.isPending) return Icons.hourglass_top_rounded;
+    if (certificate.isRejected) return Icons.highlight_off_rounded;
+    return Icons.description_outlined;
+  }
+
+  Color? _statusColor(Certificate certificate) {
+    if (certificate.isVerified) return Colors.lightGreen;
+    if (certificate.isRejected) return Colors.redAccent;
+    if (certificate.isPending) return Colors.orangeAccent;
+    return null;
+  }
+
+  String _statusLabel(Certificate certificate) {
+    switch (certificate.status) {
+      case CertificateStatus.pending:
+        return 'Under granskning';
+      case CertificateStatus.verified:
+        return 'Verifierat';
+      case CertificateStatus.rejected:
+        return 'Avslaget';
+      case CertificateStatus.unknown:
+        return certificate.statusRaw;
+    }
   }
 }
 

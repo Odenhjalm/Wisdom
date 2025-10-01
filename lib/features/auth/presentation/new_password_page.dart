@@ -1,17 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:wisdom/shared/utils/context_safe.dart';
-import 'package:wisdom/shared/utils/snack.dart';
 
-class NewPasswordPage extends StatefulWidget {
+import 'package:wisdom/core/env/env_state.dart';
+import 'package:wisdom/shared/utils/snack.dart';
+import 'package:wisdom/widgets/base_page.dart';
+
+class NewPasswordPage extends ConsumerStatefulWidget {
   const NewPasswordPage({super.key});
 
   @override
-  State<NewPasswordPage> createState() => _NewPasswordPageState();
+  ConsumerState<NewPasswordPage> createState() => _NewPasswordPageState();
 }
 
-class _NewPasswordPageState extends State<NewPasswordPage> {
+class _NewPasswordPageState extends ConsumerState<NewPasswordPage> {
   final _formKey = GlobalKey<FormState>();
   final _passwordCtrl = TextEditingController();
   final _confirmCtrl = TextEditingController();
@@ -26,74 +29,99 @@ class _NewPasswordPageState extends State<NewPasswordPage> {
 
   @override
   Widget build(BuildContext context) {
+    final envInfo = ref.watch(envInfoProvider);
+    final envBlocked = envInfo.hasIssues;
+
     return Scaffold(
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 420),
-              child: Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Form(
-                    key: _formKey,
-                    child: AutofillGroup(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Text(
-                            'Sätt nytt lösenord',
-                            style: Theme.of(context)
-                                .textTheme
-                                .headlineSmall
-                                ?.copyWith(fontWeight: FontWeight.w700),
-                          ),
-                          const SizedBox(height: 16),
-                          const Text(
-                            'Välj ett nytt lösenord för ditt konto. Det måste vara minst 6 tecken långt.',
-                          ),
-                          const SizedBox(height: 24),
-                          TextFormField(
-                            controller: _passwordCtrl,
-                            obscureText: true,
-                            autofillHints: const [AutofillHints.newPassword],
-                            decoration: const InputDecoration(
-                              labelText: 'Nytt lösenord',
-                              hintText: 'Minst 6 tecken',
+      body: BasePage(
+        child: SafeArea(
+          top: false,
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 420),
+                child: Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Form(
+                      key: _formKey,
+                      child: AutofillGroup(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            if (envBlocked)
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 16),
+                                child: Text(
+                                  '${envInfo.message} Lösenordsbyte är avstängt tills konfigurationen är klar.',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodyMedium
+                                      ?.copyWith(
+                                        color:
+                                            Theme.of(context).colorScheme.error,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                ),
+                              ),
+                            Text(
+                              'Sätt nytt lösenord',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .headlineSmall
+                                  ?.copyWith(fontWeight: FontWeight.w700),
                             ),
-                            textInputAction: TextInputAction.next,
-                            validator: _validatePassword,
-                          ),
-                          const SizedBox(height: 16),
-                          TextFormField(
-                            controller: _confirmCtrl,
-                            obscureText: true,
-                            autofillHints: const [AutofillHints.newPassword],
-                            decoration: const InputDecoration(
-                              labelText: 'Upprepa lösenord',
+                            const SizedBox(height: 16),
+                            const Text(
+                              'Välj ett nytt lösenord för ditt konto. Det måste vara minst 6 tecken långt.',
                             ),
-                            textInputAction: TextInputAction.done,
-                            onFieldSubmitted:
-                                _busy ? null : (_) => _updatePassword(context),
-                            validator: _validateConfirm,
-                          ),
-                          const SizedBox(height: 24),
-                          FilledButton(
-                            onPressed:
-                                _busy ? null : () => _updatePassword(context),
-                            child: _busy
-                                ? const SizedBox(
-                                    width: 18,
-                                    height: 18,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                    ),
-                                  )
-                                : const Text('Spara nytt lösenord'),
-                          ),
-                        ],
+                            const SizedBox(height: 24),
+                            TextFormField(
+                              controller: _passwordCtrl,
+                              enabled: !envBlocked,
+                              obscureText: true,
+                              autofillHints: const [AutofillHints.newPassword],
+                              decoration: const InputDecoration(
+                                labelText: 'Nytt lösenord',
+                                hintText: 'Minst 6 tecken',
+                              ),
+                              textInputAction: TextInputAction.next,
+                              validator: _validatePassword,
+                            ),
+                            const SizedBox(height: 16),
+                            TextFormField(
+                              controller: _confirmCtrl,
+                              enabled: !envBlocked,
+                              obscureText: true,
+                              autofillHints: const [AutofillHints.newPassword],
+                              decoration: const InputDecoration(
+                                labelText: 'Upprepa lösenord',
+                              ),
+                              textInputAction: TextInputAction.done,
+                              onFieldSubmitted: _busy || envBlocked
+                                  ? null
+                                  : (_) => _updatePassword(context),
+                              validator: _validateConfirm,
+                            ),
+                            const SizedBox(height: 24),
+                            FilledButton(
+                              onPressed: _busy || envBlocked
+                                  ? null
+                                  : () => _updatePassword(context),
+                              child: _busy
+                                  ? const SizedBox(
+                                      width: 18,
+                                      height: 18,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                  : const Text('Spara nytt lösenord'),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
@@ -107,6 +135,15 @@ class _NewPasswordPageState extends State<NewPasswordPage> {
   }
 
   Future<void> _updatePassword(BuildContext context) async {
+    final envInfo = ref.read(envInfoProvider);
+    if (envInfo.hasIssues) {
+      showSnack(
+        context,
+        '${envInfo.message} Lösenordsbyte är avstängt tills konfigurationen är klar.',
+      );
+      return;
+    }
+
     final form = _formKey.currentState;
     if (form == null || !form.validate()) return;
 
@@ -117,19 +154,15 @@ class _NewPasswordPageState extends State<NewPasswordPage> {
       await Supabase.instance.client.auth.updateUser(
         UserAttributes(password: password),
       );
-      // Tips: vid behov kan du förnya sessionen
-      // await Supabase.instance.client.auth.refreshSession();
-      context.ifMounted((c) {
-        showSnack(c, 'Lösenord uppdaterat.');
-        c.go('/');
-      });
-      // context.go('/login'); // Använd denna rad om du vill skicka tillbaka till login.
+      if (!mounted || !context.mounted) return;
+      showSnack(context, 'Lösenord uppdaterat.');
+      context.go('/');
     } on AuthException catch (e) {
-      context.ifMounted((c) => _showError(c, e.message));
+      if (!mounted || !context.mounted) return;
+      _showError(context, e.message);
     } catch (e) {
-      context.ifMounted(
-        (c) => _showError(c, 'Något gick fel. Försök igen.'),
-      );
+      if (!mounted || !context.mounted) return;
+      _showError(context, 'Något gick fel. Försök igen.');
     } finally {
       if (mounted) setState(() => _busy = false);
     }

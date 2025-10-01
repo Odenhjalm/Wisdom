@@ -8,6 +8,7 @@ import 'package:wisdom/gate.dart';
 import 'package:wisdom/shared/widgets/course_video.dart';
 import 'package:wisdom/shared/widgets/go_router_back_button.dart';
 import 'package:wisdom/shared/widgets/top_nav_action_buttons.dart';
+import 'package:wisdom/widgets/base_page.dart';
 
 class CourseIntroPage extends ConsumerWidget {
   const CourseIntroPage({super.key});
@@ -30,50 +31,53 @@ class CourseIntroPage extends ConsumerWidget {
         title: Text(title),
         actions: const [TopNavActionButtons()],
       ),
-      body: SafeArea(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 900),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: Theme.of(context)
-                            .textTheme
-                            .headlineSmall
-                            ?.copyWith(fontWeight: FontWeight.w700),
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        courseId.isEmpty
-                            ? 'Detta är en introduktionskurs.'
-                            : 'Detta är introduktionen för kursen med ID: $courseId.',
-                        style: Theme.of(context).textTheme.bodyLarge,
-                      ),
-                      const SizedBox(height: 24),
-                      _IntroVideoPreview(courseId: courseId),
-                      const SizedBox(height: 16),
-                      _QuizActions(courseId: courseId),
-                      const SizedBox(height: 24),
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: FilledButton.icon(
-                          onPressed: () {
-                            gate.allow();
-                            context.go('/home');
-                          },
-                          icon: const Icon(Icons.arrow_forward),
-                          label: const Text('Gå vidare till Home'),
+      body: BasePage(
+        child: SafeArea(
+          top: false,
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 900),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          style: Theme.of(context)
+                              .textTheme
+                              .headlineSmall
+                              ?.copyWith(fontWeight: FontWeight.w700),
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: 12),
+                        Text(
+                          courseId.isEmpty
+                              ? 'Detta är en introduktionskurs.'
+                              : 'Detta är introduktionen för kursen med ID: $courseId.',
+                          style: Theme.of(context).textTheme.bodyLarge,
+                        ),
+                        const SizedBox(height: 24),
+                        _IntroVideoPreview(courseId: courseId),
+                        const SizedBox(height: 16),
+                        _QuizActions(courseId: courseId),
+                        const SizedBox(height: 24),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: FilledButton.icon(
+                            onPressed: () {
+                              gate.allow();
+                              context.go('/home');
+                            },
+                            icon: const Icon(Icons.arrow_forward),
+                            label: const Text('Gå vidare till Home'),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -174,7 +178,8 @@ class _QuizActions extends ConsumerWidget {
               ),
             const Spacer(),
             OutlinedButton.icon(
-              onPressed: () => context.push('/course-quiz?quizId=$quizId'),
+              onPressed: () => context
+                  .push('/course-quiz?quizId=$quizId&courseId=$courseId'),
               icon: const Icon(Icons.quiz_outlined),
               label: const Text('Gör provet'),
             ),

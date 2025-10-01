@@ -4,12 +4,13 @@ import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:wisdom/core/errors/app_failure.dart';
+import 'package:wisdom/data/models/certificate.dart';
 import 'package:wisdom/core/supabase_ext.dart';
 import 'package:wisdom/features/community/application/community_providers.dart';
 import 'package:wisdom/gate.dart';
+import 'package:wisdom/features/studio/data/certificates_repository.dart';
 import 'package:wisdom/shared/utils/snack.dart';
 import 'package:wisdom/shared/widgets/app_scaffold.dart';
-import 'package:wisdom/shared/utils/context_safe.dart';
 
 class ProfilePage extends ConsumerStatefulWidget {
   const ProfilePage({super.key});
@@ -118,16 +119,28 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                               'Du har inte publicerat några certifikat ännu.')
                         else
                           ...certs.map(
-                            (c) => ListTile(
-                              leading: const Icon(Icons.verified_rounded,
-                                  color: Colors.lightGreen),
-                              title: Text(c.title),
-                              subtitle: Text([
-                                if ((c.issuer ?? '').isNotEmpty) c.issuer,
-                                if (c.issuedAt != null)
-                                  'Utfärdat: ${c.issuedAt!.toLocal().toString().split(' ').first}',
-                              ].whereType<String>().join(' • ')),
-                            ),
+                            (c) {
+                              final details = <String>[
+                                'Status: ${_certificateStatusLabel(c)}',
+                                if ((c.notes ?? '').trim().isNotEmpty)
+                                  c.notes!.trim(),
+                                if ((c.evidenceUrl ?? '').trim().isNotEmpty)
+                                  'Bevis: ${c.evidenceUrl!.trim()}',
+                                if (c.updatedAt != null)
+                                  'Uppdaterad: ${_formatDate(c.updatedAt!)}',
+                              ];
+                              return ListTile(
+                                leading: Icon(
+                                  _certificateIcon(c),
+                                  color: _certificateColor(c),
+                                ),
+                                title: Text(c.title),
+                                subtitle: Text(details.join('\n')),
+                                isThreeLine:
+                                    (c.notes ?? '').trim().isNotEmpty ||
+                                        (c.evidenceUrl ?? '').trim().isNotEmpty,
+                              );
+                            },
                           ),
                       ],
                     ),
@@ -165,16 +178,19 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
       await client.app.from('certificates').upsert(
         {
           'user_id': u.id,
-          'title': 'Läraransökan',
+          'title': Certificate.teacherApplicationTitle,
           'status': 'pending',
           'notes': 'Ansökan efter certifikat(er) från profil',
         },
         onConflict: 'user_id,title',
       );
-      context.ifMounted((c) => showSnack(c, 'Ansökan inskickad. Tack!'));
+      if (!mounted || !context.mounted) return;
+      showSnack(context, 'Ansökan inskickad. Tack!');
     } catch (error) {
-      context.ifMounted(
-        (c) => showSnack(c, 'Kunde inte skicka: ${_friendlyError(error)}'),
+      if (!mounted || !context.mounted) return;
+      showSnack(
+        context,
+        'Kunde inte skicka: ${_friendlyError(error)}',
       );
     }
   }
@@ -188,13 +204,13 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
       final repo = ref.read(authProfileRepositoryProvider);
       await repo.signInOrSignUp(email: email, password: pw);
       ref.invalidate(myProfileProvider);
-      context.ifMounted((c) => c.go('/home'));
+      if (!mounted || !context.mounted) return;
+      context.go('/home');
     } catch (error) {
-      context.ifMounted(
-        (c) => showSnack(
-          c,
-          'Inloggning misslyckades: ${_friendlyError(error)}',
-        ),
+      if (!mounted || !context.mounted) return;
+      showSnack(
+        context,
+        'Inloggning misslyckades: ${_friendlyError(error)}',
       );
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -206,15 +222,45 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     await repo.signOut();
     gate.reset();
     ref.invalidate(myProfileProvider);
-    context.ifMounted((c) {
-      showSnack(c, 'Utloggad');
-      c.go('/landing');
-    });
+    if (!mounted || !context.mounted) return;
+    showSnack(context, 'Utloggad');
+    context.go('/landing');
   }
 
   String _friendlyError(Object error) {
     if (error is AppFailure) return error.message;
     return error.toString();
+  }
+
+  IconData _certificateIcon(Certificate certificate) {
+    if (certificate.isVerified) return Icons.verified_rounded;
+    if (certificate.isPending) return Icons.hourglass_top_rounded;
+    if (certificate.isRejected) return Icons.highlight_off_rounded;
+    return Icons.description_outlined;
+  }
+
+  Color? _certificateColor(Certificate certificate) {
+    if (certificate.isVerified) return Colors.lightGreen;
+    if (certificate.isRejected) return Colors.redAccent;
+    if (certificate.isPending) return Colors.orangeAccent;
+    return null;
+  }
+
+  String _certificateStatusLabel(Certificate certificate) {
+    switch (certificate.status) {
+      case CertificateStatus.pending:
+        return 'Under granskning';
+      case CertificateStatus.verified:
+        return 'Verifierat';
+      case CertificateStatus.rejected:
+        return 'Avslaget';
+      case CertificateStatus.unknown:
+        return certificate.statusRaw;
+    }
+  }
+
+  String _formatDate(DateTime date) {
+    return date.toLocal().toString().split(' ').first;
   }
 }
 
@@ -297,14 +343,15 @@ class _AddCertificateDialog extends StatefulWidget {
 
 class _AddCertificateDialogState extends State<_AddCertificateDialog> {
   final _title = TextEditingController();
-  final _issuer = TextEditingController();
-  DateTime? _issuedAt;
+  final _notes = TextEditingController();
+  final _evidenceUrl = TextEditingController();
   bool _saving = false;
 
   @override
   void dispose() {
     _title.dispose();
-    _issuer.dispose();
+    _notes.dispose();
+    _evidenceUrl.dispose();
     super.dispose();
   }
 
@@ -319,31 +366,20 @@ class _AddCertificateDialogState extends State<_AddCertificateDialog> {
             controller: _title,
             decoration: const InputDecoration(labelText: 'Titel'),
           ),
+          const SizedBox(height: 12),
           TextField(
-            controller: _issuer,
-            decoration: const InputDecoration(labelText: 'Utfärdare'),
+            controller: _notes,
+            decoration:
+                const InputDecoration(labelText: 'Beskrivning (valfritt)'),
+            maxLines: 3,
           ),
-          Row(
-            children: [
-              Text(_issuedAt == null
-                  ? 'Ingen datum vald'
-                  : 'Utfärdat: ${_issuedAt!.toLocal().toString().split(' ').first}'),
-              const Spacer(),
-              TextButton(
-                onPressed: () async {
-                  final res = await showDatePicker(
-                    context: context,
-                    initialDate: DateTime.now(),
-                    firstDate: DateTime(2010),
-                    lastDate: DateTime.now(),
-                  );
-                  if (res != null) {
-                    setState(() => _issuedAt = res);
-                  }
-                },
-                child: const Text('Välj datum'),
-              ),
-            ],
+          const SizedBox(height: 12),
+          TextField(
+            controller: _evidenceUrl,
+            decoration: const InputDecoration(
+              labelText: 'Bevislänk (valfritt)',
+              hintText: 'https://…',
+            ),
           ),
         ],
       ),
@@ -360,19 +396,20 @@ class _AddCertificateDialogState extends State<_AddCertificateDialog> {
                   if (title.isEmpty) return;
                   setState(() => _saving = true);
                   try {
-                    final client = Supabase.instance.client;
-                    await client.app.from('certificates').insert({
-                      'title': title,
-                      if (_issuer.text.trim().isNotEmpty)
-                        'issuer': _issuer.text.trim(),
-                      if (_issuedAt != null)
-                        'issued_at': _issuedAt!.toIso8601String(),
-                    });
-                    context.ifMounted((c) => Navigator.of(c).pop(true));
-                  } catch (_) {
-                    context.ifMounted(
-                      (c) => showSnack(c, 'Kunde inte spara certifikat.'),
+                    final repo = CertificatesRepository();
+                    final notes = _notes.text.trim();
+                    final evidence = _evidenceUrl.text.trim();
+                    await repo.addCertificate(
+                      title: title,
+                      status: 'pending',
+                      notes: notes.isEmpty ? null : notes,
+                      evidenceUrl: evidence.isEmpty ? null : evidence,
                     );
+                    if (!mounted || !context.mounted) return;
+                    Navigator.of(context).pop(true);
+                  } catch (_) {
+                    if (!mounted || !context.mounted) return;
+                    showSnack(context, 'Kunde inte spara certifikat.');
                   } finally {
                     if (mounted) setState(() => _saving = false);
                   }

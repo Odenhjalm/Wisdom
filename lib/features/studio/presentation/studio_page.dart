@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:wisdom/shared/widgets/app_scaffold.dart';
 import 'package:wisdom/data/repositories/profile_repository.dart';
 import 'package:wisdom/data/models/profile.dart';
+import 'package:wisdom/data/models/certificate.dart';
 import 'package:wisdom/data/supabase/supabase_client.dart';
 import 'package:wisdom/core/supabase_ext.dart';
 import 'package:wisdom/features/studio/data/studio_repository.dart';
@@ -66,7 +67,7 @@ class _StudioPageState extends State<StudioPage> {
       await Supa.client.app.from('certificates').upsert(
         {
           'user_id': u.id,
-          'title': 'Läraransökan',
+          'title': Certificate.teacherApplicationTitle,
           'status': 'pending',
           'notes': 'Jag vill bli lärare. (ansökan från app)',
         },
@@ -114,7 +115,6 @@ class _StudioPageState extends State<StudioPage> {
       transparentAppBar: true,
       background: const HeroBackground(
         asset: 'assets/images/bakgrund.png',
-        alignment: Alignment.topCenter,
         opacity: 0.72,
       ),
       body: Column(
@@ -190,7 +190,6 @@ class _StudioShellState extends State<_StudioShell> {
       transparentAppBar: true,
       background: const HeroBackground(
         asset: 'assets/images/bakgrund.png',
-        alignment: Alignment.topCenter,
         opacity: 0.78,
       ),
       body: Align(
@@ -273,14 +272,13 @@ class _MyCoursesPageState extends State<_MyCoursesPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            ElevatedButton.icon(
-              onPressed: () => _openEditor(),
-              icon: const Icon(Icons.add_rounded),
-              label: const Text('Ny kurs'),
-            ),
-          ],
+        Align(
+          alignment: Alignment.centerLeft,
+          child: ElevatedButton.icon(
+            onPressed: () => _openEditor(),
+            icon: const Icon(Icons.add_rounded),
+            label: const Text('Ny kurs'),
+          ),
         ),
         const SizedBox(height: 12),
         if (_items.isEmpty)
@@ -710,30 +708,37 @@ class _ModulesLessonsPageState extends State<_ModulesLessonsPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(children: [
-          const Text('Kurs: '),
-          const SizedBox(width: 8),
-          DropdownButton<String>(
-            value: _selectedCourseId,
-            items: _courses
-                .map((c) => DropdownMenuItem(
-                      value: c['id'] as String,
-                      child: Text(c['title'] as String? ?? 'Untitled'),
-                    ))
-                .toList(),
-            onChanged: (v) async {
-              if (v == null) return;
-              setState(() => _selectedCourseId = v);
-              await _loadModules(v);
-            },
-          ),
-          const Spacer(),
-          ElevatedButton.icon(
-            onPressed: () => _addOrEditModule(),
-            icon: const Icon(Icons.add_rounded),
-            label: const Text('Ny modul'),
-          ),
-        ]),
+        Wrap(
+          spacing: 12,
+          runSpacing: 12,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            const Text('Kurs:'),
+            ConstrainedBox(
+              constraints: const BoxConstraints(minWidth: 200, maxWidth: 320),
+              child: DropdownButton<String>(
+                isExpanded: true,
+                value: _selectedCourseId,
+                items: _courses
+                    .map((c) => DropdownMenuItem(
+                          value: c['id'] as String,
+                          child: Text(c['title'] as String? ?? 'Untitled'),
+                        ))
+                    .toList(),
+                onChanged: (v) async {
+                  if (v == null) return;
+                  setState(() => _selectedCourseId = v);
+                  await _loadModules(v);
+                },
+              ),
+            ),
+            ElevatedButton.icon(
+              onPressed: () => _addOrEditModule(),
+              icon: const Icon(Icons.add_rounded),
+              label: const Text('Ny modul'),
+            ),
+          ],
+        ),
         const SizedBox(height: 12),
         Expanded(
           child: ListView.separated(
@@ -767,15 +772,14 @@ class _ModulesLessonsPageState extends State<_ModulesLessonsPage> {
                         ],
                       ),
                       const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          ElevatedButton.icon(
-                            onPressed: () =>
-                                _addOrEditLesson(moduleId: m['id'] as String),
-                            icon: const Icon(Icons.add_rounded),
-                            label: const Text('Ny lektion'),
-                          ),
-                        ],
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: ElevatedButton.icon(
+                          onPressed: () =>
+                              _addOrEditLesson(moduleId: m['id'] as String),
+                          icon: const Icon(Icons.add_rounded),
+                          label: const Text('Ny lektion'),
+                        ),
                       ),
                       const SizedBox(height: 8),
                       if (lessons.isEmpty)
@@ -1023,6 +1027,8 @@ class _MediaPageState extends State<_MediaPage> {
   List<Map<String, dynamic>> _lessons = [];
   String? _lessonId;
   List<Map<String, dynamic>> _media = [];
+  bool _lessonIntro = false;
+  bool _updatingLessonIntro = false;
 
   @override
   void initState() {
@@ -1059,6 +1065,7 @@ class _MediaPageState extends State<_MediaPage> {
     setState(() {
       _lessons = ls;
       _lessonId = ls.isNotEmpty ? (ls.first['id'] as String) : null;
+      _lessonIntro = ls.isNotEmpty ? (ls.first['is_intro'] == true) : false;
     });
     if (_lessonId != null) await _loadMedia(_lessonId!);
   }
@@ -1073,31 +1080,49 @@ class _MediaPageState extends State<_MediaPage> {
     });
   }
 
-  Future<void> _pickAndUpload() async {
+  Future<void> _setLessonIntro(bool value) async {
     if (_lessonId == null) return;
-    // Use file_selector to pick a file
+    setState(() {
+      _lessonIntro = value;
+      _updatingLessonIntro = true;
+    });
     try {
-      const typeGroup = fs.XTypeGroup(label: 'media', extensions: <String>[
-        'png',
-        'jpg',
-        'jpeg',
-        'gif',
-        'mp4',
-        'mov',
-        'mp3',
-        'wav',
-        'pdf'
-      ]);
+      await _svc.updateLessonIntro(lessonId: _lessonId!, isIntro: value);
+      setState(() {
+        _lessons = _lessons
+            .map((lesson) => lesson['id'] == _lessonId
+                ? {
+                    ...lesson,
+                    'is_intro': value,
+                  }
+                : lesson)
+            .toList();
+      });
+    } catch (e) {
+      if (mounted && context.mounted) {
+        showSnack(context, 'Kunde inte uppdatera intro-flagga: $e');
+      }
+    } finally {
+      if (mounted) setState(() => _updatingLessonIntro = false);
+    }
+  }
+
+  Future<void> _pickAndUploadWith(List<String> extensions) async {
+    if (_lessonId == null || _courseId == null) return;
+    try {
+      final typeGroup = fs.XTypeGroup(label: 'media', extensions: extensions);
       final xfile = await fs.openFile(acceptedTypeGroups: [typeGroup]);
       if (xfile == null) return;
       final bytes = await xfile.readAsBytes();
       final name = xfile.name;
       final ct = _guessContentType(name);
       await _svc.uploadLessonMedia(
+        courseId: _courseId!,
         lessonId: _lessonId!,
         data: bytes,
         filename: name,
         contentType: ct,
+        isIntro: _lessonIntro,
       );
       await _loadMedia(_lessonId!);
     } catch (e) {
@@ -1116,14 +1141,24 @@ class _MediaPageState extends State<_MediaPage> {
         return 'image/jpeg';
       case 'gif':
         return 'image/gif';
+      case 'webp':
+        return 'image/webp';
       case 'mp4':
         return 'video/mp4';
       case 'mov':
         return 'video/quicktime';
+      case 'm4v':
+        return 'video/x-m4v';
+      case 'webm':
+        return 'video/webm';
       case 'mp3':
         return 'audio/mpeg';
       case 'wav':
         return 'audio/wav';
+      case 'm4a':
+        return 'audio/mp4';
+      case 'aac':
+        return 'audio/aac';
       case 'pdf':
         return 'application/pdf';
       default:
@@ -1131,14 +1166,36 @@ class _MediaPageState extends State<_MediaPage> {
     }
   }
 
-  String _publicUrl(String storagePath) {
-    return Supa.client.storage.from('media').getPublicUrl(storagePath);
+  String _mediaPreview(String bucket, String path) {
+    if (bucket == 'public-media') {
+      return Supa.client.storage.from(bucket).getPublicUrl(path);
+    }
+    return '$bucket/$path';
   }
 
   Future<void> _deleteMedia(String id) async {
     await _svc.deleteLessonMedia(id);
     if (!mounted) return;
     if (_lessonId != null) await _loadMedia(_lessonId!);
+  }
+
+  Future<void> _handleReorder(int oldIndex, int newIndex) async {
+    if (_lessonId == null) return;
+    setState(() {
+      if (newIndex > oldIndex) newIndex -= 1;
+      final item = _media.removeAt(oldIndex);
+      _media.insert(newIndex, item);
+    });
+    try {
+      await _svc.reorderLessonMedia(
+        _lessonId!,
+        _media.map((m) => m['id'] as String).toList(),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      showSnack(context, 'Kunde inte spara ordning: $e');
+      await _loadMedia(_lessonId!);
+    }
   }
 
   @override
@@ -1193,14 +1250,67 @@ class _MediaPageState extends State<_MediaPage> {
                   .toList(),
               onChanged: (v) async {
                 if (v == null) return;
-                setState(() => _lessonId = v);
+                setState(() {
+                  _lessonId = v;
+                  final match = _lessons.firstWhere(
+                    (item) => item['id'] == v,
+                    orElse: () => <String, dynamic>{'is_intro': false},
+                  );
+                  _lessonIntro = match['is_intro'] == true;
+                });
                 await _loadMedia(v);
               },
             ),
-            ElevatedButton.icon(
-              onPressed: (_lessonId == null) ? null : _pickAndUpload,
-              icon: const Icon(Icons.cloud_upload_rounded),
-              label: const Text('Ladda upp media'),
+            SwitchListTile.adaptive(
+              contentPadding: EdgeInsets.zero,
+              value: _lessonIntro,
+              onChanged: (_lessonId == null || _updatingLessonIntro)
+                  ? null
+                  : (value) async => _setLessonIntro(value),
+              title: const Text('Lektionen är introduktion (gratis)'),
+              subtitle: const Text(
+                'Styr om uppladdat material ska hamna i public-media eller course-media.',
+              ),
+            ),
+            Wrap(
+              spacing: 12,
+              runSpacing: 8,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: (_lessonId == null)
+                      ? null
+                      : () => _pickAndUploadWith(
+                            const ['png', 'jpg', 'jpeg', 'gif', 'webp'],
+                          ),
+                  icon: const Icon(Icons.image_outlined),
+                  label: const Text('Ladda upp bild'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: (_lessonId == null)
+                      ? null
+                      : () => _pickAndUploadWith(
+                            const ['mp4', 'mov', 'm4v', 'webm'],
+                          ),
+                  icon: const Icon(Icons.movie_creation_outlined),
+                  label: const Text('Ladda upp video'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: (_lessonId == null)
+                      ? null
+                      : () => _pickAndUploadWith(
+                            const ['mp3', 'wav', 'm4a', 'aac'],
+                          ),
+                  icon: const Icon(Icons.audiotrack_outlined),
+                  label: const Text('Ladda upp ljud'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: (_lessonId == null)
+                      ? null
+                      : () => _pickAndUploadWith(const ['pdf']),
+                  icon: const Icon(Icons.picture_as_pdf_outlined),
+                  label: const Text('Ladda upp PDF'),
+                ),
+              ],
             ),
           ],
         ),
@@ -1208,24 +1318,53 @@ class _MediaPageState extends State<_MediaPage> {
         Expanded(
           child: _lessonId == null
               ? const Center(child: Text('Välj en lektion'))
-              : ListView.separated(
+              : ReorderableListView.builder(
                   itemCount: _media.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 8),
+                  onReorder: _handleReorder,
+                  buildDefaultDragHandles: false,
+                  padding: const EdgeInsets.symmetric(vertical: 4),
                   itemBuilder: (_, i) {
                     final m = _media[i];
-                    final url = _publicUrl(m['storage_path'] as String);
-                    return Card(
-                      child: ListTile(
-                        leading: const Icon(Icons.perm_media_rounded),
-                        title: Text(m['kind'] as String? ?? 'media'),
-                        subtitle: Text(url,
-                            maxLines: 1, overflow: TextOverflow.ellipsis),
-                        trailing: IconButton(
-                          tooltip: 'Ta bort',
-                          icon: const Icon(Icons.delete_outline_rounded),
-                          onPressed: () => _deleteMedia(m['id'] as String),
+                    final bucket =
+                        (m['storage_bucket'] as String?) ?? 'course-media';
+                    final url = _mediaPreview(
+                      bucket,
+                      m['storage_path'] as String,
+                    );
+                    final intro = bucket == 'public-media';
+                    return Padding(
+                      key: ValueKey(m['id']),
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Card(
+                        child: ListTile(
+                          leading: ReorderableDragStartListener(
+                            index: i,
+                            child: const Icon(Icons.drag_handle_rounded),
+                          ),
+                          title: Text(m['kind'] as String? ?? 'media'),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                url,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 4),
+                              Chip(
+                                label:
+                                    Text(intro ? 'Intro (gratis)' : 'Betalt'),
+                                visualDensity: VisualDensity.compact,
+                              ),
+                            ],
+                          ),
+                          trailing: IconButton(
+                            tooltip: 'Ta bort',
+                            icon: const Icon(Icons.delete_outline_rounded),
+                            onPressed: () => _deleteMedia(m['id'] as String),
+                          ),
                         ),
-                        onTap: () {},
                       ),
                     );
                   },

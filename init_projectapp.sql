@@ -22,6 +22,16 @@ begin
   end if;
 end$$;
 
+do $$
+begin
+  if not exists (
+    select 1 from pg_type t join pg_namespace n on n.oid=t.typnamespace
+    where t.typname='user_role' and n.nspname='app'
+  ) then
+    create type app.user_role as enum ('user','professional','teacher');
+  end if;
+end$$;
+
 -- Membership plan & status
 do $$
 begin
@@ -73,6 +83,8 @@ create table if not exists app.profiles (
   bio text,
   photo_url text,
   role app.role_type not null default 'user',
+  role_v2 app.user_role not null default 'user',
+  is_admin boolean not null default false,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -137,14 +149,6 @@ create table if not exists app.enrollments (
 create index if not exists idx_enroll_user on app.enrollments(user_id);
 create index if not exists idx_enroll_course on app.enrollments(course_id);
 
-create table if not exists app.certifications (
-  id uuid primary key default uuid_generate_v4(),
-  user_id uuid not null references app.profiles(user_id) on delete cascade,
-  course_id uuid not null references app.courses(id) on delete cascade,
-  issued_at timestamptz not null default now(),
-  unique(user_id, course_id)
-);
-
 create table if not exists app.memberships (
   user_id uuid primary key references app.profiles(user_id) on delete cascade,
   plan app.membership_plan not null default 'none',
@@ -168,6 +172,46 @@ create table if not exists app.orders (
 );
 create index if not exists idx_orders_user on app.orders(user_id);
 create index if not exists idx_orders_status on app.orders(status);
+
+create table if not exists app.purchases (
+  id uuid primary key default uuid_generate_v4(),
+  order_id uuid references app.orders(id) on delete set null,
+  user_id uuid references app.profiles(user_id) on delete set null,
+  buyer_email text not null,
+  course_id uuid not null references app.courses(id) on delete cascade,
+  stripe_checkout_id text unique,
+  stripe_payment_intent text unique,
+  status text not null default 'succeeded' check (status in ('succeeded','refunded','failed','pending')),
+  amount_cents integer,
+  currency text,
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_purchases_user on app.purchases(user_id);
+create index if not exists idx_purchases_course on app.purchases(course_id);
+create index if not exists idx_purchases_email on app.purchases(buyer_email);
+create unique index if not exists idx_purchases_order on app.purchases(order_id) where order_id is not null;
+
+create table if not exists app.guest_claim_tokens (
+  token uuid primary key default uuid_generate_v4(),
+  buyer_email text not null,
+  course_id uuid not null references app.courses(id) on delete cascade,
+  purchase_id uuid not null references app.purchases(id) on delete cascade,
+  used boolean not null default false,
+  expires_at timestamptz not null default (now() + interval '14 days'),
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_guest_claim_email on app.guest_claim_tokens(buyer_email);
+create index if not exists idx_guest_claim_purchase on app.guest_claim_tokens(purchase_id);
+
+-- App configuration
+create table if not exists app.app_config (
+  id integer primary key default 1,
+  free_course_limit integer not null default 5,
+  platform_fee_pct numeric not null default 10
+);
+
+insert into app.app_config(id)
+select 1 where not exists (select 1 from app.app_config where id = 1);
 
 create table if not exists app.events (
   id uuid primary key default uuid_generate_v4(),
@@ -231,6 +275,53 @@ create table if not exists app.bookings (
   unique(slot_id)
 );
 
+create table if not exists app.pro_requirements (
+  id serial primary key,
+  code text unique not null,
+  title text not null,
+  created_by uuid not null default gen_random_uuid(),
+  updated_at timestamptz not null default now()
+);
+
+insert into app.pro_requirements (code, title, created_by)
+values
+  ('STEP1','Grundutbildning', coalesce((select created_by from app.pro_requirements where code = 'STEP1'),
+                                       (select user_id from app.profiles where is_admin = true order by created_at limit 1),
+                                       gen_random_uuid())),
+  ('STEP2','Fördjupning', coalesce((select created_by from app.pro_requirements where code = 'STEP2'),
+                                    (select user_id from app.profiles where is_admin = true order by created_at limit 1),
+                                    gen_random_uuid())),
+  ('STEP3','Praktik', coalesce((select created_by from app.pro_requirements where code = 'STEP3'),
+                                 (select user_id from app.profiles where is_admin = true order by created_at limit 1),
+                                 gen_random_uuid()))
+on conflict (code) do update set
+  title = excluded.title,
+  updated_at = now();
+
+create table if not exists app.pro_progress (
+  user_id uuid references app.profiles(user_id) on delete cascade,
+  requirement_id int references app.pro_requirements(id) on delete cascade,
+  completed_at timestamptz default now(),
+  primary key (user_id, requirement_id)
+);
+
+create table if not exists app.certificates (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references app.profiles(user_id) on delete cascade,
+  title text not null,
+  status text not null default 'pending',
+  evidence_url text,
+  notes text,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+create table if not exists app.teacher_approvals (
+  user_id uuid primary key references app.profiles(user_id) on delete cascade,
+  approved_by uuid,
+  approved_at timestamptz
+);
+
 create table if not exists app.tarot_requests (
   id uuid primary key default uuid_generate_v4(),
   requester_id uuid not null references app.profiles(user_id) on delete cascade,
@@ -281,7 +372,7 @@ begin
         select 1
         from app.profiles p
         where p.user_id = auth.uid()
-          and p.role = 'admin'
+          and coalesce(p.is_admin, false) = true
       ) then
         perform set_config('row_security', v_old_rowsec, true);
         return true;
@@ -327,6 +418,48 @@ begin
     end if;
   end if;
 
+  if to_regclass('app.teacher_approvals') is not null then
+    v_old_rowsec := coalesce(current_setting('row_security', true), 'on');
+    perform set_config('row_security', 'off', true);
+    begin
+      if exists (
+        select 1
+        from app.teacher_approvals ta
+        where ta.user_id = auth.uid()
+      ) then
+        perform set_config('row_security', v_old_rowsec, true);
+        return true;
+      end if;
+    exception
+      when others then
+        perform set_config('row_security', v_old_rowsec, true);
+        raise;
+    end;
+    perform set_config('row_security', v_old_rowsec, true);
+  end if;
+
+  if to_regclass('app.certificates') is not null then
+    v_old_rowsec := coalesce(current_setting('row_security', true), 'on');
+    perform set_config('row_security', 'off', true);
+    begin
+      if exists (
+        select 1
+        from app.certificates c
+        where c.user_id = auth.uid()
+          and lower(c.title) = 'läraransökan'
+          and lower(c.status) in ('verified','approved')
+      ) then
+        perform set_config('row_security', v_old_rowsec, true);
+        return true;
+      end if;
+    exception
+      when others then
+        perform set_config('row_security', v_old_rowsec, true);
+        raise;
+    end;
+    perform set_config('row_security', v_old_rowsec, true);
+  end if;
+
   if to_regclass('app.profiles') is not null then
     v_old_rowsec := coalesce(current_setting('row_security', true), 'on');
     perform set_config('row_security', 'off', true);
@@ -335,7 +468,16 @@ begin
         select 1
         from app.profiles p
         where p.user_id = auth.uid()
-          and p.role in ('teacher', 'admin')
+          and (
+            p.role_v2 = 'teacher'
+            or coalesce(p.is_admin, false) = true
+            or (
+              p.role_v2 = 'professional'
+              and exists (
+                select 1 from app.teacher_approvals ta where ta.user_id = p.user_id
+              )
+            )
+          )
       ) then
         perform set_config('row_security', v_old_rowsec, true);
         return true;
@@ -361,11 +503,14 @@ set search_path = app, public
 as $$
 declare
   v_claim text;
-  v_profile_role app.role_type;
+  v_profile_role text;
   v_old_rowsec text;
 begin
   v_claim := auth.jwt() -> 'app_metadata' ->> 'role';
-  if v_claim in ('admin', 'teacher', 'user') then
+  if v_claim in ('admin', 'teacher', 'user', 'member') then
+    if v_claim = 'member' then
+      return 'member';
+    end if;
     return v_claim::app.role_type;
   end if;
 
@@ -380,7 +525,7 @@ begin
     v_old_rowsec := coalesce(current_setting('row_security', true), 'on');
     perform set_config('row_security', 'off', true);
     begin
-      select p.role into v_profile_role
+      select p.role_v2::text into v_profile_role
       from app.profiles p
       where p.user_id = auth.uid();
     exception
@@ -390,7 +535,13 @@ begin
     end;
     perform set_config('row_security', v_old_rowsec, true);
     if v_profile_role is not null then
-      return v_profile_role;
+      if v_profile_role = 'teacher' then
+        return 'teacher';
+      elsif v_profile_role = 'professional' then
+        return 'member';
+      else
+        return 'user';
+      end if;
     end if;
   end if;
 
@@ -402,11 +553,26 @@ create or replace function app.can_access_course(p_user uuid, p_course uuid)
 returns boolean
 language sql stable
 as $$
-  with mem as (select status from app.memberships where user_id = p_user),
-       c as (select is_free_intro from app.courses where id = p_course)
-  select exists(select 1 from c where is_free_intro)
-      or exists(select 1 from app.enrollments e where e.user_id=p_user and e.course_id=p_course)
-      or exists(select 1 from mem where status='active');
+  with course_flags as (
+    select is_free_intro from app.courses where id = p_course
+  ),
+  enroll as (
+    select 1 from app.enrollments where user_id = p_user and course_id = p_course
+  ),
+  successful_purchases as (
+    select 1 from app.purchases where user_id = p_user and course_id = p_course and status = 'succeeded'
+  ),
+  legacy_orders as (
+    select 1 from app.orders where user_id = p_user and course_id = p_course and status = 'paid'
+  ),
+  memberships as (
+    select status from app.memberships where user_id = p_user
+  )
+  select exists(select 1 from course_flags where is_free_intro)
+      or exists(select 1 from enroll)
+      or exists(select 1 from successful_purchases)
+      or exists(select 1 from legacy_orders)
+      or exists(select 1 from memberships where status = 'active');
 $$;
 
 create or replace function app.get_config()
@@ -433,7 +599,12 @@ alter table app.modules enable row level security;
 alter table app.lessons enable row level security;
 alter table app.lesson_media enable row level security;
 alter table app.enrollments enable row level security;
-alter table app.certifications enable row level security;
+alter table app.certificates enable row level security;
+alter table app.purchases enable row level security;
+alter table app.guest_claim_tokens enable row level security;
+alter table app.pro_requirements enable row level security;
+alter table app.pro_progress enable row level security;
+alter table app.teacher_approvals enable row level security;
 alter table app.memberships enable row level security;
 alter table app.orders enable row level security;
 alter table app.events enable row level security;
@@ -567,13 +738,13 @@ drop policy if exists "enroll_insert_self" on app.enrollments;
 create policy "enroll_insert_self" on app.enrollments for insert
 with check (user_id = auth.uid());
 
-drop policy if exists "cert_read_own_or_teacher" on app.certifications;
-create policy "cert_read_own_or_teacher" on app.certifications for select
+drop policy if exists "cert_read_own_or_teacher" on app.certificates;
+create policy "cert_read_own_or_teacher" on app.certificates for select
 using (user_id = auth.uid() or app.is_teacher());
 
-drop policy if exists "cert_teacher_insert" on app.certifications;
-create policy "cert_teacher_insert" on app.certifications for insert
-with check (app.is_teacher());
+drop policy if exists "cert_teacher_write" on app.certificates;
+create policy "cert_teacher_write" on app.certificates for all
+using (app.is_teacher()) with check (app.is_teacher());
 
 drop policy if exists "memb_read_own_or_admin" on app.memberships;
 create policy "memb_read_own_or_admin" on app.memberships for select
@@ -594,6 +765,28 @@ with check (user_id = auth.uid());
 drop policy if exists "orders_update_service" on app.orders;
 create policy "orders_update_service" on app.orders for update
 using (app.is_admin());
+
+drop policy if exists "purchases_read_own" on app.purchases;
+create policy "purchases_read_own" on app.purchases for select
+using (auth.uid() = user_id);
+
+revoke all on app.guest_claim_tokens from anon, authenticated;
+
+drop policy if exists "progress_read_own" on app.pro_progress;
+create policy "progress_read_own" on app.pro_progress for select
+using (user_id = auth.uid());
+
+drop policy if exists "progress_write_own" on app.pro_progress;
+create policy "progress_write_own" on app.pro_progress for all
+using (user_id = auth.uid()) with check (user_id = auth.uid());
+
+drop policy if exists "pro_req_read_all" on app.pro_requirements;
+create policy "pro_req_read_all" on app.pro_requirements for select
+using (true);
+
+drop policy if exists "teacher_approvals_read" on app.teacher_approvals;
+create policy "teacher_approvals_read" on app.teacher_approvals for select
+using (app.is_admin() or app.is_teacher());
 
 drop policy if exists "events_public_read" on app.events;
 create policy "events_public_read" on app.events for select
@@ -717,10 +910,63 @@ begin
 end; $$;
 
 create or replace function app.can_access_course(p_course uuid)
-returns boolean language sql stable as $$ select app.can_access_course(auth.uid(), p_course); $$;
+returns boolean
+language sql
+stable
+as $$
+  select app.can_access_course(auth.uid(), p_course);
+$$;
+
+create or replace function app.claim_purchase(p_token uuid)
+returns boolean
+language plpgsql
+security definer
+set search_path = app, public
+as $$
+declare
+  v_token app.guest_claim_tokens%rowtype;
+  v_user uuid := auth.uid();
+begin
+  if v_user is null then
+    raise exception 'not_authenticated';
+  end if;
+
+  select * into v_token
+  from app.guest_claim_tokens
+  where token = p_token
+    and used = false
+    and expires_at > now()
+  for update;
+
+  if not found then
+    return false;
+  end if;
+
+  update app.purchases
+     set user_id = v_user
+   where id = v_token.purchase_id;
+
+  update app.guest_claim_tokens
+     set used = true
+   where token = p_token;
+
+  insert into app.enrollments(user_id, course_id, source)
+  values (v_user, v_token.course_id, 'purchase')
+  on conflict (user_id, course_id) do nothing;
+
+  return true;
+end;
+$$;
+
+grant execute on function app.claim_purchase(uuid) to authenticated;
 
 create or replace function app.free_consumed_count()
-returns integer language sql stable as $$ select app.free_consumed_count(auth.uid()); $$;
+returns integer
+language sql
+stable
+as $$
+  select app.free_consumed_count(auth.uid());
+$$;
 
 -- ---------- 5) Storage (media) ----------
 insert into storage.buckets (id, name, public)
@@ -931,8 +1177,11 @@ begin
     'profile',        (select row_to_json(p) from app.profiles p where p.user_id = p_user),
     'memberships',    (select jsonb_agg(m) from app.memberships m where m.user_id = p_user),
     'enrollments',    (select jsonb_agg(e) from app.enrollments e where e.user_id = p_user),
-    'certifications', (select jsonb_agg(c) from app.certifications c where c.user_id = p_user),
+    'certificates',   (select jsonb_agg(c) from app.certificates c where c.user_id = p_user),
+    'purchases',      (select jsonb_agg(pr) from app.purchases pr where pr.user_id = p_user),
     'orders',         (select jsonb_agg(o) from app.orders o where o.user_id = p_user),
+    'guest_claim_tokens', (select jsonb_agg(g) from app.guest_claim_tokens g where g.buyer_email = (select email from app.profiles where user_id = p_user)),
+    'pro_progress',   (select jsonb_agg(pp) from app.pro_progress pp where pp.user_id = p_user),
     'events',         (select jsonb_agg(ev) from app.events ev where ev.created_by = p_user),
     'services',       (select jsonb_agg(s) from app.services s where s.provider_id = p_user),
     'bookings',       (select jsonb_agg(b) from app.bookings b where b.user_id = p_user),
@@ -951,26 +1200,19 @@ begin
   delete from app.tarot_requests where requester_id = p_user or reader_id = p_user;
   delete from app.services where provider_id = p_user;
   delete from app.events where created_by = p_user;
+  delete from app.guest_claim_tokens
+    where purchase_id in (select id from app.purchases where user_id = p_user)
+       or buyer_email = (select email from app.profiles where user_id = p_user);
+  delete from app.purchases where user_id = p_user;
   delete from app.orders where user_id = p_user;
-  delete from app.certifications where user_id = p_user;
+  delete from app.certificates where user_id = p_user;
+  delete from app.pro_progress where user_id = p_user;
+  delete from app.teacher_approvals where user_id = p_user;
   delete from app.enrollments where user_id = p_user;
   delete from app.memberships where user_id = p_user;
   delete from app.teacher_requests where user_id = p_user;
   delete from app.teacher_directory where user_id = p_user;
   delete from app.teacher_slots where teacher_id = p_user;
--- ---------- -1) App Config ----------
-create table if not exists app.app_config (
-  id integer primary key default 1,
-  free_course_limit integer not null default 5,
-  platform_fee_pct numeric not null default 10
-);
-alter table app.app_config enable row level security;
-drop policy if exists "cfg_public_read" on app.app_config;
-create policy "cfg_public_read" on app.app_config for select using (true);
-
-insert into app.app_config(id)
-select 1 where not exists (select 1 from app.app_config where id=1);
-
   delete from app.profiles where user_id = p_user;
   -- auth.users raderas via Supabase Auth Admin API
 end; $$;

@@ -21,12 +21,14 @@ final progressRepositoryProvider = Provider<ProgressRepository>((ref) {
   return ProgressRepository();
 });
 
-final coursesProvider = AutoDisposeFutureProvider<List<CourseSummary>>((ref) async {
+final coursesProvider =
+    AutoDisposeFutureProvider<List<CourseSummary>>((ref) async {
   final repo = ref.watch(coursesRepositoryProvider);
   return repo.fetchPublishedCourses();
 });
 
-final myCoursesProvider = AutoDisposeFutureProvider<List<CourseSummary>>((ref) async {
+final myCoursesProvider =
+    AutoDisposeFutureProvider<List<CourseSummary>>((ref) async {
   final repo = ref.watch(coursesRepositoryProvider);
   return repo.myEnrolledCourses();
 });
@@ -37,35 +39,46 @@ final firstFreeIntroCourseProvider =
   return repo.firstFreeIntroCourse();
 });
 
-final courseDetailProvider = AutoDisposeFutureProvider.family<CourseDetailData, String>(
+final courseDetailProvider =
+    AutoDisposeFutureProvider.family<CourseDetailData, String>(
   (ref, slug) async {
     final repo = ref.watch(coursesRepositoryProvider);
     return repo.fetchCourseDetailBySlug(slug);
   },
 );
 
-final courseByIdProvider = AutoDisposeFutureProvider.family<CourseSummary?, String>(
+final courseByIdProvider =
+    AutoDisposeFutureProvider.family<CourseSummary?, String>(
   (ref, courseId) async {
     final repo = ref.watch(coursesRepositoryProvider);
     return repo.getCourseById(courseId);
   },
 );
 
-final lessonDetailProvider = AutoDisposeFutureProvider.family<LessonDetailData, String>(
+final hasCourseAccessProvider =
+    AutoDisposeFutureProvider.family<bool, String>((ref, courseId) async {
+  final repo = ref.watch(coursesRepositoryProvider);
+  return repo.isEnrolled(courseId);
+});
+
+final lessonDetailProvider =
+    AutoDisposeFutureProvider.family<LessonDetailData, String>(
   (ref, lessonId) async {
     final repo = ref.watch(coursesRepositoryProvider);
     return repo.fetchLessonDetail(lessonId);
   },
 );
 
-final courseQuizInfoProvider = AutoDisposeFutureProvider.family<CourseQuizInfo, String>(
+final courseQuizInfoProvider =
+    AutoDisposeFutureProvider.family<CourseQuizInfo, String>(
   (ref, courseId) async {
     final repo = ref.watch(coursesRepositoryProvider);
     return repo.fetchQuizInfo(courseId);
   },
 );
 
-final quizQuestionsProvider = AutoDisposeFutureProvider.family<List<QuizQuestion>, String>(
+final quizQuestionsProvider =
+    AutoDisposeFutureProvider.family<List<QuizQuestion>, String>(
   (ref, quizId) async {
     final repo = ref.watch(coursesRepositoryProvider);
     return repo.fetchQuizQuestions(quizId);
@@ -96,7 +109,8 @@ bool _listEquals(List<String> a, List<String> b) {
   return true;
 }
 
-final courseProgressProvider = AutoDisposeFutureProvider.family<Map<String, double>, CourseProgressRequest>(
+final courseProgressProvider = AutoDisposeFutureProvider.family<
+    Map<String, double>, CourseProgressRequest>(
   (ref, request) async {
     final repo = ref.watch(progressRepositoryProvider);
     return repo.getProgressForCourses(request.courseIds);
@@ -123,7 +137,8 @@ class EnrollController extends AutoDisposeFamilyAsyncNotifier<void, String> {
   }
 }
 
-final enrollProvider = AutoDisposeAsyncNotifierProviderFamily<EnrollController, void, String>(
+final enrollProvider =
+    AutoDisposeAsyncNotifierProviderFamily<EnrollController, void, String>(
   EnrollController.new,
 );
 
@@ -149,7 +164,7 @@ class QuizSubmissionController
   }
 }
 
-final quizSubmissionProvider =
-    AutoDisposeAsyncNotifierProviderFamily<QuizSubmissionController, Map<String, dynamic>?, String>(
+final quizSubmissionProvider = AutoDisposeAsyncNotifierProviderFamily<
+    QuizSubmissionController, Map<String, dynamic>?, String>(
   QuizSubmissionController.new,
 );

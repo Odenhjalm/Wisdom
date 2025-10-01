@@ -85,6 +85,48 @@ begin
     end if;
   end if;
 
+  if to_regclass('app.teacher_approvals') is not null then
+    v_old_rowsec := coalesce(current_setting('row_security', true), 'on');
+    perform set_config('row_security', 'off', true);
+    begin
+      if exists (
+        select 1
+        from app.teacher_approvals ta
+        where ta.user_id = auth.uid()
+      ) then
+        perform set_config('row_security', v_old_rowsec, true);
+        return true;
+      end if;
+    exception
+      when others then
+        perform set_config('row_security', v_old_rowsec, true);
+        raise;
+    end;
+    perform set_config('row_security', v_old_rowsec, true);
+  end if;
+
+  if to_regclass('app.certificates') is not null then
+    v_old_rowsec := coalesce(current_setting('row_security', true), 'on');
+    perform set_config('row_security', 'off', true);
+    begin
+      if exists (
+        select 1
+        from app.certificates c
+        where c.user_id = auth.uid()
+          and lower(c.title) = 'läraransökan'
+          and lower(c.status) in ('verified','approved')
+      ) then
+        perform set_config('row_security', v_old_rowsec, true);
+        return true;
+      end if;
+    exception
+      when others then
+        perform set_config('row_security', v_old_rowsec, true);
+        raise;
+    end;
+    perform set_config('row_security', v_old_rowsec, true);
+  end if;
+
   if to_regclass('app.profiles') is not null then
     v_old_rowsec := coalesce(current_setting('row_security', true), 'on');
     perform set_config('row_security', 'off', true);
@@ -93,7 +135,18 @@ begin
         select 1
         from app.profiles p
         where p.user_id = auth.uid()
-          and (p.role_v2 = 'teacher' or coalesce(p.is_admin, false) = true)
+          and (
+            p.role_v2 = 'teacher'
+            or coalesce(p.is_admin, false) = true
+            or (
+              p.role_v2 = 'professional'
+              and exists (
+                select 1
+                from app.teacher_approvals ta
+                where ta.user_id = p.user_id
+              )
+            )
+          )
       ) then
         perform set_config('row_security', v_old_rowsec, true);
         return true;
@@ -150,6 +203,8 @@ begin
     if v_profile_role is not null then
       if v_profile_role = 'teacher' then
         return 'teacher';
+      elsif v_profile_role = 'professional' then
+        return 'user';
       else
         return 'user';
       end if;

@@ -10,6 +10,7 @@ import 'package:wisdom/supabase_client.dart';
 import 'package:wisdom/shared/utils/snack.dart';
 import 'package:wisdom/shared/widgets/glass_card.dart';
 import 'package:wisdom/shared/widgets/go_router_back_button.dart';
+import 'package:wisdom/widgets/base_page.dart';
 
 class TeacherEditorPage extends ConsumerStatefulWidget {
   const TeacherEditorPage({super.key});
@@ -144,6 +145,160 @@ class _TeacherEditorPageState extends ConsumerState<TeacherEditorPage> {
 
   @override
   Widget build(BuildContext context) {
+    final Widget content;
+    if (_loading) {
+      content = const Center(child: CircularProgressIndicator());
+    } else if (!_allowed) {
+      content = const Center(
+        child: Text('Åtkomst nekad – lärarbehörighet krävs.'),
+      );
+    } else {
+      content = Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 900),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: GlassCard(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Skapa ny kurs',
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleLarge
+                        ?.copyWith(fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _titleCtrl,
+                          decoration: const InputDecoration(
+                            labelText: 'Titel',
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: TextField(
+                          controller: _descCtrl,
+                          decoration: const InputDecoration(
+                            labelText: 'Beskrivning (valfri)',
+                          ),
+                          maxLines: 2,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  FilledButton.icon(
+                    onPressed: _loading ? null : _createCourse,
+                    icon: const Icon(Icons.add_circle_outline),
+                    label: const Text('Skapa kurs'),
+                  ),
+                  const SizedBox(height: 24),
+                  Text(
+                    'Mina kurser',
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleMedium
+                        ?.copyWith(fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 12),
+                  _courses.isEmpty
+                      ? const Center(
+                          child: Padding(
+                            padding: EdgeInsets.symmetric(vertical: 32),
+                            child: Text('Du har inga kurser ännu.'),
+                          ),
+                        )
+                      : ListView.separated(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: _courses.length,
+                          separatorBuilder: (_, __) =>
+                              const SizedBox(height: 12),
+                          itemBuilder: (context, index) {
+                            final c = _courses[index];
+                            final chips = <Widget>[];
+                            if (c['is_free_intro'] == true) {
+                              chips.add(const Chip(
+                                label: Text('Gratis intro'),
+                                visualDensity: VisualDensity.compact,
+                              ));
+                            }
+                            if (c['is_published'] == true) {
+                              chips.add(const Chip(
+                                label: Text('Publicerad'),
+                                visualDensity: VisualDensity.compact,
+                              ));
+                            }
+                            return ListTile(
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              tileColor: Colors.grey.shade50,
+                              title: Text('${c['title'] ?? ''}'),
+                              subtitle: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  if ((c['description'] ?? '')
+                                      .toString()
+                                      .isNotEmpty)
+                                    Text('${c['description']}'),
+                                  if ((c['video_url'] ?? '')
+                                      .toString()
+                                      .isNotEmpty)
+                                    Padding(
+                                      padding: const EdgeInsets.only(top: 4),
+                                      child: Text(
+                                        'Video: ${c['video_url']}',
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodySmall,
+                                      ),
+                                    ),
+                                  const SizedBox(height: 4),
+                                  Wrap(
+                                    spacing: 6,
+                                    runSpacing: 4,
+                                    children: [
+                                      ...chips,
+                                      Text(
+                                        'Slug: ${c['slug']}',
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodySmall,
+                                      ),
+                                      Text(
+                                        'Pris: ${(c['price_cents'] ?? 0) ~/ 100} kr',
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodySmall,
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                              trailing: IconButton(
+                                icon: const Icon(Icons.delete_outline),
+                                onPressed: () =>
+                                    _deleteCourse(c['id'] as String),
+                              ),
+                            );
+                          },
+                        ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: Colors.transparent,
       extendBodyBehindAppBar: true,
@@ -155,180 +310,11 @@ class _TeacherEditorPageState extends ConsumerState<TeacherEditorPage> {
         title: const Text('Kurs-editor'),
         actions: const [TopNavActionButtons()],
       ),
-      body: SafeArea(
-        child: _loading
-            ? const Center(child: CircularProgressIndicator())
-            : !_allowed
-                ? const Center(
-                    child: Text('Åtkomst nekad – lärarbehörighet krävs.'),
-                  )
-                : Center(
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 900),
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: GlassCard(
-                          padding: const EdgeInsets.all(24),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text('Skapa ny kurs',
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .titleLarge
-                                      ?.copyWith(fontWeight: FontWeight.w700)),
-                              const SizedBox(height: 12),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: TextField(
-                                      controller: _titleCtrl,
-                                      decoration: const InputDecoration(
-                                        labelText: 'Titel',
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: TextField(
-                                      controller: _descCtrl,
-                                      decoration: const InputDecoration(
-                                        labelText: 'Beskrivning (valfri)',
-                                      ),
-                                      maxLines: 2,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 12),
-                              TextField(
-                                controller: _videoUrlCtrl,
-                                decoration: const InputDecoration(
-                                  labelText: 'Video URL (valfri)',
-                                ),
-                              ),
-                              const SizedBox(height: 12),
-                              SwitchListTile.adaptive(
-                                value: _isFreeIntro,
-                                onChanged: (v) =>
-                                    setState(() => _isFreeIntro = v),
-                                title: const Text('Gratis introduktion'),
-                                subtitle: const Text(
-                                  'Markerade kurser visas för alla utan betalning.',
-                                ),
-                              ),
-                              const SizedBox(height: 16),
-                              Align(
-                                alignment: Alignment.centerRight,
-                                child: FilledButton(
-                                  onPressed: _createCourse,
-                                  child: const Text('Skapa kurs'),
-                                ),
-                              ),
-                              const SizedBox(height: 24),
-                              Text('Mina kurser',
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .titleLarge
-                                      ?.copyWith(fontWeight: FontWeight.w700)),
-                              const SizedBox(height: 8),
-                              Expanded(
-                                child: _courses.isEmpty
-                                    ? const Center(
-                                        child: Text('Inga kurser ännu.'),
-                                      )
-                                    : ListView.separated(
-                                        itemCount: _courses.length,
-                                        separatorBuilder: (_, __) =>
-                                            const SizedBox(height: 8),
-                                        itemBuilder: (context, i) {
-                                          final c = _courses[i];
-                                          final chips = <Widget>[];
-                                          if (c['is_free_intro'] == true) {
-                                            chips.add(const Chip(
-                                              label: Text('Gratis intro'),
-                                              visualDensity:
-                                                  VisualDensity.compact,
-                                            ));
-                                          }
-                                          if (c['is_published'] == true) {
-                                            chips.add(const Chip(
-                                              label: Text('Publicerad'),
-                                              visualDensity:
-                                                  VisualDensity.compact,
-                                            ));
-                                          }
-                                          return ListTile(
-                                            shape: RoundedRectangleBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(12),
-                                            ),
-                                            tileColor: Colors.grey.shade50,
-                                            title: Text('${c['title'] ?? ''}'),
-                                            subtitle: Column(
-                                              crossAxisAlignment:
-                                                  CrossAxisAlignment.start,
-                                              children: [
-                                                if ((c['description'] ?? '')
-                                                    .toString()
-                                                    .isNotEmpty)
-                                                  Text(
-                                                    '${c['description']}',
-                                                  ),
-                                                if ((c['video_url'] ?? '')
-                                                    .toString()
-                                                    .isNotEmpty)
-                                                  Padding(
-                                                    padding:
-                                                        const EdgeInsets.only(
-                                                            top: 4),
-                                                    child: Text(
-                                                      'Video: ${c['video_url']}',
-                                                      style: Theme.of(context)
-                                                          .textTheme
-                                                          .bodySmall,
-                                                    ),
-                                                  ),
-                                                const SizedBox(height: 4),
-                                                Wrap(
-                                                  spacing: 6,
-                                                  runSpacing: 4,
-                                                  children: [
-                                                    ...chips,
-                                                    Text(
-                                                      'Slug: ${c['slug']}',
-                                                      style: Theme.of(context)
-                                                          .textTheme
-                                                          .bodySmall,
-                                                    ),
-                                                    Text(
-                                                      'Pris: ${(c['price_cents'] ?? 0) ~/ 100} kr',
-                                                      style: Theme.of(context)
-                                                          .textTheme
-                                                          .bodySmall,
-                                                    ),
-                                                  ],
-                                                ),
-                                              ],
-                                            ),
-                                            trailing: IconButton(
-                                              icon: const Icon(
-                                                Icons.delete_outline,
-                                              ),
-                                              onPressed: () => _deleteCourse(
-                                                c['id'] as String,
-                                              ),
-                                            ),
-                                          );
-                                        },
-                                      ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
+      body: BasePage(
+        child: SafeArea(
+          top: false,
+          child: content,
+        ),
       ),
     );
   }

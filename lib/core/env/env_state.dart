@@ -19,3 +19,12 @@ class EnvInfo {
 const EnvInfo envInfoOk = EnvInfo(status: EnvStatus.ok);
 
 final envInfoProvider = StateProvider<EnvInfo>((_) => envInfoOk);
+
+extension EnvInfoX on EnvInfo {
+  String get message {
+    if (missingKeys.isEmpty) {
+      return 'Supabase-konfiguration saknas.';
+    }
+    return 'Supabase saknas: ${missingKeys.join(', ')}.';
+  }
+}

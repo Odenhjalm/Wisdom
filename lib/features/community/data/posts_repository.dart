@@ -22,8 +22,11 @@ class PostsRepository {
           .map((row) => CommunityPost.fromJson(row as Map<String, dynamic>))
           .toList();
 
-      final authorIds =
-          posts.map((post) => post.authorId).whereType<String>().toSet().toList();
+      final authorIds = posts
+          .map((post) => post.authorId)
+          .whereType<String>()
+          .toSet()
+          .toList();
       if (authorIds.isEmpty) return posts;
 
       final inList = '(${authorIds.map((id) => '"$id"').join(',')})';
@@ -52,7 +55,8 @@ class PostsRepository {
     try {
       final uid = _client.auth.currentUser?.id;
       if (uid == null) {
-        throw UnauthorizedFailure(message: 'Du måste vara inloggad för att posta.');
+        throw UnauthorizedFailure(
+            message: 'Du måste vara inloggad för att posta.');
       }
       final payload = {
         'author_id': uid,

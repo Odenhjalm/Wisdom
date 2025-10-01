@@ -1,11 +1,17 @@
-import 'package:wisdom/data/supabase/supabase_client.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
 import 'package:wisdom/data/models/profile.dart';
+import 'package:wisdom/data/supabase/supabase_client.dart';
 
 class ProfileRepository {
+  ProfileRepository({SupabaseClient? client}) : _client = client ?? Supa.client;
+
+  final SupabaseClient _client;
+
   Future<Profile?> getMe() async {
-    final u = Supa.client.auth.currentUser;
+    final u = _client.auth.currentUser;
     if (u == null) return null;
-    final res = await Supa.client.rpc('app.get_my_profile');
+    final res = await _client.rpc('app.get_my_profile');
     if (res == null) return null;
     final row = (res is Map)
         ? res

@@ -5,8 +5,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:wisdom/gate.dart';
 import 'package:wisdom/supabase_client.dart';
-import 'package:wisdom/shared/utils/context_safe.dart';
 import 'package:wisdom/shared/utils/snack.dart';
+import 'package:wisdom/widgets/base_page.dart';
 
 class LegacySignupPage extends ConsumerStatefulWidget {
   const LegacySignupPage({super.key});
@@ -42,151 +42,154 @@ class _LegacySignupPageState extends ConsumerState<LegacySignupPage> {
 
     return Scaffold(
       appBar: AppBar(title: const Text('Skapa konto')),
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 420),
-              child: Card(
-                clipBehavior: Clip.antiAlias,
-                child: Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Form(
-                    key: _formKey,
-                    child: AutofillGroup(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Text(
-                            'Kom igång på några sekunder',
-                            style: Theme.of(context)
-                                .textTheme
-                                .headlineSmall
-                                ?.copyWith(fontWeight: FontWeight.bold),
-                          ),
-                          const SizedBox(height: 12),
-                          const Text(
-                            'Skapa ett konto för att spara dina kurser och fortsätta där du slutade.',
-                          ),
-                          const SizedBox(height: 24),
-                          TextFormField(
-                            controller: _emailCtrl,
-                            autofillHints: const [AutofillHints.newUsername],
-                            keyboardType: TextInputType.emailAddress,
-                            textInputAction: TextInputAction.next,
-                            decoration: const InputDecoration(
-                              labelText: 'E-postadress',
-                              hintText: 'namn@example.com',
+      body: BasePage(
+        child: SafeArea(
+          top: false,
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 420),
+                child: Card(
+                  clipBehavior: Clip.antiAlias,
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Form(
+                      key: _formKey,
+                      child: AutofillGroup(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Text(
+                              'Kom igång på några sekunder',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .headlineSmall
+                                  ?.copyWith(fontWeight: FontWeight.bold),
                             ),
-                            validator: _validateEmailField,
-                          ),
-                          const SizedBox(height: 16),
-                          TextFormField(
-                            controller: _passwordCtrl,
-                            autofillHints: const [AutofillHints.newPassword],
-                            obscureText: true,
-                            textInputAction: TextInputAction.done,
-                            onFieldSubmitted:
-                                _loading ? null : (_) => _createAccount(sb),
-                            decoration: const InputDecoration(
-                              labelText: 'Lösenord',
-                              hintText: 'Minst 6 tecken',
+                            const SizedBox(height: 12),
+                            const Text(
+                              'Skapa ett konto för att spara dina kurser och fortsätta där du slutade.',
                             ),
-                            validator: _validatePassword,
-                          ),
-                          const SizedBox(height: 24),
-                          FilledButton(
-                            onPressed:
-                                _loading ? null : () => _createAccount(sb),
-                            child: _loading
-                                ? const SizedBox(
-                                    width: 18,
-                                    height: 18,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                    ),
-                                  )
-                                : const Text('Skapa konto'),
-                          ),
-                          const SizedBox(height: 12),
-                          Align(
-                            alignment: Alignment.center,
-                            child: TextButton(
+                            const SizedBox(height: 24),
+                            TextFormField(
+                              controller: _emailCtrl,
+                              autofillHints: const [AutofillHints.newUsername],
+                              keyboardType: TextInputType.emailAddress,
+                              textInputAction: TextInputAction.next,
+                              decoration: const InputDecoration(
+                                labelText: 'E-postadress',
+                                hintText: 'namn@example.com',
+                              ),
+                              validator: _validateEmailField,
+                            ),
+                            const SizedBox(height: 16),
+                            TextFormField(
+                              controller: _passwordCtrl,
+                              autofillHints: const [AutofillHints.newPassword],
+                              obscureText: true,
+                              textInputAction: TextInputAction.done,
+                              onFieldSubmitted:
+                                  _loading ? null : (_) => _createAccount(sb),
+                              decoration: const InputDecoration(
+                                labelText: 'Lösenord',
+                                hintText: 'Minst 6 tecken',
+                              ),
+                              validator: _validatePassword,
+                            ),
+                            const SizedBox(height: 24),
+                            FilledButton(
+                              onPressed:
+                                  _loading ? null : () => _createAccount(sb),
+                              child: _loading
+                                  ? const SizedBox(
+                                      width: 18,
+                                      height: 18,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                  : const Text('Skapa konto'),
+                            ),
+                            const SizedBox(height: 12),
+                            Align(
+                              alignment: Alignment.center,
+                              child: TextButton(
+                                onPressed: _loading
+                                    ? null
+                                    : () => context.goNamed('login'),
+                                child: const Text(
+                                    'Har du redan ett konto? Logga in'),
+                              ),
+                            ),
+                            const SizedBox(height: 24),
+                            const Divider(),
+                            const SizedBox(height: 16),
+                            Text(
+                              'Fler sätt att skapa konto',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .titleMedium
+                                  ?.copyWith(fontWeight: FontWeight.w600),
+                            ),
+                            const SizedBox(height: 12),
+                            FilledButton.tonal(
                               onPressed: _loading
                                   ? null
-                                  : () => context.goNamed('login'),
-                              child: const Text(
-                                  'Har du redan ett konto? Logga in'),
+                                  : () => _sendMagicLink(sb, redirectTarget),
+                              child: const Text('Skicka magisk länk'),
                             ),
-                          ),
-                          const SizedBox(height: 24),
-                          const Divider(),
-                          const SizedBox(height: 16),
-                          Text(
-                            'Fler sätt att skapa konto',
-                            style: Theme.of(context)
-                                .textTheme
-                                .titleMedium
-                                ?.copyWith(fontWeight: FontWeight.w600),
-                          ),
-                          const SizedBox(height: 12),
-                          FilledButton.tonal(
-                            onPressed: _loading
-                                ? null
-                                : () => _sendMagicLink(sb, redirectTarget),
-                            child: const Text('Skicka magisk länk'),
-                          ),
-                          const SizedBox(height: 12),
-                          OutlinedButton(
-                            onPressed: _loading
-                                ? null
-                                : () => _sendOtp(sb, redirectTarget),
-                            child: const Text('Skicka engångskod via e-post'),
-                          ),
-                          const SizedBox(height: 16),
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
-                            alignment: WrapAlignment.center,
-                            children: [
-                              _OauthButton(
-                                label: 'Google',
-                                icon: Icons.g_mobiledata,
-                                onPressed: _loading
-                                    ? null
-                                    : () => _oauth(
-                                          sb,
-                                          OAuthProvider.google,
-                                          redirectTarget,
-                                        ),
-                              ),
-                              _OauthButton(
-                                label: 'Microsoft',
-                                icon: Icons.work_outline,
-                                onPressed: _loading
-                                    ? null
-                                    : () => _oauth(
-                                          sb,
-                                          OAuthProvider.azure,
-                                          redirectTarget,
-                                        ),
-                              ),
-                              _OauthButton(
-                                label: 'Facebook',
-                                icon: Icons.facebook,
-                                onPressed: _loading
-                                    ? null
-                                    : () => _oauth(
-                                          sb,
-                                          OAuthProvider.facebook,
-                                          redirectTarget,
-                                        ),
-                              ),
-                            ],
-                          ),
-                        ],
+                            const SizedBox(height: 12),
+                            OutlinedButton(
+                              onPressed: _loading
+                                  ? null
+                                  : () => _sendOtp(sb, redirectTarget),
+                              child: const Text('Skicka engångskod via e-post'),
+                            ),
+                            const SizedBox(height: 16),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              alignment: WrapAlignment.center,
+                              children: [
+                                _OauthButton(
+                                  label: 'Google',
+                                  icon: Icons.g_mobiledata,
+                                  onPressed: _loading
+                                      ? null
+                                      : () => _oauth(
+                                            sb,
+                                            OAuthProvider.google,
+                                            redirectTarget,
+                                          ),
+                                ),
+                                _OauthButton(
+                                  label: 'Microsoft',
+                                  icon: Icons.work_outline,
+                                  onPressed: _loading
+                                      ? null
+                                      : () => _oauth(
+                                            sb,
+                                            OAuthProvider.azure,
+                                            redirectTarget,
+                                          ),
+                                ),
+                                _OauthButton(
+                                  label: 'Facebook',
+                                  icon: Icons.facebook,
+                                  onPressed: _loading
+                                      ? null
+                                      : () => _oauth(
+                                            sb,
+                                            OAuthProvider.facebook,
+                                            redirectTarget,
+                                          ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
@@ -217,7 +220,8 @@ class _LegacySignupPageState extends ConsumerState<LegacySignupPage> {
       if (res.user != null) {
         gate.allow();
         showSnack(context, 'Konto skapat för $email');
-        context.ifMounted((c) => c.go('/'));
+        if (!mounted || !context.mounted) return;
+        context.go('/');
       } else {
         showSnack(context, 'Kontrollera din e-post för att bekräfta kontot.');
       }
@@ -362,12 +366,14 @@ class _UnconfiguredScaffold extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: Text(title)),
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Text(
-            message,
-            textAlign: TextAlign.center,
+      body: BasePage(
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Text(
+              message,
+              textAlign: TextAlign.center,
+            ),
           ),
         ),
       ),

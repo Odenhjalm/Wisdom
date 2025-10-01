@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:wisdom/widgets/base_page.dart';
 
 class AuthCallbackPage extends ConsumerStatefulWidget {
   const AuthCallbackPage({super.key, required this.state});
@@ -106,33 +107,39 @@ class _AuthCallbackPageState extends ConsumerState<AuthCallbackPage> {
 
     if (_processing) {
       return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
+        body: BasePage(
+          child: Center(
+            child: CircularProgressIndicator(),
+          ),
+        ),
       );
     }
 
     return Scaffold(
       appBar: AppBar(title: const Text('Autentisering')),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 420),
-          child: Card(
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    'Autentisering',
-                    style: theme.textTheme.titleLarge,
-                  ),
-                  const SizedBox(height: 12),
-                  Text(_message ?? 'Klar.'),
-                  const SizedBox(height: 16),
-                  FilledButton(
-                    onPressed: () => context.go('/login'),
-                    child: const Text('Till inloggningen'),
-                  ),
-                ],
+      body: BasePage(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 420),
+            child: Card(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Autentisering',
+                      style: theme.textTheme.titleLarge,
+                    ),
+                    const SizedBox(height: 12),
+                    Text(_message ?? 'Klar.'),
+                    const SizedBox(height: 16),
+                    FilledButton(
+                      onPressed: () => context.go('/login'),
+                      child: const Text('Till inloggningen'),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),

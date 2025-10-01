@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:wisdom/supabase_client.dart';
 import 'package:wisdom/shared/widgets/go_router_back_button.dart';
+import 'package:wisdom/widgets/base_page.dart';
 
 class ChatPage extends ConsumerStatefulWidget {
   const ChatPage({super.key});
@@ -87,72 +88,77 @@ class _ChatPageState extends ConsumerState<ChatPage> {
         leading: const GoRouterBackButton(),
         title: Text(title),
       ),
-      body: SafeArea(
-        bottom: false,
-        child: _loading
-            ? const Center(child: CircularProgressIndicator())
-            : Column(
-                children: [
-                  Expanded(
-                    child: ListView.builder(
-                      padding: const EdgeInsets.all(12),
-                      itemCount: _messages.length,
-                      itemBuilder: (context, i) {
-                        final m = _messages[i];
-                        final isMe = m['sender_id'] ==
-                            ref
-                                .read(supabaseMaybeProvider)
-                                ?.auth
-                                .currentUser
-                                ?.id;
-                        return Align(
-                          alignment: isMe
-                              ? Alignment.centerRight
-                              : Alignment.centerLeft,
-                          child: Container(
-                            margin: const EdgeInsets.symmetric(vertical: 4),
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 8),
-                            decoration: BoxDecoration(
-                              color: isMe
-                                  ? Theme.of(context).colorScheme.primary
-                                  : Colors.grey.shade200,
-                              borderRadius: BorderRadius.circular(12),
+      body: BasePage(
+        child: SafeArea(
+          top: false,
+          bottom: false,
+          child: _loading
+              ? const Center(child: CircularProgressIndicator())
+              : Column(
+                  children: [
+                    Expanded(
+                      child: ListView.builder(
+                        padding: const EdgeInsets.all(12),
+                        itemCount: _messages.length,
+                        itemBuilder: (context, i) {
+                          final m = _messages[i];
+                          final isMe = m['sender_id'] ==
+                              ref
+                                  .read(supabaseMaybeProvider)
+                                  ?.auth
+                                  .currentUser
+                                  ?.id;
+                          return Align(
+                            alignment: isMe
+                                ? Alignment.centerRight
+                                : Alignment.centerLeft,
+                            child: Container(
+                              margin: const EdgeInsets.symmetric(vertical: 4),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 8,
+                              ),
+                              decoration: BoxDecoration(
+                                color: isMe
+                                    ? Theme.of(context).colorScheme.primary
+                                    : Colors.grey.shade200,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                m['content'] ?? '',
+                                style: TextStyle(
+                                  color: isMe ? Colors.white : Colors.black87,
+                                ),
+                              ),
                             ),
-                            child: Text(
-                              m['content'] ?? '',
-                              style: TextStyle(
-                                color: isMe ? Colors.white : Colors.black87,
+                          );
+                        },
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 6, 12, 12),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: _text,
+                              decoration: const InputDecoration(
+                                hintText: 'Skriv ett meddelande…',
                               ),
                             ),
                           ),
-                        );
-                      },
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(12, 6, 12, 12),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: _text,
-                            decoration: const InputDecoration(
-                              hintText: 'Skriv ett meddelande…',
-                            ),
+                          const SizedBox(width: 8),
+                          FilledButton.icon(
+                            onPressed: _send,
+                            icon: const Icon(Icons.send),
+                            label: const Text('Skicka'),
                           ),
-                        ),
-                        const SizedBox(width: 8),
-                        FilledButton.icon(
-                          onPressed: _send,
-                          icon: const Icon(Icons.send),
-                          label: const Text('Skicka'),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  )
-                ],
-              ),
+                  ],
+                ),
+        ),
       ),
     );
   }

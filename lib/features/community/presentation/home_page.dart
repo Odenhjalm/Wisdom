@@ -14,7 +14,6 @@ import 'package:wisdom/shared/utils/snack.dart';
 import 'package:wisdom/shared/widgets/app_scaffold.dart';
 import 'package:wisdom/shared/widgets/courses_grid.dart';
 import 'package:wisdom/shared/widgets/home_hero_panel.dart';
-import 'package:wisdom/shared/utils/context_safe.dart';
 
 class HomePage extends ConsumerStatefulWidget {
   const HomePage({super.key});
@@ -83,7 +82,7 @@ class _HomePageState extends ConsumerState<HomePage> {
         alignment: Alignment.center,
         topOpacity: 0.28,
         overlayColor: Theme.of(context).brightness != Brightness.dark
-            ? const Color(0xFFFFE2B8).withOpacity(0.10)
+            ? const Color(0xFFFFE2B8).withValues(alpha: 0.10)
             : null,
         child: const SizedBox.shrink(),
       ),
@@ -149,12 +148,15 @@ class _HomePageState extends ConsumerState<HomePage> {
         _composer.clear();
         ref.invalidate(postsProvider);
         if (post != null) {
-          context.ifMounted((c) => showSnack(c, 'Inlägget publicerades.'));
+          if (!mounted || !context.mounted) return;
+          showSnack(context, 'Inlägget publicerades.');
         }
       },
       error: (error, _) {
-        context.ifMounted(
-          (c) => showSnack(c, 'Kunde inte publicera: ${_errorText(error)}'),
+        if (!mounted || !context.mounted) return;
+        showSnack(
+          context,
+          'Kunde inte publicera: ${_errorText(error)}',
         );
       },
       loading: () {},
@@ -218,17 +220,21 @@ class _ComposerCard extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.only(top: 8),
                 child: Text(
-                  error is AppFailure ? error.message : error.toString(),
-                  style: Theme.of(context)
-                      .textTheme
-                      .bodySmall
-                      ?.copyWith(color: Theme.of(context).colorScheme.error),
+                  _errorMessage(error),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.error,
+                      ),
                 ),
               ),
           ],
         ),
       ),
     );
+  }
+
+  String _errorMessage(Object? error) {
+    if (error is AppFailure) return error.message;
+    return error?.toString() ?? 'Ett okänt fel inträffade.';
   }
 }
 

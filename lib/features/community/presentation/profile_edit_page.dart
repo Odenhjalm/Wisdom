@@ -6,6 +6,7 @@ import 'package:wisdom/shared/widgets/top_nav_action_buttons.dart';
 import 'package:wisdom/supabase_client.dart';
 import 'package:wisdom/shared/widgets/go_router_back_button.dart';
 import 'package:wisdom/shared/utils/snack.dart';
+import 'package:wisdom/widgets/base_page.dart';
 
 class ProfileEditScreen extends ConsumerStatefulWidget {
   const ProfileEditScreen({super.key});
@@ -78,62 +79,65 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
         title: const Text('Redigera profil'),
         actions: const [TopNavActionButtons()],
       ),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 520),
-              child: Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Profilinformation',
-                        style: Theme.of(context)
-                            .textTheme
-                            .titleLarge
-                            ?.copyWith(fontWeight: FontWeight.w700),
-                      ),
-                      const SizedBox(height: 12),
-                      if (displayName != null) ...[
-                        Text('Namn',
-                            style: Theme.of(context)
-                                .textTheme
-                                .titleSmall
-                                ?.copyWith(fontWeight: FontWeight.w600)),
-                        const SizedBox(height: 4),
-                        Text(displayName),
+      body: BasePage(
+        child: SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 520),
+                child: Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Profilinformation',
+                          style: Theme.of(context)
+                              .textTheme
+                              .titleLarge
+                              ?.copyWith(fontWeight: FontWeight.w700),
+                        ),
                         const SizedBox(height: 12),
+                        if (displayName != null) ...[
+                          Text('Namn',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .titleSmall
+                                  ?.copyWith(fontWeight: FontWeight.w600)),
+                          const SizedBox(height: 4),
+                          Text(displayName),
+                          const SizedBox(height: 12),
+                        ],
+                        TextField(
+                          controller: _photoCtrl,
+                          decoration: const InputDecoration(
+                            labelText: 'Bild-URL',
+                            hintText: 'https://…',
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: _bioCtrl,
+                          decoration: const InputDecoration(
+                            labelText: 'Beskrivning',
+                          ),
+                          maxLines: 4,
+                        ),
+                        const SizedBox(height: 16),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: FilledButton.icon(
+                            onPressed: _loading ? null : _save,
+                            icon: const Icon(Icons.save),
+                            label: const Text('Spara'),
+                          ),
+                        ),
                       ],
-                      TextField(
-                        controller: _photoCtrl,
-                        decoration: const InputDecoration(
-                          labelText: 'Bild-URL',
-                          hintText: 'https://…',
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: _bioCtrl,
-                        decoration: const InputDecoration(
-                          labelText: 'Beskrivning',
-                        ),
-                        maxLines: 4,
-                      ),
-                      const SizedBox(height: 16),
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: FilledButton.icon(
-                          onPressed: _loading ? null : _save,
-                          icon: const Icon(Icons.save),
-                          label: const Text('Spara'),
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
                 ),
               ),

@@ -102,3 +102,8 @@ class BasePage extends StatelessWidget {
 
 COMMIT-TEXT
 feat(ui): global top-centered AppLogo on all screens + move “Sveriges ledande…” badge above “Populära kurser”
+
+## Status 2025-09-30
+- AppLogo + BasePage inlagda som gemensam layoutkomponent och kopplade till AppScaffold.
+- Samtliga auth-, community-, kurs-, studio- och legacy-sidor uppdaterade att använda BasePage/Top-logo.
+- Landing badge "Sveriges ledande…" flyttad ovanför "Populära kurser" och hero-spacing justerad.

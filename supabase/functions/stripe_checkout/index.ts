@@ -15,6 +15,7 @@ serve(async (req: Request) => {
       success_url,
       cancel_url,
       customer_email,
+      buyer_email,
     } = body;
 
     if (!order_id || !amount_cents || !success_url || !cancel_url) {
@@ -24,6 +25,11 @@ serve(async (req: Request) => {
     const secret = Deno.env.get('STRIPE_SECRET_KEY');
     if (!secret) return new Response('Stripe not configured', { status: 500 });
     const stripe = new Stripe(secret, { apiVersion: '2024-06-20' });
+
+    const metadata = {
+      order_id,
+      ...(buyer_email ? { buyer_email } : {}),
+    } as Record<string, string>;
 
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
@@ -41,9 +47,9 @@ serve(async (req: Request) => {
         },
       ],
       payment_intent_data: {
-        metadata: { order_id },
+        metadata,
       },
-      metadata: { order_id },
+      metadata,
       customer_email,
     });
 
@@ -54,4 +60,3 @@ serve(async (req: Request) => {
     return new Response(JSON.stringify({ error: String(e) }), { status: 500 });
   }
 });
-

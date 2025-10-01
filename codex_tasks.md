@@ -1,3 +1,85 @@
+Here’s the straight summary of what we’ve shaped for Visdom so far:
+
+User Roles & Flow
+
+Guest: kan se öppet innehåll, köpa enstaka kurs med e-post, claima senare till konto.
+
+User: inloggad, kan se events, feed, köpa kurser.
+
+Professional: får rätt att skapa events när krav/cert uppfyllts.
+
+Teacher: godkänns av admin, får skapa kurser.
+
+Admin: du själv, med kontroll över bakgrund, säsongstema och godkännande.
+
+Backend (Supabase)
+
+Fullt SQL-schema för profiles, certificates, pro_requirements/pro_progress, courses/modules/prices, purchases, guest_claim_tokens, events/attendance, posts/follows.
+
+RLS som styr: kurser endast för rätt roller, moduler preview/offentlig, purchases endast egna.
+
+RPCs: ensure_profile(), has_course_access(), claim_purchase(), grant_professional_if_ready(), grant_teacher().
+
+Stripe Edge Functions: create_checkout (skapar session), stripe_webhook (loggar purchase, skapar claim token för guests).
+
+Frontend (Flutter + Riverpod + go_router)
+
+Providers för session, profile, userRole, hasCourseAccess.
+
+Guards i router för att stoppa icke-pro från /events/new och icke-teacher från /teacher/studio.
+
+CourseAccessGate + PaywallPrompt som antingen visar kurs eller öppnar Checkout.
+
+Event på home screen för att skapa event (endast pro/teacher).
+
+Teacher Studio för kurs-CRUD.
+
+Landing med gratis intro-kurser, login-CTA, “köp enstaka kurs”.
+
+Social feed (posts + follows).
+
+Payments & Access
+
+Stripe Checkout via email (även utan konto).
+
+Webhook loggar purchase i Supabase.
+
+Om ingen profil → guest_claim_tokens skapas och skickas via länk.
+
+Claim-flöde: login med e-post → anropa claim_purchase(token, user_id) → access kopplas.
+
+Extra Features
+
+Admin-panel: du kan godkänna certifikat, promota users till teacher, styra visuella teman.
+
+Editor med live preview så kursens utseende syns innan publicering.
+
+Single sign-on (Google/Microsoft/Facebook) kopplat till Stripe för smidigare onboarding.
+
+Share-knapp med rätt formaterade thumbnails för sociala medier.
+
+Möjlighet till karusell eller kort intro-video i delningar för att öka engagemang.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 4) UI-polish & “infinite width” guardrails
 Mål
 
@@ -18,7 +100,7 @@ Codex-prompt
 Sweep all Row button layouts: if a child button or wrapper uses double.infinity width, replace with Expanded(child: Button(...)). Keep spacing with SizedBox(width: 12).
 Add const constructors where applicable.
 Remove unused imports.
-Ensure all snackbars go through showSnack, post-await navigation through context.ifMounted.
+Ensure all snackbars go through showSnack, post-await navigation guarded by `if (!mounted || !context.mounted) return;` (eller motsvarande `context.mounted` i stateless widgets).
 Confirm zero use_build_context_synchronously.
 Return changed files.
 
@@ -51,7 +133,8 @@ Ensure .gitignore contains .env, android/key.properties.
 Return changed files.
 
 Status (2025-09-25)
-- ✅ Alla use_build_context_synchronously-varningar åtgärdade via `context.ifMounted` och uppdaterade imports.
+- ✅ Alla use_build_context_synchronously-varningar åtgärdade via explicita `mounted/context.mounted`-kontroller.
+- ✅ Säkerhet & miljö: Supabase-konfiguration flaggar tydligt genom envInfo, auth-flöden och abonnemang blockeras när nycklar saknas och visar instruktioner.
 - ⚠️ Övrig UI-polish (Expanded/Flexible, const, spacing) återstår.
 
 6) Tester (minst sanity + router + en dataflow)
@@ -84,48 +167,7 @@ Use flutter_test, mocktail.
 Return new test files.
 
 7) CI/CD (GitHub Actions)
-Mål
-
-PR-grön: format + analyze + test.
-
-Manual workflow för flutter build appbundle --release.
-
-Acceptans
-
-.github/workflows/flutter.yml körs grönt på PR.
-
-Release-workflow kan triggas manuellt.
-
-Codex-prompt
-
-Create .github/workflows/flutter.yml that runs on push/pull_request:
-
-flutter pub get, dart format --output=none --set-exit-if-changed ., flutter analyze, flutter test.
-Create .github/workflows/release-android.yml with a manual dispatch that builds appbundle --release and uploads as artifact.
-Return both YAMLs.
+Status: ✅ Flutter CI (format/analyze/test) & release AppBundle workflows ligger i `.github/workflows/flutter.yml` och `release-android.yml`.
 
 8) Android build (prod)
-Mål
-
-Keystore, key.properties, release-signing.
-
-compileSdk 34, targetSdk 34, minSdk 23/24.
-
-Deep link wisdom://auth-callback i manifest.
-
-Acceptans
-
-flutter build appbundle --release OK.
-
-Intern test i Play Console fungerar.
-
-Codex-prompt
-
-In android/:
-
-Set compileSdkVersion 34, targetSdkVersion 34, minSdkVersion 23.
-
-Add digital asset links and manifest <intent-filter> for scheme wisdom host auth-callback.
-
-Ensure signingConfigs.release reads from key.properties.
-Return changed gradle & manifest files.
+Status: ✅ Gradle uppdaterad till compileSdk/targetSdk 36, minSdk 23 bibehållen. Manifest har `wisdom://auth-callback` och digital asset links, `flutter build appbundle --release` verifierad.

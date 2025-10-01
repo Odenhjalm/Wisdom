@@ -3,12 +3,10 @@ import 'package:flutter/material.dart';
 /// Fullscreen bakgrundsbild med mjuk gradient för bättre läsbarhet.
 class HeroBackground extends StatelessWidget {
   final String asset;
-  final Alignment alignment;
   final double opacity;
   const HeroBackground({
     super.key,
     required this.asset,
-    this.alignment = Alignment.center,
     this.opacity = 0.9,
   });
 
@@ -17,7 +15,11 @@ class HeroBackground extends StatelessWidget {
     return Stack(
       fit: StackFit.expand,
       children: [
-        Image.asset(asset, fit: BoxFit.cover, alignment: alignment),
+        Image.asset(
+          asset,
+          fit: BoxFit.cover,
+          alignment: Alignment.center,
+        ),
         // Subtil mörk gradient för att text/widgets ligger tydligt ovanpå
         DecoratedBox(
           decoration: BoxDecoration(

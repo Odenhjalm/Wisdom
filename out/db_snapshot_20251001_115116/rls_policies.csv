@@ -1,0 +1,409 @@
+schemaname,tablename,policyname,cmd,roles,permissive,using_expr,with_check_expr
+app,app_config,cfg_public_read,SELECT,{public},PERMISSIVE,true,
+app,bookings,bookings_delete,DELETE,{public},PERMISSIVE,(created_by = auth.uid()),
+app,bookings,bookings_insert,INSERT,{public},PERMISSIVE,,(created_by = auth.uid())
+app,bookings,bookings_owner_insert,INSERT,{public},PERMISSIVE,,(user_id = auth.uid())
+app,bookings,bookings_owner_update,UPDATE,{public},PERMISSIVE,((user_id = auth.uid()) OR app.is_teacher()),((user_id = auth.uid()) OR app.is_teacher())
+app,bookings,bookings_read_own_or_teacher,SELECT,{public},PERMISSIVE,((user_id = auth.uid()) OR app.is_teacher()),
+app,bookings,bookings_select,SELECT,{public},PERMISSIVE,(created_by = auth.uid()),
+app,bookings,bookings_update,UPDATE,{public},PERMISSIVE,(created_by = auth.uid()),(created_by = auth.uid())
+app,certificates,certificates_delete,DELETE,{public},PERMISSIVE,(created_by = auth.uid()),
+app,certificates,certificates_insert,INSERT,{public},PERMISSIVE,,(created_by = auth.uid())
+app,certificates,certificates_select,SELECT,{public},PERMISSIVE,(created_by = auth.uid()),
+app,certificates,certificates_update,UPDATE,{public},PERMISSIVE,(created_by = auth.uid()),(created_by = auth.uid())
+app,certifications,cert_read_own_or_teacher,SELECT,{public},PERMISSIVE,((user_id = auth.uid()) OR app.is_teacher()),
+app,certifications,cert_teacher_insert,INSERT,{public},PERMISSIVE,,app.is_teacher()
+app,certifications,certifications_delete,DELETE,{public},PERMISSIVE,(created_by = auth.uid()),
+app,certifications,certifications_insert,INSERT,{public},PERMISSIVE,,((created_by = auth.uid()) AND (EXISTS ( SELECT 1
+   FROM app.courses c
+  WHERE ((c.id = certifications.course_id) AND (c.created_by = auth.uid())))))
+app,certifications,certifications_select,SELECT,{public},PERMISSIVE,((created_by = auth.uid()) OR (EXISTS ( SELECT 1
+   FROM app.courses c
+  WHERE ((c.id = certifications.course_id) AND (COALESCE(c.is_published, false) = true))))),
+app,certifications,certifications_update,UPDATE,{public},PERMISSIVE,(created_by = auth.uid()),(created_by = auth.uid())
+app,courses,courses_delete,DELETE,{public},PERMISSIVE,(created_by = auth.uid()),
+app,courses,courses_free_intro_read,SELECT,{anon,authenticated},PERMISSIVE,(is_free_intro = true),
+app,courses,courses_insert,INSERT,{public},PERMISSIVE,,(created_by = auth.uid())
+app,courses,courses_owner_manage,ALL,{authenticated},PERMISSIVE,((created_by = auth.uid()) OR app.is_admin()),((created_by = auth.uid()) OR app.is_admin())
+app,courses,courses_owner_read,SELECT,{authenticated},PERMISSIVE,(created_by = auth.uid()),
+app,courses,courses_owner_update,UPDATE,{authenticated},PERMISSIVE,(created_by = auth.uid()),(created_by = auth.uid())
+app,courses,courses_public_read,SELECT,{public},PERMISSIVE,((is_published = true) OR app.is_teacher()),
+app,courses,courses_select,SELECT,{public},PERMISSIVE,(created_by = auth.uid()),
+app,courses,courses_select_or_publish,SELECT,{public},PERMISSIVE,((created_by = auth.uid()) OR (COALESCE(is_published, false) = true)),
+app,courses,courses_teacher_write,ALL,{public},PERMISSIVE,(app.is_teacher() AND ((created_by = auth.uid()) OR app.is_admin())),(app.is_teacher() AND ((created_by = auth.uid()) OR app.is_admin()))
+app,courses,courses_update,UPDATE,{public},PERMISSIVE,(created_by = auth.uid()),(created_by = auth.uid())
+app,courses,courses_write_own,ALL,{public},PERMISSIVE,(created_by = auth.uid()),(created_by = auth.uid())
+app,drip_plans,drip_plans_delete,DELETE,{public},PERMISSIVE,app.owns_course(course_id),
+app,drip_plans,drip_plans_insert,INSERT,{public},PERMISSIVE,,app.owns_course(course_id)
+app,drip_plans,drip_plans_select,SELECT,{public},PERMISSIVE,app.owns_course(course_id),
+app,drip_plans,drip_plans_update,UPDATE,{public},PERMISSIVE,app.owns_course(course_id),app.owns_course(course_id)
+app,drip_rules,drip_rules_delete,DELETE,{public},PERMISSIVE,(EXISTS ( SELECT 1
+   FROM app.drip_plans p
+  WHERE ((p.id = drip_rules.plan_id) AND app.owns_course(p.course_id)))),
+app,drip_rules,drip_rules_insert,INSERT,{public},PERMISSIVE,,(EXISTS ( SELECT 1
+   FROM app.drip_plans p
+  WHERE ((p.id = drip_rules.plan_id) AND app.owns_course(p.course_id))))
+app,drip_rules,drip_rules_select,SELECT,{public},PERMISSIVE,(EXISTS ( SELECT 1
+   FROM app.drip_plans p
+  WHERE ((p.id = drip_rules.plan_id) AND app.owns_course(p.course_id)))),
+app,drip_rules,drip_rules_update,UPDATE,{public},PERMISSIVE,(EXISTS ( SELECT 1
+   FROM app.drip_plans p
+  WHERE ((p.id = drip_rules.plan_id) AND app.owns_course(p.course_id)))),(EXISTS ( SELECT 1
+   FROM app.drip_plans p
+  WHERE ((p.id = drip_rules.plan_id) AND app.owns_course(p.course_id))))
+app,editor_styles,editor_styles_delete,DELETE,{public},PERMISSIVE,app.owns_course(course_id),
+app,editor_styles,editor_styles_insert,INSERT,{public},PERMISSIVE,,app.owns_course(course_id)
+app,editor_styles,editor_styles_select,SELECT,{public},PERMISSIVE,app.owns_course(course_id),
+app,editor_styles,editor_styles_update,UPDATE,{public},PERMISSIVE,app.owns_course(course_id),app.owns_course(course_id)
+app,enrollments,enroll_insert_self,INSERT,{public},PERMISSIVE,,(user_id = auth.uid())
+app,enrollments,enroll_read_own_or_teacher,SELECT,{public},PERMISSIVE,((user_id = auth.uid()) OR app.is_teacher()),
+app,events,events_delete,DELETE,{public},PERMISSIVE,(created_by = auth.uid()),
+app,events,events_insert,INSERT,{public},PERMISSIVE,,(created_by = auth.uid())
+app,events,events_public_read,SELECT,{public},PERMISSIVE,((is_published = true) OR app.is_teacher()),
+app,events,events_select,SELECT,{public},PERMISSIVE,(created_by = auth.uid()),
+app,events,events_teacher_write,ALL,{public},PERMISSIVE,app.is_teacher(),app.is_teacher()
+app,events,events_update,UPDATE,{public},PERMISSIVE,(created_by = auth.uid()),(created_by = auth.uid())
+app,lesson_media,media_read,SELECT,{public},PERMISSIVE,(app.is_teacher() OR (EXISTS ( SELECT 1
+   FROM ((app.lessons l
+     JOIN app.modules m ON ((m.id = l.module_id)))
+     JOIN app.courses c ON ((c.id = m.course_id)))
+  WHERE ((l.id = lesson_media.lesson_id) AND (c.is_published = true) AND ((l.is_intro = true) OR app.can_access_course(auth.uid(), c.id)))))),
+app,lesson_media,media_teacher_write,ALL,{public},PERMISSIVE,(app.is_teacher() AND (EXISTS ( SELECT 1
+   FROM ((app.lessons l
+     JOIN app.modules m ON ((m.id = l.module_id)))
+     JOIN app.courses c ON ((c.id = m.course_id)))
+  WHERE ((l.id = lesson_media.lesson_id) AND ((c.created_by = auth.uid()) OR app.is_admin()))))),(app.is_teacher() AND (EXISTS ( SELECT 1
+   FROM ((app.lessons l
+     JOIN app.modules m ON ((m.id = l.module_id)))
+     JOIN app.courses c ON ((c.id = m.course_id)))
+  WHERE ((l.id = lesson_media.lesson_id) AND ((c.created_by = auth.uid()) OR app.is_admin())))))
+app,lessons,lessons_delete,DELETE,{public},PERMISSIVE,(created_by = auth.uid()),
+app,lessons,lessons_free_intro_read,SELECT,{anon,authenticated},PERMISSIVE,(EXISTS ( SELECT 1
+   FROM (app.modules m
+     JOIN app.courses c ON ((c.id = m.course_id)))
+  WHERE ((m.id = lessons.module_id) AND (c.is_free_intro = true)))),
+app,lessons,lessons_insert,INSERT,{public},PERMISSIVE,,(created_by = auth.uid())
+app,lessons,lessons_owner_manage,ALL,{authenticated},PERMISSIVE,(EXISTS ( SELECT 1
+   FROM (app.modules m
+     JOIN app.courses c ON ((c.id = m.course_id)))
+  WHERE ((m.id = lessons.module_id) AND ((c.created_by = auth.uid()) OR app.is_admin())))),(EXISTS ( SELECT 1
+   FROM (app.modules m
+     JOIN app.courses c ON ((c.id = m.course_id)))
+  WHERE ((m.id = lessons.module_id) AND ((c.created_by = auth.uid()) OR app.is_admin()))))
+app,lessons,lessons_read,SELECT,{public},PERMISSIVE,(app.is_teacher() OR (EXISTS ( SELECT 1
+   FROM (app.modules m
+     JOIN app.courses c ON ((c.id = m.course_id)))
+  WHERE ((m.id = lessons.module_id) AND (c.is_published = true) AND ((lessons.is_intro = true) OR app.can_access_course(auth.uid(), c.id)))))),
+app,lessons,lessons_select,SELECT,{public},PERMISSIVE,(created_by = auth.uid()),
+app,lessons,lessons_teacher_write,ALL,{public},PERMISSIVE,(app.is_teacher() AND (EXISTS ( SELECT 1
+   FROM (app.modules m
+     JOIN app.courses c ON ((c.id = m.course_id)))
+  WHERE ((m.id = lessons.module_id) AND ((c.created_by = auth.uid()) OR app.is_admin()))))),(app.is_teacher() AND (EXISTS ( SELECT 1
+   FROM (app.modules m
+     JOIN app.courses c ON ((c.id = m.course_id)))
+  WHERE ((m.id = lessons.module_id) AND ((c.created_by = auth.uid()) OR app.is_admin())))))
+app,lessons,lessons_update,UPDATE,{public},PERMISSIVE,(created_by = auth.uid()),(created_by = auth.uid())
+app,magic_links,magic_links_delete,DELETE,{public},PERMISSIVE,app.owns_course(course_id),
+app,magic_links,magic_links_insert,INSERT,{public},PERMISSIVE,,app.owns_course(course_id)
+app,magic_links,magic_links_select,SELECT,{public},PERMISSIVE,app.owns_course(course_id),
+app,magic_links,magic_links_update,UPDATE,{public},PERMISSIVE,app.owns_course(course_id),app.owns_course(course_id)
+app,meditations,med_read,SELECT,{public},PERMISSIVE,((is_public = true) OR (teacher_id = auth.uid()) OR app.is_teacher()),
+app,meditations,med_write_owner,ALL,{public},PERMISSIVE,((teacher_id = auth.uid()) OR app.is_teacher()),((teacher_id = auth.uid()) OR app.is_teacher())
+app,meditations,meditations_delete,DELETE,{public},PERMISSIVE,(created_by = auth.uid()),
+app,meditations,meditations_insert,INSERT,{public},PERMISSIVE,,(created_by = auth.uid())
+app,meditations,meditations_select,SELECT,{public},PERMISSIVE,(created_by = auth.uid()),
+app,meditations,meditations_update,UPDATE,{public},PERMISSIVE,(created_by = auth.uid()),(created_by = auth.uid())
+app,memberships,memb_admin_write,ALL,{public},PERMISSIVE,app.is_admin(),app.is_admin()
+app,memberships,memb_read_own_or_admin,SELECT,{public},PERMISSIVE,((user_id = auth.uid()) OR app.is_admin()),
+app,memberships,memberships_delete,DELETE,{public},PERMISSIVE,(created_by = auth.uid()),
+app,memberships,memberships_insert,INSERT,{public},PERMISSIVE,,(created_by = auth.uid())
+app,memberships,memberships_select,SELECT,{public},PERMISSIVE,(created_by = auth.uid()),
+app,memberships,memberships_update,UPDATE,{public},PERMISSIVE,(created_by = auth.uid()),(created_by = auth.uid())
+app,messages,messages_delete,DELETE,{public},PERMISSIVE,(created_by = auth.uid()),
+app,messages,messages_insert,INSERT,{public},PERMISSIVE,,(created_by = auth.uid())
+app,messages,messages_read,SELECT,{public},PERMISSIVE,app.can_read_channel(channel),
+app,messages,messages_select,SELECT,{public},PERMISSIVE,(created_by = auth.uid()),
+app,messages,messages_update,UPDATE,{public},PERMISSIVE,(created_by = auth.uid()),(created_by = auth.uid())
+app,modules,modules_delete,DELETE,{public},PERMISSIVE,(created_by = auth.uid()),
+app,modules,modules_free_intro_read,SELECT,{anon,authenticated},PERMISSIVE,(EXISTS ( SELECT 1
+   FROM app.courses c
+  WHERE ((c.id = modules.course_id) AND (c.is_free_intro = true)))),
+app,modules,modules_insert,INSERT,{public},PERMISSIVE,,((created_by = auth.uid()) AND (EXISTS ( SELECT 1
+   FROM app.courses c
+  WHERE ((c.id = modules.course_id) AND (c.created_by = auth.uid())))))
+app,modules,modules_owner_manage,ALL,{authenticated},PERMISSIVE,(EXISTS ( SELECT 1
+   FROM app.courses c
+  WHERE ((c.id = modules.course_id) AND ((c.created_by = auth.uid()) OR app.is_admin())))),(EXISTS ( SELECT 1
+   FROM app.courses c
+  WHERE ((c.id = modules.course_id) AND ((c.created_by = auth.uid()) OR app.is_admin()))))
+app,modules,modules_read,SELECT,{public},PERMISSIVE,(EXISTS ( SELECT 1
+   FROM app.courses c
+  WHERE ((c.id = modules.course_id) AND (c.is_published OR app.is_teacher())))),
+app,modules,modules_select,SELECT,{public},PERMISSIVE,((created_by = auth.uid()) OR (EXISTS ( SELECT 1
+   FROM app.courses c
+  WHERE ((c.id = modules.course_id) AND (COALESCE(c.is_published, false) = true))))),
+app,modules,modules_teacher_write,ALL,{public},PERMISSIVE,(app.is_teacher() AND (EXISTS ( SELECT 1
+   FROM app.courses c
+  WHERE ((c.id = modules.course_id) AND ((c.created_by = auth.uid()) OR app.is_admin()))))),(app.is_teacher() AND (EXISTS ( SELECT 1
+   FROM app.courses c
+  WHERE ((c.id = modules.course_id) AND ((c.created_by = auth.uid()) OR app.is_admin())))))
+app,modules,modules_update,UPDATE,{public},PERMISSIVE,(created_by = auth.uid()),(created_by = auth.uid())
+app,notification_jobs,notif_jobs_delete,DELETE,{public},PERMISSIVE,app.owns_course(course_id),
+app,notification_jobs,notif_jobs_insert,INSERT,{public},PERMISSIVE,,app.owns_course(course_id)
+app,notification_jobs,notif_jobs_select,SELECT,{public},PERMISSIVE,((user_id = auth.uid()) OR app.owns_course(course_id)),
+app,notification_jobs,notif_jobs_update,UPDATE,{public},PERMISSIVE,app.owns_course(course_id),
+app,notification_templates,notif_tpl_delete,DELETE,{public},PERMISSIVE,app.owns_course(course_id),
+app,notification_templates,notif_tpl_insert,INSERT,{public},PERMISSIVE,,app.owns_course(course_id)
+app,notification_templates,notif_tpl_select,SELECT,{public},PERMISSIVE,app.owns_course(course_id),
+app,notification_templates,notif_tpl_update,UPDATE,{public},PERMISSIVE,app.owns_course(course_id),app.owns_course(course_id)
+app,orders,orders_delete,DELETE,{public},PERMISSIVE,(created_by = auth.uid()),
+app,orders,orders_insert,INSERT,{public},PERMISSIVE,,((created_by = auth.uid()) AND (EXISTS ( SELECT 1
+   FROM app.courses c
+  WHERE ((c.id = orders.course_id) AND (c.created_by = auth.uid())))))
+app,orders,orders_insert_self,INSERT,{public},PERMISSIVE,,(user_id = auth.uid())
+app,orders,orders_read_own,SELECT,{public},PERMISSIVE,(user_id = auth.uid()),
+app,orders,orders_select,SELECT,{public},PERMISSIVE,((created_by = auth.uid()) OR (EXISTS ( SELECT 1
+   FROM app.courses c
+  WHERE ((c.id = orders.course_id) AND (COALESCE(c.is_published, false) = true))))),
+app,orders,orders_update,UPDATE,{public},PERMISSIVE,(created_by = auth.uid()),(created_by = auth.uid())
+app,orders,orders_update_service,UPDATE,{public},PERMISSIVE,app.is_admin(),
+app,pro_progress,pro_progress_delete,DELETE,{public},PERMISSIVE,(created_by = auth.uid()),
+app,pro_progress,pro_progress_insert,INSERT,{public},PERMISSIVE,,(created_by = auth.uid())
+app,pro_progress,pro_progress_select,SELECT,{public},PERMISSIVE,(created_by = auth.uid()),
+app,pro_progress,pro_progress_update,UPDATE,{public},PERMISSIVE,(created_by = auth.uid()),(created_by = auth.uid())
+app,pro_requirements,pro_requirements_delete,DELETE,{public},PERMISSIVE,(created_by = auth.uid()),
+app,pro_requirements,pro_requirements_insert,INSERT,{public},PERMISSIVE,,(created_by = auth.uid())
+app,pro_requirements,pro_requirements_select,SELECT,{public},PERMISSIVE,(created_by = auth.uid()),
+app,pro_requirements,pro_requirements_update,UPDATE,{public},PERMISSIVE,(created_by = auth.uid()),(created_by = auth.uid())
+app,profiles,profiles_admin_update,UPDATE,{public},PERMISSIVE,app.is_admin(),app.is_admin()
+app,profiles,profiles_insert_self,INSERT,{public},PERMISSIVE,,(auth.uid() = user_id)
+app,profiles,profiles_read_own_or_admin,SELECT,{public},PERMISSIVE,((auth.uid() = user_id) OR app.is_teacher()),
+app,profiles,profiles_update_own,UPDATE,{public},PERMISSIVE,(auth.uid() = user_id),
+app,purchases,purchases_owner_select,SELECT,{public},PERMISSIVE,(auth.uid() = user_id),
+app,services,services_delete,DELETE,{public},PERMISSIVE,(created_by = auth.uid()),
+app,services,services_insert,INSERT,{public},PERMISSIVE,,(created_by = auth.uid())
+app,services,services_owner_write,ALL,{public},PERMISSIVE,((provider_id = auth.uid()) OR app.is_teacher()),((provider_id = auth.uid()) OR app.is_teacher())
+app,services,services_public_read,SELECT,{public},PERMISSIVE,((is_active = true) OR app.is_teacher()),
+app,services,services_select,SELECT,{public},PERMISSIVE,(created_by = auth.uid()),
+app,services,services_update,UPDATE,{public},PERMISSIVE,(created_by = auth.uid()),(created_by = auth.uid())
+app,tarot_requests,tarot_insert_requester,INSERT,{public},PERMISSIVE,,(requester_id = auth.uid())
+app,tarot_requests,tarot_read_parties,SELECT,{public},PERMISSIVE,((requester_id = auth.uid()) OR (reader_id = auth.uid()) OR app.is_teacher()),
+app,tarot_requests,tarot_requests_delete,DELETE,{public},PERMISSIVE,(created_by = auth.uid()),
+app,tarot_requests,tarot_requests_insert,INSERT,{public},PERMISSIVE,,(created_by = auth.uid())
+app,tarot_requests,tarot_requests_select,SELECT,{public},PERMISSIVE,(created_by = auth.uid()),
+app,tarot_requests,tarot_requests_update,UPDATE,{public},PERMISSIVE,(created_by = auth.uid()),(created_by = auth.uid())
+app,tarot_requests,tarot_update_parties,UPDATE,{public},PERMISSIVE,((requester_id = auth.uid()) OR (reader_id = auth.uid()) OR app.is_teacher()),((requester_id = auth.uid()) OR (reader_id = auth.uid()) OR app.is_teacher())
+app,teacher_approvals,teacher_approvals_delete,DELETE,{public},PERMISSIVE,(created_by = auth.uid()),
+app,teacher_approvals,teacher_approvals_insert,INSERT,{public},PERMISSIVE,,(created_by = auth.uid())
+app,teacher_approvals,teacher_approvals_select,SELECT,{public},PERMISSIVE,(created_by = auth.uid()),
+app,teacher_approvals,teacher_approvals_update,UPDATE,{public},PERMISSIVE,(created_by = auth.uid()),(created_by = auth.uid())
+app,teacher_directory,tdir_admin_write,ALL,{public},PERMISSIVE,app.is_admin(),app.is_admin()
+app,teacher_directory,tdir_public_read,SELECT,{public},PERMISSIVE,true,
+app,teacher_permissions,tp_delete_own,DELETE,{authenticated},PERMISSIVE,(profile_id = ( SELECT auth.uid() AS uid)),
+app,teacher_permissions,tp_insert_own,INSERT,{authenticated},PERMISSIVE,,(profile_id = ( SELECT auth.uid() AS uid))
+app,teacher_permissions,tp_select_own,SELECT,{authenticated},PERMISSIVE,(profile_id = ( SELECT auth.uid() AS uid)),
+app,teacher_permissions,tp_update_own,UPDATE,{authenticated},PERMISSIVE,(profile_id = ( SELECT auth.uid() AS uid)),(profile_id = ( SELECT auth.uid() AS uid))
+app,teacher_requests,treq_admin_update,UPDATE,{public},PERMISSIVE,app.is_admin(),app.is_admin()
+app,teacher_requests,treq_owner_insert,INSERT,{public},PERMISSIVE,,(user_id = auth.uid())
+app,teacher_requests,treq_read_owner_or_admin,SELECT,{public},PERMISSIVE,((user_id = auth.uid()) OR app.is_teacher()),
+app,teacher_slots,slots_read_teacher_or_public_future,SELECT,{public},PERMISSIVE,(app.is_teacher() OR ((is_booked = false) AND (starts_at > now()))),
+app,teacher_slots,slots_teacher_write,ALL,{public},PERMISSIVE,((teacher_id = auth.uid()) OR app.is_teacher()),((teacher_id = auth.uid()) OR app.is_teacher())
+public,admin_keys,keys admin insert,INSERT,{public},PERMISSIVE,,(EXISTS ( SELECT 1
+   FROM auth.users
+  WHERE ((users.id = auth.uid()) AND ((users.raw_app_meta_data ->> 'role'::text) = 'admin'::text))))
+public,admin_keys,keys admin select,SELECT,{public},PERMISSIVE,(EXISTS ( SELECT 1
+   FROM auth.users
+  WHERE ((users.id = auth.uid()) AND ((users.raw_app_meta_data ->> 'role'::text) = 'admin'::text)))),
+public,admin_keys,keys admin update,UPDATE,{public},PERMISSIVE,(EXISTS ( SELECT 1
+   FROM auth.users
+  WHERE ((users.id = auth.uid()) AND ((users.raw_app_meta_data ->> 'role'::text) = 'admin'::text)))),true
+public,availability_slots,Admins can view all slots,ALL,{public},PERMISSIVE,has_role(auth.uid(), 'admin'::app_role),
+public,availability_slots,Students can view available slots,SELECT,{public},PERMISSIVE,(auth.uid() IS NOT NULL),
+public,availability_slots,Teachers can manage their slots,ALL,{public},PERMISSIVE,(auth.uid() = teacher_id),
+public,bookings,Admins can manage all bookings,ALL,{public},PERMISSIVE,has_role(auth.uid(), 'admin'::app_role),
+public,bookings,Students can create bookings,INSERT,{public},PERMISSIVE,,(auth.uid() = student_id)
+public,bookings,Students can update their bookings,UPDATE,{public},PERMISSIVE,(auth.uid() = student_id),
+public,bookings,Students can view their bookings,SELECT,{public},PERMISSIVE,(auth.uid() = student_id),
+public,bookings,Teachers can update their bookings,UPDATE,{public},PERMISSIVE,(auth.uid() = teacher_id),
+public,bookings,Teachers can view their bookings,SELECT,{public},PERMISSIVE,(auth.uid() = teacher_id),
+public,certificates,cert insert teacher,INSERT,{public},PERMISSIVE,,(EXISTS ( SELECT 1
+   FROM teacher_permissions
+  WHERE (teacher_permissions.user_id = auth.uid())))
+public,certificates,cert read own,SELECT,{public},PERMISSIVE,(user_id = auth.uid()),
+public,certificates,cert_select_own,SELECT,{authenticated},PERMISSIVE,(auth.uid() = user_id),
+public,certificates,cert_teacher_insert,INSERT,{authenticated},PERMISSIVE,,user_is_teacher()
+public,coupons,coupons admin delete,DELETE,{public},PERMISSIVE,(EXISTS ( SELECT 1
+   FROM auth.users
+  WHERE ((users.id = auth.uid()) AND ((users.raw_app_meta_data ->> 'role'::text) = 'admin'::text)))),
+public,coupons,coupons admin insert,INSERT,{public},PERMISSIVE,,(EXISTS ( SELECT 1
+   FROM auth.users
+  WHERE ((users.id = auth.uid()) AND ((users.raw_app_meta_data ->> 'role'::text) = 'admin'::text))))
+public,coupons,coupons admin select,SELECT,{public},PERMISSIVE,(EXISTS ( SELECT 1
+   FROM auth.users
+  WHERE ((users.id = auth.uid()) AND ((users.raw_app_meta_data ->> 'role'::text) = 'admin'::text)))),
+public,coupons,coupons admin update,UPDATE,{public},PERMISSIVE,(EXISTS ( SELECT 1
+   FROM auth.users
+  WHERE ((users.id = auth.uid()) AND ((users.raw_app_meta_data ->> 'role'::text) = 'admin'::text)))),true
+public,course_enrollments,Admins can manage all enrollments,ALL,{public},PERMISSIVE,has_role(auth.uid(), 'admin'::app_role),
+public,course_enrollments,Students can enroll themselves,INSERT,{public},PERMISSIVE,,(auth.uid() = student_id)
+public,course_enrollments,Students can view their enrollments,SELECT,{public},PERMISSIVE,(auth.uid() = student_id),
+public,course_enrollments,Teachers can manage enrollments in their courses,ALL,{public},PERMISSIVE,(EXISTS ( SELECT 1
+   FROM courses
+  WHERE ((courses.id = course_enrollments.course_id) AND (courses.teacher_id = auth.uid())))),
+public,course_enrollments,Teachers can view enrollments in their courses,SELECT,{public},PERMISSIVE,(EXISTS ( SELECT 1
+   FROM courses
+  WHERE ((courses.id = course_enrollments.course_id) AND (courses.teacher_id = auth.uid())))),
+public,course_modules,cm read,SELECT,{public},PERMISSIVE,true,
+public,course_modules,cm write teacher,ALL,{public},PERMISSIVE,(EXISTS ( SELECT 1
+   FROM teacher_permissions
+  WHERE (teacher_permissions.user_id = auth.uid()))),(EXISTS ( SELECT 1
+   FROM teacher_permissions
+  WHERE (teacher_permissions.user_id = auth.uid())))
+public,course_modules,cm_select_all,SELECT,{public},PERMISSIVE,true,
+public,course_modules,cm_teacher_write,ALL,{authenticated},PERMISSIVE,user_is_teacher(),user_is_teacher()
+public,course_quizzes,cq_select_all,SELECT,{public},PERMISSIVE,true,
+public,course_quizzes,cq_teacher_write,ALL,{authenticated},PERMISSIVE,user_is_teacher(),user_is_teacher()
+public,course_quizzes,quiz read,SELECT,{public},PERMISSIVE,true,
+public,course_quizzes,quiz write teacher,ALL,{public},PERMISSIVE,(EXISTS ( SELECT 1
+   FROM teacher_permissions
+  WHERE (teacher_permissions.user_id = auth.uid()))),(EXISTS ( SELECT 1
+   FROM teacher_permissions
+  WHERE (teacher_permissions.user_id = auth.uid())))
+public,courses,Admins can manage all courses,ALL,{public},PERMISSIVE,has_role(auth.uid(), 'admin'::app_role),
+public,courses,Everyone can view published courses,SELECT,{public},PERMISSIVE,((is_published = true) OR (auth.uid() = teacher_id)),
+public,courses,Teachers can manage their courses,ALL,{public},PERMISSIVE,(auth.uid() = teacher_id),
+public,courses,courses delete own,DELETE,{public},PERMISSIVE,(created_by = auth.uid()),
+public,courses,courses insert teacher,INSERT,{public},PERMISSIVE,,(EXISTS ( SELECT 1
+   FROM teacher_permissions t
+  WHERE (t.user_id = auth.uid())))
+public,courses,courses read,SELECT,{public},PERMISSIVE,true,
+public,courses,courses update own,UPDATE,{public},PERMISSIVE,(created_by = auth.uid()),
+public,lesson_media,Admins can manage all lesson media,ALL,{public},PERMISSIVE,has_role(auth.uid(), 'admin'::app_role),
+public,lesson_media,Teachers can manage media for their lessons,ALL,{public},PERMISSIVE,(EXISTS ( SELECT 1
+   FROM ((lessons l
+     JOIN modules m ON ((m.id = l.module_id)))
+     JOIN courses c ON ((c.id = m.course_id)))
+  WHERE ((l.id = lesson_media.lesson_id) AND (c.teacher_id = auth.uid())))),
+public,lesson_media,Users can view public media,SELECT,{public},PERMISSIVE,(is_public = true),
+public,lessons,Admins can manage all lessons,ALL,{public},PERMISSIVE,has_role(auth.uid(), 'admin'::app_role),
+public,lessons,Anyone can view free preview lessons,SELECT,{public},PERMISSIVE,((free_preview = true) AND (EXISTS ( SELECT 1
+   FROM (modules m
+     JOIN courses c ON ((c.id = m.course_id)))
+  WHERE ((m.id = lessons.module_id) AND (c.is_published = true))))),
+public,lessons,Enrolled students can view lessons,SELECT,{public},PERMISSIVE,(EXISTS ( SELECT 1
+   FROM ((modules m
+     JOIN courses c ON ((c.id = m.course_id)))
+     JOIN course_enrollments ce ON ((ce.course_id = c.id)))
+  WHERE ((m.id = lessons.module_id) AND (ce.student_id = auth.uid()) AND (ce.status = 'active'::text)))),
+public,lessons,Teachers can manage their own course lessons,ALL,{public},PERMISSIVE,(EXISTS ( SELECT 1
+   FROM (modules m
+     JOIN courses c ON ((c.id = m.course_id)))
+  WHERE ((m.id = lessons.module_id) AND (c.teacher_id = auth.uid())))),
+public,messages,Users can send messages,INSERT,{public},PERMISSIVE,,(auth.uid() = sender_id)
+public,messages,Users can update their messages,UPDATE,{public},PERMISSIVE,(auth.uid() = sender_id),
+public,messages,Users can view their messages,SELECT,{public},PERMISSIVE,((auth.uid() = sender_id) OR (auth.uid() = recipient_id) OR ((course_id IS NOT NULL) AND ((EXISTS ( SELECT 1
+   FROM course_enrollments
+  WHERE ((course_enrollments.course_id = messages.course_id) AND (course_enrollments.student_id = auth.uid()) AND (course_enrollments.status = 'active'::text)))) OR (EXISTS ( SELECT 1
+   FROM courses
+  WHERE ((courses.id = messages.course_id) AND (courses.teacher_id = auth.uid()))))))),
+public,modules,Admins can manage all modules,ALL,{public},PERMISSIVE,has_role(auth.uid(), 'admin'::app_role),
+public,modules,Anyone can view published course modules,SELECT,{public},PERMISSIVE,(EXISTS ( SELECT 1
+   FROM courses
+  WHERE ((courses.id = modules.course_id) AND (courses.is_published = true)))),
+public,modules,Teachers can manage their own course modules,ALL,{public},PERMISSIVE,(EXISTS ( SELECT 1
+   FROM courses
+  WHERE ((courses.id = modules.course_id) AND (courses.teacher_id = auth.uid())))),
+public,notifications,Users can update their notifications,UPDATE,{public},PERMISSIVE,(auth.uid() = user_id),
+public,notifications,Users can view their notifications,SELECT,{public},PERMISSIVE,(auth.uid() = user_id),
+public,profiles,Users can insert their own profile,INSERT,{public},PERMISSIVE,,(auth.uid() = user_id)
+public,profiles,Users can only view their own profile,SELECT,{public},PERMISSIVE,(auth.uid() = user_id),
+public,profiles,Users can update their own profile,UPDATE,{public},PERMISSIVE,(auth.uid() = user_id),
+public,profiles,profiles read,SELECT,{public},PERMISSIVE,true,
+public,profiles,profiles update own,UPDATE,{public},PERMISSIVE,(auth.uid() = id),(auth.uid() = id)
+public,public_teacher_info,Admins can manage all public teacher info,ALL,{public},PERMISSIVE,has_role(auth.uid(), 'admin'::app_role),
+public,public_teacher_info,Anyone can view public teacher info,SELECT,{public},PERMISSIVE,true,
+public,public_teacher_info,Teachers can insert their own public info,INSERT,{public},PERMISSIVE,,(auth.uid() = user_id)
+public,public_teacher_info,Teachers can update their own public info,UPDATE,{public},PERMISSIVE,(auth.uid() = user_id),
+public,quiz_attempts,qa insert self,INSERT,{public},PERMISSIVE,,(user_id = auth.uid())
+public,quiz_attempts,qa read own,SELECT,{public},PERMISSIVE,(user_id = auth.uid()),
+public,quiz_attempts,qa_insert_own,INSERT,{authenticated},PERMISSIVE,,(auth.uid() = user_id)
+public,quiz_attempts,qa_select_own,SELECT,{authenticated},PERMISSIVE,(auth.uid() = user_id),
+public,quiz_questions,qq read,SELECT,{public},PERMISSIVE,true,
+public,quiz_questions,qq write teacher,ALL,{public},PERMISSIVE,(EXISTS ( SELECT 1
+   FROM teacher_permissions
+  WHERE (teacher_permissions.user_id = auth.uid()))),(EXISTS ( SELECT 1
+   FROM teacher_permissions
+  WHERE (teacher_permissions.user_id = auth.uid())))
+public,quiz_questions,qq_select_all,SELECT,{public},PERMISSIVE,true,
+public,quiz_questions,qq_teacher_write,ALL,{authenticated},PERMISSIVE,user_is_teacher(),user_is_teacher()
+public,services,services read,SELECT,{public},PERMISSIVE,true,
+public,services,services write own,ALL,{public},PERMISSIVE,(owner = auth.uid()),(owner = auth.uid())
+public,subscription_plans,plans read all,SELECT,{public},PERMISSIVE,true,
+public,subscriptions,subs nobody delete,DELETE,{public},PERMISSIVE,false,
+public,subscriptions,subs nobody insert,INSERT,{public},PERMISSIVE,,false
+public,subscriptions,subs nobody update,UPDATE,{public},PERMISSIVE,false,false
+public,subscriptions,subs read own/admin,SELECT,{public},PERMISSIVE,((user_id = auth.uid()) OR (EXISTS ( SELECT 1
+   FROM auth.users
+  WHERE ((users.id = auth.uid()) AND ((users.raw_app_meta_data ->> 'role'::text) = 'admin'::text))))),
+public,tarot_readings,Admins can view all readings,ALL,{public},PERMISSIVE,has_role(auth.uid(), 'admin'::app_role),
+public,tarot_readings,Students can create readings,INSERT,{public},PERMISSIVE,,(auth.uid() = student_id)
+public,tarot_readings,Students can view their own readings,SELECT,{public},PERMISSIVE,(auth.uid() = student_id),
+public,tarot_readings,Teachers can update assigned readings,UPDATE,{public},PERMISSIVE,(auth.uid() = teacher_id),
+public,tarot_readings,Teachers can view assigned readings,SELECT,{public},PERMISSIVE,(auth.uid() = teacher_id),
+public,teacher_directory,Admins can manage all teacher directory entries,ALL,{public},PERMISSIVE,has_role(auth.uid(), 'admin'::app_role),
+public,teacher_directory,Anyone can view teacher directory,SELECT,{public},PERMISSIVE,true,
+public,teacher_directory,Teachers can manage their own directory entry,ALL,{public},PERMISSIVE,(auth.uid() = user_id),
+public,teacher_permissions,teacher admin delete,DELETE,{public},PERMISSIVE,(EXISTS ( SELECT 1
+   FROM auth.users
+  WHERE ((users.id = auth.uid()) AND ((users.raw_app_meta_data ->> 'role'::text) = 'admin'::text)))),
+public,teacher_permissions,teacher admin insert,INSERT,{public},PERMISSIVE,,(EXISTS ( SELECT 1
+   FROM auth.users
+  WHERE ((users.id = auth.uid()) AND ((users.raw_app_meta_data ->> 'role'::text) = 'admin'::text))))
+public,teacher_permissions,teacher read own,SELECT,{public},PERMISSIVE,((user_id = auth.uid()) OR (EXISTS ( SELECT 1
+   FROM auth.users
+  WHERE ((users.id = auth.uid()) AND ((users.raw_app_meta_data ->> 'role'::text) = 'admin'::text))))),
+public,teacher_requests,Admins can manage all teacher requests,ALL,{public},PERMISSIVE,has_role(auth.uid(), 'admin'::app_role),
+public,teacher_requests,Users can create their own teacher requests,INSERT,{public},PERMISSIVE,,(auth.uid() = user_id)
+public,teacher_requests,Users can view their own teacher requests,SELECT,{public},PERMISSIVE,(auth.uid() = user_id),
+public,user_certifications,cert read own/admin,SELECT,{public},PERMISSIVE,((user_id = auth.uid()) OR (EXISTS ( SELECT 1
+   FROM auth.users
+  WHERE ((users.id = auth.uid()) AND ((users.raw_app_meta_data ->> 'role'::text) = 'admin'::text))))),
+public,user_certifications,cert write own,ALL,{public},PERMISSIVE,(user_id = auth.uid()),(user_id = auth.uid())
+public,user_roles,Admins can manage all roles,ALL,{public},PERMISSIVE,has_role(auth.uid(), 'admin'::app_role),
+public,user_roles,Users can view their own roles,SELECT,{public},PERMISSIVE,(auth.uid() = user_id),
+storage,objects,Authenticated users can upload to their own folder in public-me,INSERT,{public},PERMISSIVE,,((bucket_id = 'public-media'::text) AND ((auth.uid())::text = (storage.foldername(name))[1]))
+storage,objects,Public media is readable by everyone,SELECT,{public},PERMISSIVE,(bucket_id = 'public-media'::text),
+storage,objects,SELECT 1r7zrx6_0,SELECT,{public},PERMISSIVE,(bucket_id = 'media'::text),
+storage,objects,Users can delete their own files in public-media,DELETE,{public},PERMISSIVE,((bucket_id = 'public-media'::text) AND ((auth.uid())::text = (storage.foldername(name))[1])),
+storage,objects,Users can update their own files in public-media,UPDATE,{public},PERMISSIVE,((bucket_id = 'public-media'::text) AND ((auth.uid())::text = (storage.foldername(name))[1])),
+storage,objects,avatars public read,SELECT,{anon,authenticated},PERMISSIVE,(bucket_id = 'avatars'::text),
+storage,objects,avatars user delete,DELETE,{authenticated},PERMISSIVE,((bucket_id = 'avatars'::text) AND (owner = auth.uid())),
+storage,objects,avatars user insert,INSERT,{authenticated},PERMISSIVE,,((bucket_id = 'avatars'::text) AND (owner = auth.uid()))
+storage,objects,avatars user update,UPDATE,{authenticated},PERMISSIVE,((bucket_id = 'avatars'::text) AND (owner = auth.uid())),
+storage,objects,avatars_read,SELECT,{public},PERMISSIVE,(bucket_id = 'avatars'::text),
+storage,objects,avatars_write,ALL,{public},PERMISSIVE,((bucket_id = 'avatars'::text) AND (split_part(name, '/'::text, 1) = (auth.uid())::text)),((bucket_id = 'avatars'::text) AND (split_part(name, '/'::text, 1) = (auth.uid())::text))
+storage,objects,course-media read,SELECT,{public},PERMISSIVE,(bucket_id = 'course-media'::text),
+storage,objects,course-media teacher write,ALL,{public},PERMISSIVE,((bucket_id = 'course-media'::text) AND (EXISTS ( SELECT 1
+   FROM teacher_permissions
+  WHERE (teacher_permissions.user_id = auth.uid())))),((bucket_id = 'course-media'::text) AND (EXISTS ( SELECT 1
+   FROM teacher_permissions
+  WHERE (teacher_permissions.user_id = auth.uid()))))
+storage,objects,course_media_public_read,SELECT,{public},PERMISSIVE,(bucket_id = 'course-media'::text),
+storage,objects,course_media_read,SELECT,{public},PERMISSIVE,((bucket_id = 'course-media'::text) AND (EXISTS ( SELECT 1
+   FROM app.courses c
+  WHERE (((c.id)::text = split_part(objects.name, '/'::text, 1)) AND ((c.is_published = true) OR (c.created_by = auth.uid())))))),
+storage,objects,course_media_teacher_write,ALL,{authenticated},PERMISSIVE,((bucket_id = 'course-media'::text) AND user_is_teacher()),((bucket_id = 'course-media'::text) AND user_is_teacher())
+storage,objects,course_media_write,INSERT,{public},PERMISSIVE,,((bucket_id = 'course-media'::text) AND (EXISTS ( SELECT 1
+   FROM app.courses c
+  WHERE (((c.id)::text = split_part(objects.name, '/'::text, 1)) AND (c.created_by = auth.uid())))))
+storage,objects,media_teacher_update,UPDATE,{public},PERMISSIVE,((bucket_id = 'media'::text) AND app.is_teacher()),((bucket_id = 'media'::text) AND app.is_teacher())
+storage,objects,media_teacher_write,INSERT,{public},PERMISSIVE,,((bucket_id = 'media'::text) AND app.is_teacher())
+storage,objects,public read media,SELECT,{anon,authenticated},PERMISSIVE,(bucket_id = 'media'::text),
+storage,objects,public-assets admin write,ALL,{public},PERMISSIVE,((bucket_id = 'public-assets'::text) AND (EXISTS ( SELECT 1
+   FROM auth.users
+  WHERE ((users.id = auth.uid()) AND ((users.raw_app_meta_data ->> 'role'::text) = 'admin'::text))))),((bucket_id = 'public-assets'::text) AND (EXISTS ( SELECT 1
+   FROM auth.users
+  WHERE ((users.id = auth.uid()) AND ((users.raw_app_meta_data ->> 'role'::text) = 'admin'::text)))))
+storage,objects,public-assets read,SELECT,{public},PERMISSIVE,(bucket_id = 'public-assets'::text),
+storage,objects,public_assets_read,SELECT,{public},PERMISSIVE,(bucket_id = 'public-assets'::text),
+storage,objects,update to authenticated 1prfdz4_0,UPDATE,{authenticated},PERMISSIVE,((bucket_id = 'media'::text) AND app.is_teacher_uid(auth.uid())),

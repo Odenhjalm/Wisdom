@@ -81,7 +81,8 @@ class _ProfileViewPageState extends ConsumerState<ProfileViewPage> {
                       ),
                       const SizedBox(width: 12),
                       ElevatedButton.icon(
-                        onPressed: _toggling ? null : () => _toggleFollow(following),
+                        onPressed:
+                            _toggling ? null : () => _toggleFollow(following),
                         icon: Icon(
                           following
                               ? Icons.check_rounded
@@ -101,7 +102,8 @@ class _ProfileViewPageState extends ConsumerState<ProfileViewPage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text('Tjänster',
-                          style: t.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
+                          style: t.titleMedium
+                              ?.copyWith(fontWeight: FontWeight.w800)),
                       const SizedBox(height: 8),
                       if (services.isEmpty)
                         const Text('Inga tjänster.')
@@ -109,11 +111,14 @@ class _ProfileViewPageState extends ConsumerState<ProfileViewPage> {
                         ...services.map(
                           (service) => ListTile(
                             leading: const Icon(Icons.work_rounded),
-                            title: Text(service['title'] as String? ?? 'Tjänst'),
-                            subtitle: Text(service['description'] as String? ?? ''),
+                            title:
+                                Text(service['title'] as String? ?? 'Tjänst'),
+                            subtitle:
+                                Text(service['description'] as String? ?? ''),
                             trailing: Text(
                                 '${((service['price_cents'] as int?) ?? 0) / 100} kr'),
-                            onTap: () => context.push('/service/${service['id']}'),
+                            onTap: () =>
+                                context.push('/service/${service['id']}'),
                           ),
                         ),
                     ],
@@ -128,7 +133,8 @@ class _ProfileViewPageState extends ConsumerState<ProfileViewPage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text('Meditationer',
-                          style: t.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
+                          style: t.titleMedium
+                              ?.copyWith(fontWeight: FontWeight.w800)),
                       const SizedBox(height: 8),
                       if (meditations.isEmpty)
                         const Text('Inga meditationer ännu.')

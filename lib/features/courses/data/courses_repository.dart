@@ -5,11 +5,15 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:wisdom/core/errors/app_failure.dart';
 import 'package:wisdom/core/supabase_ext.dart';
 
+import 'course_access_api.dart';
+
 class CoursesRepository {
-  CoursesRepository({SupabaseClient? client})
-      : _client = client ?? Supabase.instance.client;
+  CoursesRepository({SupabaseClient? client, CourseAccessApi? accessApi})
+      : _client = client ?? Supabase.instance.client,
+        _accessApi = accessApi ?? SupabaseCourseAccessApi(client ?? Supabase.instance.client);
 
   final SupabaseClient _client;
+  final CourseAccessApi _accessApi;
 
   Future<CourseDetailData> fetchCourseDetailBySlug(String slug) async {
     try {
@@ -105,7 +109,8 @@ class CoursesRepository {
     }
   }
 
-  Future<List<CourseSummary>> fetchPublishedCourses({bool onlyFreeIntro = false}) async {
+  Future<List<CourseSummary>> fetchPublishedCourses(
+      {bool onlyFreeIntro = false}) async {
     try {
       final query = _client.app.from('courses').select(
           'id, slug, title, description, cover_url, video_url, is_free_intro, is_published, price_cents');
@@ -222,7 +227,7 @@ class CoursesRepository {
     try {
       final rows = await _client.app
           .from('lesson_media')
-          .select('id, kind, storage_path, position')
+          .select('id, kind, storage_path, storage_bucket, position')
           .eq('lesson_id', lessonId)
           .order('position');
       return (rows as List? ?? [])
@@ -255,13 +260,24 @@ class CoursesRepository {
     }
   }
 
+  Future<bool> hasAccess(String courseId) async {
+    try {
+      final primary = await _accessApi.hasAccess(courseId);
+      if (primary) return true;
+      return await _accessApi.fallbackHasAccess(courseId);
+    } catch (error) {
+      try {
+        return await _accessApi.fallbackHasAccess(courseId);
+      } catch (_) {
+        // Both primary and fallback failed – treat as no access instead of throwing.
+        return false;
+      }
+    }
+  }
+
   Future<bool> isEnrolled(String courseId) async {
     try {
-      final res = await _client
-          .schema('app')
-          .rpc('can_access_course', params: {'p_course': courseId});
-      if (res is bool) return res;
-      return false;
+      return await hasAccess(courseId);
     } catch (error, stackTrace) {
       throw AppFailure.from(error, stackTrace);
     }
@@ -361,7 +377,9 @@ class CoursesRepository {
     required Map<String, dynamic> answers,
   }) async {
     try {
-      final res = await _client.schema('app').rpc('grade_quiz_and_issue_certificate', params: {
+      final res = await _client
+          .schema('app')
+          .rpc('grade_quiz_and_issue_certificate', params: {
         'p_quiz': quizId,
         'p_answers': answers,
       });
@@ -505,12 +523,14 @@ class LessonMediaItem {
     required this.id,
     required this.kind,
     required this.storagePath,
+    required this.storageBucket,
     required this.position,
   });
 
   final String id;
   final String kind;
   final String storagePath;
+  final String storageBucket;
   final int position;
 
   factory LessonMediaItem.fromJson(Map<String, dynamic> json) {
@@ -518,6 +538,7 @@ class LessonMediaItem {
       id: json['id'] as String,
       kind: (json['kind'] ?? '') as String,
       storagePath: (json['storage_path'] ?? '') as String,
+      storageBucket: (json['storage_bucket'] ?? 'course-media') as String,
       position: CourseSummary._asInt(json['position']) ?? 0,
     );
   }

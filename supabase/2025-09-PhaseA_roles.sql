@@ -22,15 +22,23 @@ ALTER TABLE app.profiles
 ALTER TABLE app.profiles
   ADD COLUMN IF NOT EXISTS role_v2 app.user_role NOT NULL DEFAULT 'user';
 
--- Map legacy roles into role_v2 + admin flag
 UPDATE app.profiles SET role_v2 = 'user'
-WHERE role_v2 = 'user' AND role::text = 'user';
+WHERE role::text = 'user';
 
-UPDATE app.profiles SET role_v2 = 'professional'
-WHERE role::text = 'member';
-
-UPDATE app.profiles SET role_v2 = 'teacher'
-WHERE role::text = 'teacher';
+WITH permm_teachers AS (
+  SELECT tp.profile_id AS user_id
+  FROM app.teacher_permissions tp
+  WHERE coalesce(tp.can_edit_courses, false) OR coalesce(tp.can_publish, false)
+)
+UPDATE app.profiles
+SET role_v2 = CASE
+      WHEN role::text = 'teacher' THEN 'teacher'
+      WHEN user_id IN (SELECT user_id FROM permm_teachers) THEN 'teacher'
+      WHEN role::text = 'member' THEN 'professional'
+      ELSE role_v2
+    END
+WHERE role::text IN ('teacher','member')
+   OR user_id IN (SELECT user_id FROM permm_teachers);
 
 UPDATE app.profiles SET role_v2 = 'teacher', is_admin = true
 WHERE role::text = 'admin';
@@ -39,14 +47,25 @@ WHERE role::text = 'admin';
 CREATE TABLE IF NOT EXISTS app.pro_requirements (
   id serial PRIMARY KEY,
   code text UNIQUE NOT NULL,
-  title text NOT NULL
+  title text NOT NULL,
+  created_by uuid NOT NULL DEFAULT gen_random_uuid(),
+  updated_at timestamptz NOT NULL DEFAULT now()
 );
 
-INSERT INTO app.pro_requirements (code, title) VALUES
-  ('STEP1','Grundutbildning'),
-  ('STEP2','Fördjupning'),
-  ('STEP3','Praktik')
-ON CONFLICT (code) DO NOTHING;
+INSERT INTO app.pro_requirements (code, title, created_by)
+VALUES
+  ('STEP1','Grundutbildning', COALESCE((SELECT created_by FROM app.pro_requirements WHERE code = 'STEP1'),
+                                       (SELECT user_id FROM app.profiles WHERE is_admin = true ORDER BY created_at LIMIT 1),
+                                       gen_random_uuid())),
+  ('STEP2','Fördjupning', COALESCE((SELECT created_by FROM app.pro_requirements WHERE code = 'STEP2'),
+                                    (SELECT user_id FROM app.profiles WHERE is_admin = true ORDER BY created_at LIMIT 1),
+                                    gen_random_uuid())),
+  ('STEP3','Praktik', COALESCE((SELECT created_by FROM app.pro_requirements WHERE code = 'STEP3'),
+                                 (SELECT user_id FROM app.profiles WHERE is_admin = true ORDER BY created_at LIMIT 1),
+                                 gen_random_uuid()))
+ON CONFLICT (code) DO UPDATE SET
+  title = excluded.title,
+  updated_at = now();
 
 CREATE TABLE IF NOT EXISTS app.pro_progress (
   user_id uuid REFERENCES app.profiles(user_id) ON DELETE CASCADE,

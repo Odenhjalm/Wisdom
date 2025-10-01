@@ -5,7 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:wisdom/data/models/profile.dart';
-import 'package:wisdom/data/repositories/profile_repository.dart';
+import 'package:wisdom/features/auth/application/user_access_provider.dart';
+import 'package:wisdom/domain/models/user_access.dart';
 
 import 'package:wisdom/data/supabase/supabase_client.dart';
 import 'package:wisdom/features/auth/presentation/auth_callback_page.dart';
@@ -24,6 +25,7 @@ import 'package:wisdom/features/community/presentation/profile_view_page.dart';
 import 'package:wisdom/features/community/presentation/service_detail_page.dart';
 import 'package:wisdom/features/community/presentation/tarot_page.dart';
 import 'package:wisdom/features/community/presentation/teacher_profile_page.dart';
+import 'package:wisdom/widgets/base_page.dart';
 import 'package:wisdom/features/courses/presentation/course_intro_page.dart';
 import 'package:wisdom/features/courses/presentation/course_intro_redirect_page.dart';
 import 'package:wisdom/features/courses/presentation/course_page.dart';
@@ -36,6 +38,7 @@ import 'package:wisdom/features/messages/presentation/chat_page.dart';
 import 'package:wisdom/features/messages/presentation/messages_page.dart';
 import 'package:wisdom/features/payments/presentation/booking_page.dart';
 import 'package:wisdom/features/payments/presentation/subscribe_screen.dart';
+import 'package:wisdom/features/payments/presentation/claim_purchase_page.dart';
 import 'package:wisdom/features/studio/presentation/course_editor_page.dart';
 import 'package:wisdom/features/studio/presentation/studio_page.dart';
 import 'package:wisdom/features/studio/presentation/teacher_home_page.dart';
@@ -101,72 +104,20 @@ const _publicPaths = <String>{
   '/new-password',
   '/auth-callback',
   '/landing',
+  '/claim',
 };
 
 final userProfileProvider = FutureProvider<Profile?>((ref) async {
-  final authState = ref.watch(sessionProvider);
-  final user = authState.session?.user;
-  if (user == null) return null;
-
-  final profile = await ProfileRepository().getMe();
-
-  if (profile != null && (profile.isAdmin || profile.isTeacher)) {
-    return profile;
-  }
-
-  Future<Map<String, dynamic>?> fetchPermissions() async {
-    final attempts = [
-      () => Supa.client
-          .schema('app')
-          .from('teacher_permissions')
-          .select('can_edit_courses, can_publish')
-          .eq('profile_id', user.id)
-          .maybeSingle(),
-      () => Supa.client
-          .from('teacher_permissions_compat')
-          .select('can_edit_courses, can_publish')
-          .eq('profile_id', user.id)
-          .maybeSingle(),
-      () => Supa.client
-          .from('teacher_permissions')
-          .select('can_edit_courses, can_publish')
-          .eq('user_id', user.id)
-          .maybeSingle(),
-    ];
-
-    for (final attempt in attempts) {
-      try {
-        final res = await attempt();
-        if (res case Map<String, dynamic> map when map.isNotEmpty) {
-          return map;
-        }
-        if (res case Map<dynamic, dynamic> map when map.isNotEmpty) {
-          return Map<String, dynamic>.from(map);
-        }
-      } on PostgrestException {
-        // next source
-      }
-    }
-    return null;
-  }
-
-  final perms = await fetchPermissions();
-  if (perms != null) {
-    final canEdit = perms['can_edit_courses'] == true;
-    final canPublish = perms['can_publish'] == true;
-    if (canEdit || canPublish) {
-      return profile?.copyWith(userRole: UserRole.teacher, isAdmin: false);
-    }
-  }
-
-  return profile;
+  final access = await ref.watch(userAccessProvider.future);
+  return access.effectiveProfile;
 });
 
 final appRouterProvider = Provider<GoRouter>((ref) {
-  final profile = ref.watch(userProfileProvider).maybeWhen(
-        data: (p) => p,
-        orElse: () => null,
+  final access = ref.watch(userAccessProvider).maybeWhen(
+        data: (value) => value,
+        orElse: () => UserAccessState.unauthenticated,
       );
+  final profile = access.effectiveProfile;
   final authState = ref.watch(sessionProvider);
   const guard = AuthGuard(_publicPaths);
   final refreshListenable = GoRouterRefreshStream(
@@ -181,7 +132,9 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/login',
         name: 'login',
-        builder: (context, state) => const LoginPage(),
+        builder: (context, state) => LoginPage(
+          redirectPath: state.uri.queryParameters['redirect'],
+        ),
       ),
       GoRoute(
         path: '/signup',
@@ -219,6 +172,13 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const LandingPage(),
       ),
       GoRoute(
+        path: '/claim',
+        name: 'claim',
+        builder: (context, state) => ClaimPurchasePage(
+          token: state.uri.queryParameters['token'],
+        ),
+      ),
+      GoRoute(
         path: '/course-intro',
         name: 'course-intro',
         builder: (context, state) => const CourseIntroPage(),
@@ -236,11 +196,23 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/teacher',
         name: 'teacher-home',
+        redirect: (_, __) {
+          if (!access.isTeacher && !access.isAdmin) {
+            return '/profile';
+          }
+          return null;
+        },
         builder: (context, state) => const TeacherHomeScreen(),
       ),
       GoRoute(
         path: '/teacher/editor',
         name: 'teacher-editor',
+        redirect: (_, __) {
+          if (!access.isTeacher && !access.isAdmin) {
+            return '/profile';
+          }
+          return null;
+        },
         builder: (context, state) => CourseEditorScreen(
           courseId: state.uri.queryParameters['id'],
         ),
@@ -381,7 +353,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     ],
     errorBuilder: (context, state) => Scaffold(
       appBar: AppBar(title: const Text('Fel')),
-      body: Center(child: Text('Sidan hittades inte: ${state.error}')),
+      body: BasePage(
+        child: Center(
+          child: Text('Sidan hittades inte: ${state.error}'),
+        ),
+      ),
     ),
   );
 });

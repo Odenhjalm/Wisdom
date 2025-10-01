@@ -12,33 +12,13 @@ returns boolean language sql stable as $$
   select coalesce((auth.jwt() -> 'app_metadata' ->> 'role') in ('teacher','admin'), false)
 $$;
 
--- Compat helper: true if current user is teacher by role or teacher_permissions (supports different schemas)
+-- Compat helper now defers to app.is_teacher()
 create or replace function public.user_is_teacher()
 returns boolean
-language plpgsql
+language sql
 stable
-set search_path = public
 as $$
-declare
-  allowed boolean := false;
-begin
-  -- If JWT role says teacher/admin -> true
-  if public.is_teacher() then
-    return true;
-  end if;
-
-  if to_regclass('public.teacher_permissions_compat') is null then
-    return false;
-  end if;
-
-  select exists (
-    select 1
-    from public.teacher_permissions_compat tp
-    where tp.profile_id = auth.uid()
-      and coalesce(tp.can_edit_courses, false) = true
-  ) into allowed;
-  return coalesce(allowed, false);
-end;
+  select app.is_teacher();
 $$;
 
 -- =======================

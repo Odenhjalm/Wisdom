@@ -48,17 +48,41 @@ class PaymentsService {
     required String cancelUrl,
     String? customerEmail,
   }) async {
+    final currentEmail = customerEmail ?? _sb.auth.currentUser?.email;
     final res = await _sb.functions.invoke('stripe_checkout', body: {
       'order_id': orderId,
       'amount_cents': amountCents,
       'currency': currency,
       'success_url': successUrl,
       'cancel_url': cancelUrl,
-      if (customerEmail != null) 'customer_email': customerEmail,
+      if (currentEmail != null) 'customer_email': currentEmail,
+      if (currentEmail != null) 'buyer_email': currentEmail,
     });
     final data = res.data;
     if (data is Map && data['url'] is String) return data['url'] as String;
     return null;
+  }
+
+  Future<bool> claimPurchase({required String token}) async {
+    final res = await _sb.schema('app').rpc('claim_purchase', params: {
+      'p_token': token,
+    });
+    if (res is bool) return res;
+    if (res is Map && res['claim_purchase'] is bool) {
+      return res['claim_purchase'] as bool;
+    }
+    return false;
+  }
+
+  Future<bool> hasCourseAccess({required String courseId}) async {
+    final res = await _sb.schema('app').rpc('can_access_course', params: {
+      'p_course': courseId,
+    });
+    if (res is bool) return res;
+    if (res is Map && res['can_access_course'] is bool) {
+      return res['can_access_course'] as bool;
+    }
+    return false;
   }
 
   /// Subscribe to order row updates; returns a cancel function.

@@ -65,3 +65,14 @@ Använd den här filen för att notera varje ändring och beskriv vilka punker d
 - La till verifieringschecklista för teacher-requests migreringen i `docs/phase_a_teacher_requests_verification.md`.
 - Sammanställde nästa-steg-lista i `docs/phase_a_next_actions.md` för verifiering och fortsatta uppgifter.
 - Uppdaterade Studio/Profil/Booking/Admin-flöden att använda `app.certificates`/`teacher_approvals` i stället för `teacher_requests` och noterade ändringarna i planerna.
+- Införde env-status i Flutter (Riverpod) och blockeringar/banners i auth- och abonnemangsvyer när Supabase-nycklar saknas.
+- Säkerställde att `.github/workflows/flutter.yml` (format/analyze/test) och `release-android.yml` (manuell appbundle) finns och beskrivet i tasks.
+- Uppgraderade Android buildconfig till compileSdk/targetSdk 36 och verifierade `flutter build appbundle --release`.
+- Uppdaterade `app.is_teacher`/`public.user_is_teacher` att använda nya Phase A-tabeller (`teacher_approvals`, `certificates`) för RLS och guard-funktioner.
+- Beslöt att hoppa över migreringen av `app.teacher_requests`; lärare sätts manuellt (skriptet finns som no-op för spårbarhet).
+
+## 2025-09-30 Codex-session
+- Införde `AppLogo` och `BasePage` för global topplogga/baslayout enligt codex_task2025-09-29.
+- Uppdaterade `AppScaffold` och samtliga sidor med egna `Scaffold`-anrop (landing, auth, legacy, quiz, meddelanden, studio m.fl.) att använda `BasePage` och justerade `SafeArea`-inställningar.
+- Rensade landing-hero (modern & legacy) från duplicerad logga, flyttade badgen till sektionen "Populära kurser" och finjusterade hero-spacing.
+- Formaterade berörda filer med `dart format`; `flutter analyze`-försök blockerades av sandbox (`engine.stamp: Permission denied`).

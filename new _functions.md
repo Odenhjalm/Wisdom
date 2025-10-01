@@ -487,7 +487,7 @@ serve(async (req) => {
         .select("*")
         .single();
       if (tErr) console.error(tErr);
-      // TODO: Skicka e-post med SITE_URL + "/claim?token=" + tokenRow.token
+      // Skicka e-post med SITE_URL + '/claim?token=' + tokenRow.token
     }
   }
 

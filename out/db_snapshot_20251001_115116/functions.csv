@@ -1,0 +1,163 @@
+schema,function,argtypes,returns,volatility,security,leakproof,lang
+app,_courses_set_owner,,trigger,VOLATILE,SECURITY INVOKER,,plpgsql
+app,approve_teacher,p_user uuid,void,VOLATILE,SECURITY DEFINER,,plpgsql
+app,can_access_course,p_user uuid, p_course uuid,boolean,STABLE,SECURITY INVOKER,,sql
+app,can_access_course,p_course uuid,boolean,STABLE,SECURITY INVOKER,,sql
+app,can_post_channel,p_channel text, p_sender uuid,boolean,STABLE,SECURITY INVOKER,,sql
+app,can_read_channel,p_channel text,boolean,STABLE,SECURITY INVOKER,,sql
+app,claim_purchase,p_token uuid,boolean,VOLATILE,SECURITY DEFINER,,plpgsql
+app,complete_order,p_order_id uuid, p_payment_intent text, p_checkout_id text DEFAULT NULL::text,app.orders,VOLATILE,SECURITY DEFINER,,plpgsql
+app,current_role,,app.role_type,STABLE,SECURITY DEFINER,,plpgsql
+app,delete_user_data,p_user uuid,void,VOLATILE,SECURITY DEFINER,,plpgsql
+app,enrollments_materialize_trg_fn,,trigger,VOLATILE,SECURITY DEFINER,,plpgsql
+app,ensure_owner_policies,IN p_table text,,VOLATILE,SECURITY INVOKER,,plpgsql
+app,ensure_profile,p_email text DEFAULT NULL::text, p_display_name text DEFAULT NULL::text,app.profiles,VOLATILE,SECURITY DEFINER,,plpgsql
+app,ensure_touch_trigger,IN p_schema text, IN p_table text, IN p_trigger text,,VOLATILE,SECURITY INVOKER,,plpgsql
+app,export_user_data,p_user uuid DEFAULT auth.uid(),jsonb,VOLATILE,SECURITY DEFINER,,plpgsql
+app,free_consumed_count,,integer,STABLE,SECURITY INVOKER,,sql
+app,free_consumed_count,p_user uuid,integer,STABLE,SECURITY INVOKER,,sql
+app,get_config,,app.app_config,STABLE,SECURITY INVOKER,,sql
+app,get_fallback_owner,,uuid,STABLE,SECURITY INVOKER,,plpgsql
+app,get_my_profile,,app.profiles,VOLATILE,SECURITY DEFINER,,sql
+app,grant_professional_if_ready,p_user uuid,void,VOLATILE,SECURITY INVOKER,,plpgsql
+app,handle_new_user,,trigger,VOLATILE,SECURITY DEFINER,,plpgsql
+app,has_column,p_schema text, p_table text, p_column text,boolean,STABLE,SECURITY INVOKER,,sql
+app,is_admin,,boolean,STABLE,SECURITY DEFINER,,plpgsql
+app,is_admin,u uuid,boolean,STABLE,SECURITY INVOKER,,sql
+app,is_teacher,,boolean,STABLE,SECURITY DEFINER,,plpgsql
+app,is_teacher_uid,uid uuid,boolean,STABLE,SECURITY INVOKER,,sql
+app,materialize_drip_jobs,p_user uuid, p_course uuid,integer,VOLATILE,SECURITY DEFINER,,plpgsql
+app,null_created_by_report,,TABLE(schema_name text, table_name text, null_count bigint),STABLE,SECURITY INVOKER,,plpgsql
+app,owns_course,_course_id uuid,boolean,STABLE,SECURITY INVOKER,,sql
+app,reject_teacher,p_user uuid,void,VOLATILE,SECURITY DEFINER,,plpgsql
+app,start_order,p_course_id uuid, p_amount_cents integer, p_currency text DEFAULT 'sek'::text, p_metadata jsonb DEFAULT '{}'::jsonb,app.orders,VOLATILE,SECURITY DEFINER,,plpgsql
+app,start_service_order,p_service_id uuid, p_amount_cents integer, p_currency text DEFAULT 'sek'::text, p_metadata jsonb DEFAULT '{}'::jsonb,app.orders,VOLATILE,SECURITY DEFINER,,plpgsql
+app,touch_updated_at,,trigger,VOLATILE,SECURITY INVOKER,,plpgsql
+app,trigger_report,,TABLE(schema_name text, table_name text, trigger_name text, enabled_state text, trigger_def text),STABLE,SECURITY INVOKER,,sql
+auth,email,,text,STABLE,SECURITY INVOKER,,sql
+auth,jwt,,jsonb,STABLE,SECURITY INVOKER,,sql
+auth,role,,text,STABLE,SECURITY INVOKER,,sql
+auth,uid,,uuid,STABLE,SECURITY INVOKER,,sql
+extensions,armor,bytea, text[], text[],text,IMMUTABLE,SECURITY INVOKER,,c
+extensions,armor,bytea,text,IMMUTABLE,SECURITY INVOKER,,c
+extensions,crypt,text, text,text,IMMUTABLE,SECURITY INVOKER,,c
+extensions,dearmor,text,bytea,IMMUTABLE,SECURITY INVOKER,,c
+extensions,decrypt,bytea, bytea, text,bytea,IMMUTABLE,SECURITY INVOKER,,c
+extensions,decrypt_iv,bytea, bytea, bytea, text,bytea,IMMUTABLE,SECURITY INVOKER,,c
+extensions,digest,bytea, text,bytea,IMMUTABLE,SECURITY INVOKER,,c
+extensions,digest,text, text,bytea,IMMUTABLE,SECURITY INVOKER,,c
+extensions,encrypt,bytea, bytea, text,bytea,IMMUTABLE,SECURITY INVOKER,,c
+extensions,encrypt_iv,bytea, bytea, bytea, text,bytea,IMMUTABLE,SECURITY INVOKER,,c
+extensions,gen_random_bytes,integer,bytea,VOLATILE,SECURITY INVOKER,,c
+extensions,gen_random_uuid,,uuid,VOLATILE,SECURITY INVOKER,,c
+extensions,gen_salt,text,text,VOLATILE,SECURITY INVOKER,,c
+extensions,gen_salt,text, integer,text,VOLATILE,SECURITY INVOKER,,c
+extensions,grant_pg_cron_access,,event_trigger,VOLATILE,SECURITY INVOKER,,plpgsql
+extensions,grant_pg_graphql_access,,event_trigger,VOLATILE,SECURITY INVOKER,,plpgsql
+extensions,grant_pg_net_access,,event_trigger,VOLATILE,SECURITY INVOKER,,plpgsql
+extensions,hmac,text, text, text,bytea,IMMUTABLE,SECURITY INVOKER,,c
+extensions,hmac,bytea, bytea, text,bytea,IMMUTABLE,SECURITY INVOKER,,c
+extensions,pg_stat_statements,showtext boolean, OUT userid oid, OUT dbid oid, OUT toplevel boolean, OUT queryid bigint, OUT query text, OUT plans bigint, OUT total_plan_time double precision, OUT min_plan_time double precision, OUT max_plan_time double precision, OUT mean_plan_time double precision, OUT stddev_plan_time double precision, OUT calls bigint, OUT total_exec_time double precision, OUT min_exec_time double precision, OUT max_exec_time double precision, OUT mean_exec_time double precision, OUT stddev_exec_time double precision, OUT rows bigint, OUT shared_blks_hit bigint, OUT shared_blks_read bigint, OUT shared_blks_dirtied bigint, OUT shared_blks_written bigint, OUT local_blks_hit bigint, OUT local_blks_read bigint, OUT local_blks_dirtied bigint, OUT local_blks_written bigint, OUT temp_blks_read bigint, OUT temp_blks_written bigint, OUT shared_blk_read_time double precision, OUT shared_blk_write_time double precision, OUT local_blk_read_time double precision, OUT local_blk_write_time double precision, OUT temp_blk_read_time double precision, OUT temp_blk_write_time double precision, OUT wal_records bigint, OUT wal_fpi bigint, OUT wal_bytes numeric, OUT jit_functions bigint, OUT jit_generation_time double precision, OUT jit_inlining_count bigint, OUT jit_inlining_time double precision, OUT jit_optimization_count bigint, OUT jit_optimization_time double precision, OUT jit_emission_count bigint, OUT jit_emission_time double precision, OUT jit_deform_count bigint, OUT jit_deform_time double precision, OUT stats_since timestamp with time zone, OUT minmax_stats_since timestamp with time zone,SETOF record,VOLATILE,SECURITY INVOKER,,c
+extensions,pg_stat_statements_info,OUT dealloc bigint, OUT stats_reset timestamp with time zone,record,VOLATILE,SECURITY INVOKER,,c
+extensions,pg_stat_statements_reset,userid oid DEFAULT 0, dbid oid DEFAULT 0, queryid bigint DEFAULT 0, minmax_only boolean DEFAULT false,timestamp with time zone,VOLATILE,SECURITY INVOKER,,c
+extensions,pgp_armor_headers,text, OUT key text, OUT value text,SETOF record,IMMUTABLE,SECURITY INVOKER,,c
+extensions,pgp_key_id,bytea,text,IMMUTABLE,SECURITY INVOKER,,c
+extensions,pgp_pub_decrypt,bytea, bytea, text, text,text,IMMUTABLE,SECURITY INVOKER,,c
+extensions,pgp_pub_decrypt,bytea, bytea, text,text,IMMUTABLE,SECURITY INVOKER,,c
+extensions,pgp_pub_decrypt,bytea, bytea,text,IMMUTABLE,SECURITY INVOKER,,c
+extensions,pgp_pub_decrypt_bytea,bytea, bytea, text,bytea,IMMUTABLE,SECURITY INVOKER,,c
+extensions,pgp_pub_decrypt_bytea,bytea, bytea,bytea,IMMUTABLE,SECURITY INVOKER,,c
+extensions,pgp_pub_decrypt_bytea,bytea, bytea, text, text,bytea,IMMUTABLE,SECURITY INVOKER,,c
+extensions,pgp_pub_encrypt,text, bytea,bytea,VOLATILE,SECURITY INVOKER,,c
+extensions,pgp_pub_encrypt,text, bytea, text,bytea,VOLATILE,SECURITY INVOKER,,c
+extensions,pgp_pub_encrypt_bytea,bytea, bytea, text,bytea,VOLATILE,SECURITY INVOKER,,c
+extensions,pgp_pub_encrypt_bytea,bytea, bytea,bytea,VOLATILE,SECURITY INVOKER,,c
+extensions,pgp_sym_decrypt,bytea, text, text,text,IMMUTABLE,SECURITY INVOKER,,c
+extensions,pgp_sym_decrypt,bytea, text,text,IMMUTABLE,SECURITY INVOKER,,c
+extensions,pgp_sym_decrypt_bytea,bytea, text,bytea,IMMUTABLE,SECURITY INVOKER,,c
+extensions,pgp_sym_decrypt_bytea,bytea, text, text,bytea,IMMUTABLE,SECURITY INVOKER,,c
+extensions,pgp_sym_encrypt,text, text, text,bytea,VOLATILE,SECURITY INVOKER,,c
+extensions,pgp_sym_encrypt,text, text,bytea,VOLATILE,SECURITY INVOKER,,c
+extensions,pgp_sym_encrypt_bytea,bytea, text, text,bytea,VOLATILE,SECURITY INVOKER,,c
+extensions,pgp_sym_encrypt_bytea,bytea, text,bytea,VOLATILE,SECURITY INVOKER,,c
+extensions,pgrst_ddl_watch,,event_trigger,VOLATILE,SECURITY INVOKER,,plpgsql
+extensions,pgrst_drop_watch,,event_trigger,VOLATILE,SECURITY INVOKER,,plpgsql
+extensions,set_graphql_placeholder,,event_trigger,VOLATILE,SECURITY INVOKER,,plpgsql
+extensions,uuid_generate_v1,,uuid,VOLATILE,SECURITY INVOKER,,c
+extensions,uuid_generate_v1mc,,uuid,VOLATILE,SECURITY INVOKER,,c
+extensions,uuid_generate_v3,namespace uuid, name text,uuid,IMMUTABLE,SECURITY INVOKER,,c
+extensions,uuid_generate_v4,,uuid,VOLATILE,SECURITY INVOKER,,c
+extensions,uuid_generate_v5,namespace uuid, name text,uuid,IMMUTABLE,SECURITY INVOKER,,c
+extensions,uuid_nil,,uuid,IMMUTABLE,SECURITY INVOKER,,c
+extensions,uuid_ns_dns,,uuid,IMMUTABLE,SECURITY INVOKER,,c
+extensions,uuid_ns_oid,,uuid,IMMUTABLE,SECURITY INVOKER,,c
+extensions,uuid_ns_url,,uuid,IMMUTABLE,SECURITY INVOKER,,c
+extensions,uuid_ns_x500,,uuid,IMMUTABLE,SECURITY INVOKER,,c
+graphql,_internal_resolve,query text, variables jsonb DEFAULT '{}'::jsonb, "operationName" text DEFAULT NULL::text, extensions jsonb DEFAULT NULL::jsonb,jsonb,VOLATILE,SECURITY INVOKER,,c
+graphql,comment_directive,comment_ text,jsonb,IMMUTABLE,SECURITY INVOKER,,sql
+graphql,exception,message text,text,VOLATILE,SECURITY INVOKER,,plpgsql
+graphql,get_schema_version,,integer,VOLATILE,SECURITY DEFINER,,sql
+graphql,increment_schema_version,,event_trigger,VOLATILE,SECURITY DEFINER,,plpgsql
+graphql,resolve,query text, variables jsonb DEFAULT '{}'::jsonb, "operationName" text DEFAULT NULL::text, extensions jsonb DEFAULT NULL::jsonb,jsonb,VOLATILE,SECURITY INVOKER,,plpgsql
+graphql_public,graphql,"operationName" text DEFAULT NULL::text, query text DEFAULT NULL::text, variables jsonb DEFAULT NULL::jsonb, extensions jsonb DEFAULT NULL::jsonb,jsonb,VOLATILE,SECURITY INVOKER,,sql
+pgbouncer,get_auth,p_usename text,TABLE(username text, password text),VOLATILE,SECURITY DEFINER,,plpgsql
+public,_next_period_end,p_interval text, p_trial_days integer,timestamp with time zone,IMMUTABLE,SECURITY INVOKER,,sql
+public,_set_created_by,,trigger,VOLATILE,SECURITY DEFINER,,plpgsql
+public,grade_quiz_and_issue_certificate,p_quiz uuid, p_answers jsonb,jsonb,VOLATILE,SECURITY DEFINER,,plpgsql
+public,handle_new_teacher,,trigger,VOLATILE,SECURITY DEFINER,,plpgsql
+public,handle_new_user,,trigger,VOLATILE,SECURITY DEFINER,,plpgsql
+public,has_role,_user_id uuid, _role app_role,boolean,STABLE,SECURITY DEFINER,,sql
+public,is_teacher,,boolean,STABLE,SECURITY INVOKER,,sql
+public,preview_coupon,p_plan uuid, p_code text,jsonb,VOLATILE,SECURITY DEFINER,,plpgsql
+public,redeem_coupon_and_provision,p_plan uuid, p_code text,jsonb,VOLATILE,SECURITY DEFINER,,plpgsql
+public,redeem_key,p_code text,jsonb,VOLATILE,SECURITY DEFINER,,plpgsql
+public,set_created_by,,trigger,VOLATILE,SECURITY DEFINER,,plpgsql
+public,set_owner,,trigger,VOLATILE,SECURITY DEFINER,,plpgsql
+public,update_updated_at_column,,trigger,VOLATILE,SECURITY DEFINER,,plpgsql
+public,user_is_teacher,,boolean,STABLE,SECURITY INVOKER,,plpgsql
+realtime,apply_rls,wal jsonb, max_record_bytes integer DEFAULT (1024 * 1024),SETOF realtime.wal_rls,VOLATILE,SECURITY INVOKER,,plpgsql
+realtime,broadcast_changes,topic_name text, event_name text, operation text, table_name text, table_schema text, new record, old record, level text DEFAULT 'ROW'::text,void,VOLATILE,SECURITY INVOKER,,plpgsql
+realtime,build_prepared_statement_sql,prepared_statement_name text, entity regclass, columns realtime.wal_column[],text,VOLATILE,SECURITY INVOKER,,sql
+realtime,cast,val text, type_ regtype,jsonb,IMMUTABLE,SECURITY INVOKER,,plpgsql
+realtime,check_equality_op,op realtime.equality_op, type_ regtype, val_1 text, val_2 text,boolean,IMMUTABLE,SECURITY INVOKER,,plpgsql
+realtime,is_visible_through_filters,columns realtime.wal_column[], filters realtime.user_defined_filter[],boolean,IMMUTABLE,SECURITY INVOKER,,sql
+realtime,list_changes,publication name, slot_name name, max_changes integer, max_record_bytes integer,SETOF realtime.wal_rls,VOLATILE,SECURITY INVOKER,,sql
+realtime,quote_wal2json,entity regclass,text,IMMUTABLE,SECURITY INVOKER,,sql
+realtime,send,payload jsonb, event text, topic text, private boolean DEFAULT true,void,VOLATILE,SECURITY INVOKER,,plpgsql
+realtime,subscription_check_filters,,trigger,VOLATILE,SECURITY INVOKER,,plpgsql
+realtime,to_regrole,role_name text,regrole,IMMUTABLE,SECURITY INVOKER,,sql
+realtime,topic,,text,STABLE,SECURITY INVOKER,,sql
+storage,add_prefixes,_bucket_id text, _name text,void,VOLATILE,SECURITY DEFINER,,plpgsql
+storage,can_insert_object,bucketid text, name text, owner uuid, metadata jsonb,void,VOLATILE,SECURITY INVOKER,,plpgsql
+storage,delete_leaf_prefixes,bucket_ids text[], names text[],void,VOLATILE,SECURITY DEFINER,,plpgsql
+storage,delete_prefix,_bucket_id text, _name text,boolean,VOLATILE,SECURITY DEFINER,,plpgsql
+storage,delete_prefix_hierarchy_trigger,,trigger,VOLATILE,SECURITY INVOKER,,plpgsql
+storage,enforce_bucket_name_length,,trigger,VOLATILE,SECURITY INVOKER,,plpgsql
+storage,extension,name text,text,IMMUTABLE,SECURITY INVOKER,,plpgsql
+storage,filename,name text,text,VOLATILE,SECURITY INVOKER,,plpgsql
+storage,foldername,name text,text[],IMMUTABLE,SECURITY INVOKER,,plpgsql
+storage,get_level,name text,integer,IMMUTABLE,SECURITY INVOKER,,sql
+storage,get_prefix,name text,text,IMMUTABLE,SECURITY INVOKER,,sql
+storage,get_prefixes,name text,text[],IMMUTABLE,SECURITY INVOKER,,plpgsql
+storage,get_size_by_bucket,,TABLE(size bigint, bucket_id text),STABLE,SECURITY INVOKER,,plpgsql
+storage,list_multipart_uploads_with_delimiter,bucket_id text, prefix_param text, delimiter_param text, max_keys integer DEFAULT 100, next_key_token text DEFAULT ''::text, next_upload_token text DEFAULT ''::text,TABLE(key text, id text, created_at timestamp with time zone),VOLATILE,SECURITY INVOKER,,plpgsql
+storage,list_objects_with_delimiter,bucket_id text, prefix_param text, delimiter_param text, max_keys integer DEFAULT 100, start_after text DEFAULT ''::text, next_token text DEFAULT ''::text,TABLE(name text, id uuid, metadata jsonb, updated_at timestamp with time zone),VOLATILE,SECURITY INVOKER,,plpgsql
+storage,lock_top_prefixes,bucket_ids text[], names text[],void,VOLATILE,SECURITY DEFINER,,plpgsql
+storage,objects_delete_cleanup,,trigger,VOLATILE,SECURITY DEFINER,,plpgsql
+storage,objects_insert_prefix_trigger,,trigger,VOLATILE,SECURITY INVOKER,,plpgsql
+storage,objects_update_cleanup,,trigger,VOLATILE,SECURITY DEFINER,,plpgsql
+storage,objects_update_level_trigger,,trigger,VOLATILE,SECURITY INVOKER,,plpgsql
+storage,objects_update_prefix_trigger,,trigger,VOLATILE,SECURITY INVOKER,,plpgsql
+storage,operation,,text,STABLE,SECURITY INVOKER,,plpgsql
+storage,prefixes_delete_cleanup,,trigger,VOLATILE,SECURITY DEFINER,,plpgsql
+storage,prefixes_insert_trigger,,trigger,VOLATILE,SECURITY INVOKER,,plpgsql
+storage,search,prefix text, bucketname text, limits integer DEFAULT 100, levels integer DEFAULT 1, offsets integer DEFAULT 0, search text DEFAULT ''::text, sortcolumn text DEFAULT 'name'::text, sortorder text DEFAULT 'asc'::text,TABLE(name text, id uuid, updated_at timestamp with time zone, created_at timestamp with time zone, last_accessed_at timestamp with time zone, metadata jsonb),VOLATILE,SECURITY INVOKER,,plpgsql
+storage,search_legacy_v1,prefix text, bucketname text, limits integer DEFAULT 100, levels integer DEFAULT 1, offsets integer DEFAULT 0, search text DEFAULT ''::text, sortcolumn text DEFAULT 'name'::text, sortorder text DEFAULT 'asc'::text,TABLE(name text, id uuid, updated_at timestamp with time zone, created_at timestamp with time zone, last_accessed_at timestamp with time zone, metadata jsonb),STABLE,SECURITY INVOKER,,plpgsql
+storage,search_v1_optimised,prefix text, bucketname text, limits integer DEFAULT 100, levels integer DEFAULT 1, offsets integer DEFAULT 0, search text DEFAULT ''::text, sortcolumn text DEFAULT 'name'::text, sortorder text DEFAULT 'asc'::text,TABLE(name text, id uuid, updated_at timestamp with time zone, created_at timestamp with time zone, last_accessed_at timestamp with time zone, metadata jsonb),STABLE,SECURITY INVOKER,,plpgsql
+storage,search_v2,prefix text, bucket_name text, limits integer DEFAULT 100, levels integer DEFAULT 1, start_after text DEFAULT ''::text, sort_order text DEFAULT 'asc'::text, sort_column text DEFAULT 'name'::text, sort_column_after text DEFAULT ''::text,TABLE(key text, name text, id uuid, updated_at timestamp with time zone, created_at timestamp with time zone, last_accessed_at timestamp with time zone, metadata jsonb),STABLE,SECURITY INVOKER,,plpgsql
+storage,update_updated_at_column,,trigger,VOLATILE,SECURITY INVOKER,,plpgsql
+vault,_crypto_aead_det_decrypt,message bytea, additional bytea, key_id bigint, context bytea DEFAULT '\x7067736f6469756d'::bytea, nonce bytea DEFAULT NULL::bytea,bytea,IMMUTABLE,SECURITY INVOKER,,c
+vault,_crypto_aead_det_encrypt,message bytea, additional bytea, key_id bigint, context bytea DEFAULT '\x7067736f6469756d'::bytea, nonce bytea DEFAULT NULL::bytea,bytea,IMMUTABLE,SECURITY INVOKER,,c
+vault,_crypto_aead_det_noncegen,,bytea,IMMUTABLE,SECURITY INVOKER,,c
+vault,create_secret,new_secret text, new_name text DEFAULT NULL::text, new_description text DEFAULT ''::text, new_key_id uuid DEFAULT NULL::uuid,uuid,VOLATILE,SECURITY DEFINER,,plpgsql
+vault,update_secret,secret_id uuid, new_secret text DEFAULT NULL::text, new_name text DEFAULT NULL::text, new_description text DEFAULT NULL::text, new_key_id uuid DEFAULT NULL::uuid,void,VOLATILE,SECURITY DEFINER,,plpgsql

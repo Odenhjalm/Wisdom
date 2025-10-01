@@ -34,7 +34,8 @@ sealed class AppFailure implements Exception {
 
     if (error is TimeoutException) {
       return TimeoutFailure(
-        message: 'Tidsgränsen överskreds. Kontrollera din uppkoppling och försök igen.',
+        message:
+            'Tidsgränsen överskreds. Kontrollera din uppkoppling och försök igen.',
         original: error,
         stackTrace: stackTrace,
       );
@@ -188,7 +189,8 @@ sealed class AppFailure implements Exception {
   }
 
   @override
-  String toString() => 'AppFailure(kind: $kind, message: $message, code: $code)';
+  String toString() =>
+      'AppFailure(kind: $kind, message: $message, code: $code)';
 }
 
 class NetworkFailure extends AppFailure {

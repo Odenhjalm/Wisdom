@@ -11,6 +11,7 @@ import 'package:wisdom/features/payments/presentation/subscribe_screen.dart';
 import 'package:wisdom/features/auth/presentation/login_page.dart';
 import 'package:wisdom/features/auth/presentation/signup_page.dart';
 import 'package:wisdom/features/community/presentation/profile_edit_page.dart';
+import 'package:wisdom/widgets/base_page.dart';
 import 'gate.dart';
 import 'supabase_client.dart';
 import 'package:wisdom/features/messages/presentation/chat_page.dart';
@@ -109,7 +110,11 @@ final GoRouter appRouter = GoRouter(
   ],
   errorBuilder: (context, state) => Scaffold(
     appBar: AppBar(title: const Text('Fel')),
-    body: Center(child: Text('Sidan hittades inte: ${state.error}')),
+    body: BasePage(
+      child: Center(
+        child: Text('Sidan hittades inte: ${state.error}'),
+      ),
+    ),
   ),
 );
 

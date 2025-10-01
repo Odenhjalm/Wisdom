@@ -7,7 +7,7 @@ import 'package:wisdom/shared/theme/ui_consts.dart';
 import 'package:wisdom/shared/utils/snack.dart';
 import 'package:wisdom/gate.dart';
 import 'package:wisdom/supabase_client.dart';
-import 'package:wisdom/shared/utils/context_safe.dart';
+import 'package:wisdom/widgets/base_page.dart';
 
 const _wisdomBrandGradient = LinearGradient(
   colors: [
@@ -38,11 +38,6 @@ class _HomeShellState extends State<HomeShell> {
     ];
 
     final sectionTitle = ['Kurser', 'Tjänster', 'Min profil', 'Lärare'][_index];
-    final mediaQuery = MediaQuery.of(context);
-    final devicePixelRatio = mediaQuery.devicePixelRatio;
-    const logoHeight = 128.0;
-    final logoCacheWidth = (logoHeight * devicePixelRatio).round();
-
     return Scaffold(
       backgroundColor: Colors.transparent,
       extendBodyBehindAppBar: true,
@@ -51,19 +46,10 @@ class _HomeShellState extends State<HomeShell> {
         backgroundColor: Colors.transparent,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
-        toolbarHeight: 108,
-        leadingWidth: logoHeight + 60,
+        toolbarHeight: 96,
+        leadingWidth: 0,
         titleSpacing: 0,
-        leading: Padding(
-          padding: const EdgeInsets.only(left: 16),
-          child: Image.asset(
-            'assets/loggo_clea.png',
-            height: logoHeight,
-            fit: BoxFit.contain,
-            filterQuality: FilterQuality.high,
-            cacheWidth: logoCacheWidth,
-          ),
-        ),
+        leading: const SizedBox.shrink(),
         title: Row(
           children: [
             ShaderMask(
@@ -82,7 +68,7 @@ class _HomeShellState extends State<HomeShell> {
             Container(
               width: 1,
               height: 18,
-              color: Colors.white.withOpacity(0.25),
+              color: Colors.white.withValues(alpha: 0.25),
             ),
             const SizedBox(width: 12),
             Text(
@@ -96,10 +82,12 @@ class _HomeShellState extends State<HomeShell> {
         ),
         actions: const [TopNavActionButtons()],
       ),
-      body: SafeArea(
-        top: true,
-        bottom: false,
-        child: IndexedStack(index: _index, children: pages),
+      body: BasePage(
+        child: SafeArea(
+          top: false,
+          bottom: false,
+          child: IndexedStack(index: _index, children: pages),
+        ),
       ),
       bottomNavigationBar: NavigationBar(
         backgroundColor: Colors.transparent,
@@ -210,11 +198,10 @@ class _ProfileTab extends ConsumerWidget {
                       final email = emailCtrl.text.trim();
                       if (email.isEmpty) return;
                       await sb.auth.signInWithOtp(email: email);
-                      context.ifMounted(
-                        (c) => showSnack(
-                          c,
-                          'Magisk länk skickad (kontrollera din e-post).',
-                        ),
+                      if (!context.mounted) return;
+                      showSnack(
+                        context,
+                        'Magisk länk skickad (kontrollera din e-post).',
                       );
                     },
                     child: const Text('Skicka magisk länk'),
@@ -248,10 +235,9 @@ class _ProfileTab extends ConsumerWidget {
                   onPressed: () async {
                     await sb.auth.signOut();
                     gate.reset();
-                    context.ifMounted((c) {
-                      showSnack(c, 'Utloggad');
-                      c.go('/landing');
-                    });
+                    if (!context.mounted) return;
+                    showSnack(context, 'Utloggad');
+                    context.go('/landing');
                   },
                   icon: const Icon(Icons.logout),
                   label: const Text('Logga ut'),

@@ -1,4 +1,14 @@
 
+STATUS 2025-09-29 — Genomgång och läge
+
+- use_build_context_synchronously: Löses nu genom explicita vakter (`if (!mounted || !context.mounted) return;`) i de berörda vyerna. Alla tidigare `context.ifMounted`-anrop har ersatts, och helpern i `lib/shared/utils/context_safe.dart` är borttagen.
+- Const-lints: Flera statiska widgets är redan markerade som `const` i nya vyer (t.ex. `lib/features/landing/presentation/landing_page.dart` och `lib/features/community/presentation/home_shell.dart`). Eventuella kvarvarande const-optimeringar kan tas iterativt men blockerar inte körning.
+- OAuth redirect helper: Implementerad i `lib/core/auth/oauth_redirect.dart:1` och använd i `forgot_password_page.dart` och `signup_page.dart`.
+- Auth callback-sida: Finns och är kopplad i router: `lib/features/auth/presentation/auth_callback_page.dart:1` och route i `lib/core/routing/app_router.dart:199`.
+- Dotenv-laddning: Init före `runApp` i `lib/main.dart:12`, med fallback om `.env` saknas.
+
+Slutsats: De praktiska delarna av denna “old tasks”-lista är implementerade i nuvarande kodbas. Om du vill kan jag köra en riktad städpass för eventuella kvarvarande `prefer_const_constructors`-varningar när du kör `flutter analyze` lokalt.
+
 
 1. **use\_build\_context\_synchronously** (alla efter `await`).
    → De ska omskrivas till `context.ifMounted((c){…})` med din nya helper.

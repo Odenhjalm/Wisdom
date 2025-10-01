@@ -73,7 +73,8 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
                               DropdownMenuItem(
                                   value: 'newest', child: Text('Nyast')),
                             ],
-                            onChanged: (v) => setState(() => _sort = v ?? 'rating'),
+                            onChanged: (v) =>
+                                setState(() => _sort = v ?? 'rating'),
                           ),
                         ],
                       ),

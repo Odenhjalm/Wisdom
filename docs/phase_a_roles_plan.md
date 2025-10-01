@@ -40,8 +40,8 @@ Migrera från `app.role_type` (user/member/teacher/admin) till blueprintens `app
    - Säkerställ att RLS-policys fortsätter att fungera genom test med Supabase CLI (anon/authenticated tokens).
 
 ## TODO-lista inför implementation
-- [ ] Bekräfta att `app.teacher_requests` dataformat kan mappar till Certificates (fält `message`, `status`).
-- [ ] Identifiera funktioner/stored procedures beroende av `app.role_type` (`rg "role_type" supabase`).
+- [x] Bekräfta att `app.teacher_requests` dataformat kan mappar till Certificates (fält `message`, `status`). (`app.teacher_requests_legacy` vy speglar `certificates` + `teacher_approvals`).
+- [x] Identifiera funktioner/stored procedures beroende av `app.role_type` (`rg "role_type" supabase`).
 - [ ] Avgjör var admin-rättigheter används i appen; definiera `is_admin` flöde.
 - [x] Förbereda SQL-migration `supabase/2025-09-PhaseA_roles.sql` enligt stegen ovan.
 - [x] Uppdatera `tasks2025-09-25.md` med status när migreringsskriptet finns.

@@ -4,10 +4,10 @@ import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher_string.dart';
 
 import 'package:wisdom/core/errors/app_failure.dart';
-import 'package:wisdom/shared/utils/context_safe.dart';
 import 'package:wisdom/domain/services/payments/payments_service.dart';
 import 'package:wisdom/features/courses/application/course_providers.dart';
 import 'package:wisdom/features/courses/data/courses_repository.dart';
+import 'package:wisdom/features/payments/presentation/paywall_prompt.dart';
 import 'package:wisdom/shared/utils/snack.dart';
 import 'package:wisdom/shared/widgets/app_scaffold.dart';
 
@@ -63,15 +63,13 @@ class _CoursePageState extends ConsumerState<CoursePage> {
     final state = ref.read(enrollProvider(detail.course.id));
     state.when(
       data: (_) {
-        context.ifMounted((c) {
-          showSnack(c, 'Du är nu anmäld till introduktionen.');
-          ref.invalidate(courseDetailProvider(widget.slug));
-        });
+        if (!mounted || !context.mounted) return;
+        showSnack(context, 'Du är nu anmäld till introduktionen.');
+        ref.invalidate(courseDetailProvider(widget.slug));
       },
       error: (error, _) {
-        context.ifMounted(
-          (c) => showSnack(c, 'Kunde inte anmäla: ${_friendlyError(error)}'),
-        );
+        if (!mounted || !context.mounted) return;
+        showSnack(context, 'Kunde inte anmäla: ${_friendlyError(error)}');
       },
       loading: () {},
     );
@@ -86,7 +84,7 @@ class _CoursePageState extends ConsumerState<CoursePage> {
       final pay = PaymentsService();
       final order =
           await pay.startCourseOrder(courseId: courseId, amountCents: price);
-      if (!mounted) return;
+      if (!mounted || !context.mounted) return;
       // Watch realtime updates for the specific order
       try {
         _cancelOrderWatch?.call();
@@ -108,16 +106,14 @@ class _CoursePageState extends ConsumerState<CoursePage> {
       if (url != null) {
         await launchUrlString(url);
       } else {
-        context.ifMounted(
-          (c) => showSnack(c, 'Kunde inte initiera betalning.'),
-        );
+        if (!mounted || !context.mounted) return;
+        showSnack(context, 'Kunde inte initiera betalning.');
       }
     } catch (error) {
-      context.ifMounted(
-        (c) => showSnack(
-          c,
-          'Kunde inte skapa order: ${_friendlyError(error)}',
-        ),
+      if (!mounted || !context.mounted) return;
+      showSnack(
+        context,
+        'Kunde inte skapa order: ${_friendlyError(error)}',
       );
     } finally {
       if (mounted) setState(() => _ordering = false);
@@ -158,6 +154,7 @@ class _CourseContent extends StatelessWidget {
     final enrollError = enrollState.whenOrNull(
       error: (error, _) => error,
     );
+    final canPurchase = priceCents > 0 && !detail.isEnrolled;
 
     return AppScaffold(
       title: course.title,
@@ -183,31 +180,39 @@ class _CourseContent extends StatelessWidget {
                   const SizedBox(height: 12),
                   Row(
                     children: [
-                      ElevatedButton(
-                        onPressed: isEnrolling ? null : onEnroll,
-                        child: isEnrolling
-                            ? const SizedBox(
-                                height: 18,
-                                width: 18,
-                                child:
-                                    CircularProgressIndicator(strokeWidth: 2),
-                              )
-                            : const Text('Starta gratis intro'),
-                      ),
-                      const SizedBox(width: 10),
-                      if (priceCents > 0)
-                        OutlinedButton(
-                          onPressed: ordering ? null : onStartCheckout,
-                          child: ordering
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: isEnrolling ? null : onEnroll,
+                          child: isEnrolling
                               ? const SizedBox(
                                   height: 18,
                                   width: 18,
                                   child:
                                       CircularProgressIndicator(strokeWidth: 2),
                                 )
-                              : Text(
-                                  'Köp hela kursen (${priceCents / 100} kr)'),
+                              : const Text('Starta gratis intro'),
                         ),
+                      ),
+                      if (priceCents > 0) ...[
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: ordering || !canPurchase
+                                ? null
+                                : onStartCheckout,
+                            child: ordering
+                                ? const SizedBox(
+                                    height: 18,
+                                    width: 18,
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2),
+                                  )
+                                : Text(detail.isEnrolled
+                                    ? 'Åtkomst aktiverad'
+                                    : 'Köp hela kursen (${priceCents / 100} kr)'),
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                   const SizedBox(height: 8),
@@ -215,6 +220,13 @@ class _CourseContent extends StatelessWidget {
                     'Använda gratis-intros: ${detail.freeConsumed}/${detail.freeLimit} $enrolledText',
                     style: t.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                   ),
+                  if (detail.isEnrolled && priceCents > 0) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      'Du har redan full åtkomst till kursen.',
+                      style: t.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                    ),
+                  ],
                   const SizedBox(height: 8),
                   if (detail.latestOrder != null)
                     Row(
@@ -260,15 +272,30 @@ class _CourseContent extends StatelessWidget {
                       ),
                       const SizedBox(height: 8),
                       ...lessons.map(
-                        (lesson) => ListTile(
-                          leading:
-                              const Icon(Icons.play_circle_outline_rounded),
-                          title: Text(lesson.title),
-                          subtitle: lesson.isIntro
-                              ? const Text('Förhandsvisning')
-                              : null,
-                          onTap: () => _openLesson(context, lesson.id),
-                        ),
+                        (lesson) {
+                          final isLocked =
+                              !lesson.isIntro && !detail.isEnrolled;
+                          return ListTile(
+                            leading: Icon(
+                              isLocked
+                                  ? Icons.lock_outline_rounded
+                                  : Icons.play_circle_outline_rounded,
+                            ),
+                            title: Text(lesson.title),
+                            subtitle: lesson.isIntro
+                                ? const Text('Förhandsvisning')
+                                : (isLocked
+                                    ? const Text('Låst innehåll')
+                                    : null),
+                            enabled: !isLocked,
+                            onTap: () => _handleLessonTap(
+                              context,
+                              lesson,
+                              detail,
+                              isLocked,
+                            ),
+                          );
+                        },
                       ),
                     ],
                   ),
@@ -283,6 +310,41 @@ class _CourseContent extends StatelessWidget {
 
   void _openLesson(BuildContext context, String lessonId) {
     context.push('/lesson/$lessonId');
+  }
+
+  void _handleLessonTap(
+    BuildContext context,
+    LessonSummary lesson,
+    CourseDetailData detail,
+    bool isLocked,
+  ) {
+    if (!isLocked) {
+      _openLesson(context, lesson.id);
+      return;
+    }
+
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(ctx).viewInsets.bottom,
+          ),
+          child: ClipRRect(
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+            child: Material(
+              color: Theme.of(ctx).scaffoldBackgroundColor,
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: PaywallPrompt(courseId: detail.course.id),
+              ),
+            ),
+          ),
+        );
+      },
+    );
   }
 
   String _friendlyError(Object error) {

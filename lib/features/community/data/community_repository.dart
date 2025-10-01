@@ -82,7 +82,7 @@ class CommunityRepository {
         .from('certificates')
         .select('user_id')
         .filter('user_id', 'in', inList)
-        .eq('verified', true);
+        .eq('status', 'verified');
     final map = <String, int>{};
     for (final r in (rows as List? ?? [])) {
       final id = (r as Map)['user_id'] as String?;
@@ -94,21 +94,8 @@ class CommunityRepository {
   Future<Map<String, List<String>>> listVerifiedCertSpecialties(
       List<String> userIds) async {
     if (userIds.isEmpty) return {};
-    final inList = '(${userIds.map((e) => '"$e"').join(',')})';
-    final rows = await _sb.app
-        .from('certificates')
-        .select('user_id, specialties')
-        .filter('user_id', 'in', inList)
-        .eq('verified', true);
-    final map = <String, Set<String>>{};
-    for (final r in (rows as List? ?? [])) {
-      final m = Map<String, dynamic>.from(r as Map);
-      final id = m['user_id'] as String?;
-      final specs = (m['specialties'] as List?)?.cast<String>() ?? const [];
-      if (id == null) continue;
-      map.putIfAbsent(id, () => <String>{}).addAll(specs);
-    }
-    return {for (final e in map.entries) e.key: e.value.toList()};
+    // Specialties hanteras inte i nya certificates-schemat.
+    return {};
   }
 
   Future<Map<String, dynamic>> startServiceOrder(
