@@ -1,33 +1,21 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:wisdom/supabase_client.dart';
+import 'package:wisdom/api/auth_repository.dart';
+import 'package:wisdom/features/payments/data/payments_repository.dart';
+
+final paymentsRepositoryProvider = Provider<PaymentsRepository>((ref) {
+  final client = ref.watch(apiClientProvider);
+  return PaymentsRepository(client);
+});
 
 final plansProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
-  final sb = ref.read(supabaseMaybeProvider);
-  if (sb == null) return const <Map<String, dynamic>>[];
-  final res = await sb
-      .from('subscription_plans')
-      .select('id,name,price_cents,interval,is_active')
-      .eq('is_active', true)
-      .order('price_cents');
-  final list = res as List?;
-  if (list == null) return const <Map<String, dynamic>>[];
-  return list
-      .map((e) => Map<String, dynamic>.from(e as Map))
-      .toList(growable: false);
+  final repo = ref.watch(paymentsRepositoryProvider);
+  return repo.plans();
 });
 
-final activeSubscriptionProvider = FutureProvider<bool>((ref) async {
-  final sb = ref.read(supabaseMaybeProvider);
-  final uid = sb?.auth.currentUser?.id;
-  if (uid == null || sb == null) return false;
-  final res = await sb
-      .from('subscriptions')
-      .select('id,status,current_period_end')
-      .eq('user_id', uid)
-      .eq('status', 'active')
-      .gte('current_period_end', DateTime.now().toUtc().toIso8601String())
-      .limit(1);
-  final list = res as List?;
-  return list != null && list.isNotEmpty;
-});
+final activeSubscriptionProvider = FutureProvider<Map<String, dynamic>?>(
+  (ref) async {
+    final repo = ref.watch(paymentsRepositoryProvider);
+    return repo.currentSubscription();
+  },
+);

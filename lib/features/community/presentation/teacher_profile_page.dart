@@ -6,11 +6,10 @@ import 'package:url_launcher/url_launcher_string.dart';
 
 import 'package:wisdom/core/errors/app_failure.dart';
 import 'package:wisdom/data/models/certificate.dart';
-import 'package:wisdom/data/supabase/supabase_client.dart';
-import 'package:wisdom/domain/services/payments/payments_service.dart';
 import 'package:wisdom/features/community/application/community_providers.dart';
 import 'package:wisdom/shared/utils/snack.dart';
 import 'package:wisdom/shared/widgets/app_scaffold.dart';
+import 'package:wisdom/features/payments/application/payments_providers.dart';
 
 class TeacherProfilePage extends ConsumerStatefulWidget {
   const TeacherProfilePage({super.key, required this.userId});
@@ -92,20 +91,18 @@ class _TeacherProfilePageState extends ConsumerState<TeacherProfilePage> {
     if (serviceId == null || price <= 0) return;
     setState(() => _buying = true);
     try {
-      final repo = ref.read(communityRepositoryProvider);
+      final repo = ref.read(paymentsRepositoryProvider);
       final order = await repo.startServiceOrder(
         serviceId: serviceId,
         amountCents: price,
       );
-      final pay = PaymentsService();
-      final url = await pay.createCheckoutSession(
+      final url = await repo.checkoutUrl(
         orderId: order['id'] as String,
-        amountCents: price,
         successUrl:
             'https://andlig.app/payment/success?order_id=${order['id']}',
         cancelUrl: 'https://andlig.app/payment/cancel?order_id=${order['id']}',
       );
-      if (url != null) {
+      if (url.isNotEmpty) {
         await launchUrlString(url);
       } else {
         _showSnack('Kunde inte initiera betalning.');
@@ -277,9 +274,8 @@ class _MeditationsCard extends StatelessWidget {
                 (m) => _MeditationTile(
                   title: m['title'] as String? ?? 'Meditation',
                   description: m['description'] as String? ?? '',
-                  url: Supa.client.storage
-                      .from('media')
-                      .getPublicUrl(m['audio_path'] as String),
+                  url: (m['audio_url'] as String?) ??
+                      (m['audio_path'] as String? ?? ''),
                   durationSeconds: (m['duration_seconds'] as int?) ?? 0,
                 ),
               ),
@@ -329,6 +325,7 @@ class _MeditationTileState extends State<_MeditationTile> {
   }
 
   Future<void> _toggle() async {
+    if (widget.url.isEmpty) return;
     if (_state == PlayerState.playing) {
       await _player.pause();
     } else {

@@ -23,8 +23,8 @@ final envInfoProvider = StateProvider<EnvInfo>((_) => envInfoOk);
 extension EnvInfoX on EnvInfo {
   String get message {
     if (missingKeys.isEmpty) {
-      return 'Supabase-konfiguration saknas.';
+      return 'API-konfiguration saknas.';
     }
-    return 'Supabase saknas: ${missingKeys.join(', ')}.';
+    return 'Miljövariabler saknas: ${missingKeys.join(', ')}.';
   }
 }

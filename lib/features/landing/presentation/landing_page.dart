@@ -5,9 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:wisdom/core/env/env_state.dart';
-import 'package:wisdom/data/supabase/supabase_client.dart';
-import 'package:wisdom/core/supabase_ext.dart';
-import 'package:wisdom/features/community/data/community_repository.dart';
+import 'package:wisdom/features/landing/application/landing_providers.dart';
 import 'package:wisdom/shared/utils/snack.dart';
 import 'package:wisdom/shared/widgets/glass_card.dart';
 import 'package:wisdom/shared/widgets/hero_badge.dart';
@@ -53,12 +51,15 @@ class _LandingPageState extends ConsumerState<LandingPage>
 
   // Data for sections
   bool _loading = true;
-  List<Map<String, dynamic>> _popularCourses = const [];
-  List<Map<String, dynamic>> _teachers = const [];
-  List<Map<String, dynamic>> _services = const [];
-  List<Map<String, dynamic>> _introCourses = const [];
+  LandingSectionState _popularCourses = const LandingSectionState(items: []);
+  LandingSectionState _teachers = const LandingSectionState(items: []);
+  LandingSectionState _services = const LandingSectionState(items: []);
+  LandingSectionState _introCourses = const LandingSectionState(items: []);
   bool _envSnackShown = false;
 
+  List<Map<String, dynamic>> get _popularItems => _popularCourses.items;
+  List<Map<String, dynamic>> get _teacherItems => _teachers.items;
+  List<Map<String, dynamic>> get _serviceItems => _services.items;
   @override
   void initState() {
     super.initState();
@@ -85,8 +86,8 @@ class _LandingPageState extends ConsumerState<LandingPage>
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         final missing = info.missingKeys.isEmpty
-            ? 'Supabase-konfiguration saknas.'
-            : 'Supabase saknas: ${info.missingKeys.join(', ')}.';
+            ? 'API-konfiguration saknas.'
+            : 'Miljövariabler saknas: ${info.missingKeys.join(', ')}.';
         showSnack(
           context,
           '$missing Lägg till nycklar i .env eller via --dart-define.',
@@ -103,43 +104,16 @@ class _LandingPageState extends ConsumerState<LandingPage>
 
   Future<void> _load() async {
     setState(() => _loading = true);
-    if (!Supa.isReady) {
-      if (!mounted) return;
-      setState(() => _loading = false);
-      return;
-    }
     try {
-      final sb = Supa.client;
-      final popular = await sb.app
-          .from('courses')
-          .select('id,slug,title,description,is_free_intro,cover_url')
-          .order('is_free_intro', ascending: false)
-          .order('created_at', ascending: false)
-          .limit(6);
-      final intros = await sb.app
-          .from('courses')
-          .select('id,slug,title,is_free_intro')
-          .eq('is_free_intro', true)
-          .order('created_at', ascending: false)
-          .limit(5);
-      final svcRows = await sb.app
-          .from('services')
-          .select('id,title,description,price_cents,certified_area,active')
-          .eq('active', true)
-          .order('created_at', ascending: false)
-          .limit(6);
-      final teachers = await CommunityRepository().listTeachers();
+      final popular = await ref.read(popularCoursesProvider.future);
+      final intros = await ref.read(introCoursesProvider.future);
+      final services = await ref.read(recentServicesProvider.future);
+      final teachers = await ref.read(teachersProvider.future);
       if (!mounted) return;
       setState(() {
-        _popularCourses = (popular as List? ?? [])
-            .map((e) => Map<String, dynamic>.from(e))
-            .toList();
-        _introCourses = (intros as List? ?? [])
-            .map((e) => Map<String, dynamic>.from(e))
-            .toList();
-        _services = (svcRows as List? ?? [])
-            .map((e) => Map<String, dynamic>.from(e))
-            .toList();
+        _popularCourses = popular;
+        _introCourses = intros;
+        _services = services;
         _teachers = teachers;
         _loading = false;
       });
@@ -150,19 +124,12 @@ class _LandingPageState extends ConsumerState<LandingPage>
   }
 
   void _openIntroModal() {
-    if (!Supa.isReady) {
-      showSnack(
-        context,
-        'Supabase saknas. Lägg till SUPABASE_URL och SUPABASE_ANON_KEY för att visa kurser.',
-      );
-      return;
-    }
     showModalBottomSheet(
       context: context,
       isScrollControlled: false,
       backgroundColor: Colors.transparent,
       builder: (_) {
-        final items = _introCourses;
+        final items = _introCourses.items;
         return ClipRRect(
           borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
           child: BackdropFilter(
@@ -378,7 +345,7 @@ class _LandingPageState extends ConsumerState<LandingPage>
                             padding: const EdgeInsets.all(16),
                             child: Text(
                               envInfo.missingKeys.isEmpty
-                                  ? 'Supabase-konfiguration saknas. Lägg till SUPABASE_URL och SUPABASE_ANON_KEY i .env eller via --dart-define för att aktivera inloggning.'
+                                  ? 'API-konfiguration saknas. Lägg till API_BASE_URL i .env eller via --dart-define för att aktivera inloggning.'
                                   : 'Saknade nycklar: ${envInfo.missingKeys.join(', ')}. Lägg till dem i .env eller via --dart-define för att aktivera inloggning.',
                               style: t.bodyMedium?.copyWith(
                                 color: Colors.white,
@@ -489,7 +456,7 @@ class _LandingPageState extends ConsumerState<LandingPage>
                                           child: Center(
                                               child:
                                                   CircularProgressIndicator()))
-                                      : _popularCourses.isEmpty
+                                      : _popularItems.isEmpty
                                           ? const Padding(
                                               padding: EdgeInsets.all(12),
                                               child: Text('Inga kurser ännu.'),
@@ -504,8 +471,7 @@ class _LandingPageState extends ConsumerState<LandingPage>
                                                 shrinkWrap: true,
                                                 physics:
                                                     const NeverScrollableScrollPhysics(),
-                                                itemCount:
-                                                    _popularCourses.length,
+                                                itemCount: _popularItems.length,
                                                 gridDelegate:
                                                     SliverGridDelegateWithFixedCrossAxisCount(
                                                   crossAxisCount: cross,
@@ -514,7 +480,7 @@ class _LandingPageState extends ConsumerState<LandingPage>
                                                   childAspectRatio: 1.35,
                                                 ),
                                                 itemBuilder: (_, i) {
-                                                  final c = _popularCourses[i];
+                                                  final c = _popularItems[i];
                                                   return _CourseTileGlass(
                                                       course: c);
                                                 },
@@ -559,17 +525,17 @@ class _LandingPageState extends ConsumerState<LandingPage>
                                           itemBuilder: (_, __) =>
                                               const _TeacherPillSkeleton(),
                                         )
-                                      : _teachers.isEmpty
+                                      : _teacherItems.isEmpty
                                           ? const Center(
                                               child: Text('Inga lärare ännu.'))
                                           : ListView.separated(
                                               scrollDirection: Axis.horizontal,
-                                              itemCount: _teachers.length,
+                                              itemCount: _teacherItems.length,
                                               separatorBuilder: (_, __) =>
                                                   const SizedBox(width: 8),
                                               itemBuilder: (_, i) =>
                                                   _TeacherPillData(
-                                                      map: _teachers[i]),
+                                                      map: _teacherItems[i]),
                                             ),
                                 ),
                               ),
@@ -603,7 +569,7 @@ class _LandingPageState extends ConsumerState<LandingPage>
                                         height: 160,
                                         child: Center(
                                             child: CircularProgressIndicator()))
-                                    : _services.isEmpty
+                                    : _serviceItems.isEmpty
                                         ? const Padding(
                                             padding: EdgeInsets.all(12),
                                             child: Text('Inga tjänster ännu.'),
@@ -617,7 +583,7 @@ class _LandingPageState extends ConsumerState<LandingPage>
                                               shrinkWrap: true,
                                               physics:
                                                   const NeverScrollableScrollPhysics(),
-                                              itemCount: _services.length,
+                                              itemCount: _serviceItems.length,
                                               gridDelegate:
                                                   SliverGridDelegateWithFixedCrossAxisCount(
                                                 crossAxisCount: cross,
@@ -627,7 +593,8 @@ class _LandingPageState extends ConsumerState<LandingPage>
                                               ),
                                               itemBuilder: (_, i) =>
                                                   _ServiceTileGlass(
-                                                      service: _services[i]),
+                                                      service:
+                                                          _serviceItems[i]),
                                             );
                                           }),
                               ),

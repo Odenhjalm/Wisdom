@@ -4,12 +4,12 @@ import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher_string.dart';
 
 import 'package:wisdom/core/errors/app_failure.dart';
-import 'package:wisdom/domain/services/payments/payments_service.dart';
 import 'package:wisdom/features/courses/application/course_providers.dart';
 import 'package:wisdom/features/courses/data/courses_repository.dart';
 import 'package:wisdom/features/payments/presentation/paywall_prompt.dart';
 import 'package:wisdom/shared/utils/snack.dart';
 import 'package:wisdom/shared/widgets/app_scaffold.dart';
+import 'package:wisdom/features/payments/application/payments_providers.dart';
 
 class CoursePage extends ConsumerStatefulWidget {
   const CoursePage({super.key, required this.slug});
@@ -22,13 +22,6 @@ class CoursePage extends ConsumerStatefulWidget {
 
 class _CoursePageState extends ConsumerState<CoursePage> {
   bool _ordering = false;
-  VoidCallback? _cancelOrderWatch;
-
-  @override
-  void dispose() {
-    _cancelOrderWatch?.call();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -81,30 +74,21 @@ class _CoursePageState extends ConsumerState<CoursePage> {
     if (price <= 0) return;
     setState(() => _ordering = true);
     try {
-      final pay = PaymentsService();
-      final order =
-          await pay.startCourseOrder(courseId: courseId, amountCents: price);
-      if (!mounted || !context.mounted) return;
-      // Watch realtime updates for the specific order
-      try {
-        _cancelOrderWatch?.call();
-        _cancelOrderWatch = await pay.watchOrderStatus(
-          orderId: order['id'] as String,
-          onUpdate: (row) {
-            ref.invalidate(courseDetailProvider(widget.slug));
-          },
-        );
-      } catch (_) {}
-      final url = await pay.createCheckoutSession(
-        orderId: order['id'] as String,
+      final repo = ref.read(paymentsRepositoryProvider);
+      final order = await repo.startCourseOrder(
+        courseId: courseId,
         amountCents: price,
+      );
+      if (!mounted || !context.mounted) return;
+      final url = await repo.checkoutUrl(
+        orderId: order['id'] as String,
         successUrl:
             'https://andlig.app/payment/success?order_id=${order['id']}',
         cancelUrl: 'https://andlig.app/payment/cancel?order_id=${order['id']}',
-        customerEmail: null,
       );
-      if (url != null) {
+      if (url.isNotEmpty) {
         await launchUrlString(url);
+        ref.invalidate(courseDetailProvider(widget.slug));
       } else {
         if (!mounted || !context.mounted) return;
         showSnack(context, 'Kunde inte initiera betalning.');
@@ -149,12 +133,19 @@ class _CourseContent extends StatelessWidget {
     final t = Theme.of(context).textTheme;
     final cs = Theme.of(context).colorScheme;
     final priceCents = course.priceCents ?? 0;
-    final enrolledText = detail.isEnrolled ? '• Du är anmäld' : '';
+    final hasAccess = detail.hasAccess;
+    final isEnrolled = detail.isEnrolled;
+    final hasSubscription = detail.hasActiveSubscription;
+    final enrolledText = hasAccess
+        ? (hasSubscription && !isEnrolled
+            ? '• Prenumeration aktiv'
+            : '• Du är anmäld')
+        : '';
     final isEnrolling = enrollState.isLoading;
     final enrollError = enrollState.whenOrNull(
       error: (error, _) => error,
     );
-    final canPurchase = priceCents > 0 && !detail.isEnrolled;
+    final canPurchase = priceCents > 0 && !hasAccess;
 
     return AppScaffold(
       title: course.title,
@@ -207,8 +198,10 @@ class _CourseContent extends StatelessWidget {
                                     child: CircularProgressIndicator(
                                         strokeWidth: 2),
                                   )
-                                : Text(detail.isEnrolled
-                                    ? 'Åtkomst aktiverad'
+                                : Text(hasAccess
+                                    ? (hasSubscription && !isEnrolled
+                                        ? 'Prenumeration aktiv'
+                                        : 'Åtkomst aktiverad')
                                     : 'Köp hela kursen (${priceCents / 100} kr)'),
                           ),
                         ),
@@ -220,12 +213,18 @@ class _CourseContent extends StatelessWidget {
                     'Använda gratis-intros: ${detail.freeConsumed}/${detail.freeLimit} $enrolledText',
                     style: t.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                   ),
-                  if (detail.isEnrolled && priceCents > 0) ...[
+                  if (hasAccess && priceCents > 0) ...[
                     const SizedBox(height: 8),
                     Text(
                       'Du har redan full åtkomst till kursen.',
                       style: t.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                     ),
+                    if (hasSubscription && !isEnrolled)
+                      Text(
+                        'Din prenumeration ger dig åtkomst till allt innehåll.',
+                        style:
+                            t.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                      ),
                   ],
                   const SizedBox(height: 8),
                   if (detail.latestOrder != null)
@@ -273,8 +272,7 @@ class _CourseContent extends StatelessWidget {
                       const SizedBox(height: 8),
                       ...lessons.map(
                         (lesson) {
-                          final isLocked =
-                              !lesson.isIntro && !detail.isEnrolled;
+                          final isLocked = !lesson.isIntro && !hasAccess;
                           return ListTile(
                             leading: Icon(
                               isLocked

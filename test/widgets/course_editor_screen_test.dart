@@ -1,56 +1,86 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'package:wisdom/features/courses/application/course_providers.dart';
 import 'package:wisdom/features/courses/data/courses_repository.dart';
 import 'package:wisdom/features/studio/data/studio_repository.dart';
-import 'package:wisdom/features/studio/data/teacher_repository.dart';
 import 'package:wisdom/features/studio/presentation/course_editor_page.dart';
-import 'package:wisdom/domain/services/auth_service.dart';
-
-class _MockSupabaseClient extends Mock implements SupabaseClient {}
-
-class _MockGoTrueClient extends Mock implements GoTrueClient {}
-
-class _MockAuthService extends Mock implements AuthService {}
+import 'package:wisdom/core/auth/auth_controller.dart';
+import 'package:wisdom/core/env/app_config.dart';
+import 'package:wisdom/api/auth_repository.dart';
+import 'package:wisdom/data/models/profile.dart';
+import 'package:wisdom/features/studio/application/studio_providers.dart';
+import 'package:wisdom/features/studio/application/studio_upload_queue.dart';
 
 class _MockStudioRepository extends Mock implements StudioRepository {}
 
-class _MockTeacherRepository extends Mock implements TeacherRepository {}
-
 class _MockCoursesRepository extends Mock implements CoursesRepository {}
+
+class _MockAuthRepository extends Mock implements AuthRepository {}
+
+class _FakeAuthController extends AuthController {
+  _FakeAuthController() : super(_MockAuthRepository()) {
+    state = AuthState(
+      profile: Profile(
+        id: 'user-1',
+        email: 'teacher@example.com',
+        userRole: UserRole.teacher,
+        isAdmin: false,
+        createdAt: DateTime.utc(2024, 1, 1),
+        updatedAt: DateTime.utc(2024, 1, 1),
+      ),
+    );
+  }
+
+  @override
+  Future<void> loadSession() async {}
+}
+
+class _NoopUploadQueueNotifier extends UploadQueueNotifier {
+  _NoopUploadQueueNotifier(super.repo);
+
+  @override
+  String enqueueUpload({
+    required String courseId,
+    required String lessonId,
+    required Uint8List data,
+    required String filename,
+    required String contentType,
+    required bool isIntro,
+  }) {
+    return 'noop';
+  }
+
+  @override
+  void cancelUpload(String id) {}
+
+  @override
+  void retryUpload(String id) {}
+
+  @override
+  void removeJob(String id) {}
+}
 
 void main() {
   setUpAll(() {
     registerFallbackValue(const Duration());
   });
 
-  testWidgets('CourseEditorScreen renders provided course data', (tester) async {
-    final supabase = _MockSupabaseClient();
-    final auth = _MockGoTrueClient();
-    when(() => supabase.auth).thenReturn(auth);
-    final user = User.fromJson({
-      'id': 'user-1',
-      'email': 'teacher@example.com',
-      'aud': 'authenticated',
-      'app_metadata': <String, dynamic>{},
-      'user_metadata': <String, dynamic>{},
-      'created_at': DateTime.now().toIso8601String(),
-    })!;
-    when(() => auth.currentUser).thenReturn(user);
-
-    final authService = _MockAuthService();
-    when(() => authService.isTeacher()).thenAnswer((_) async => true);
-
+  testWidgets('CourseEditorScreen renders provided course data',
+      (tester) async {
     final studioRepo = _MockStudioRepository();
     final coursesRepo = _MockCoursesRepository();
-    final teacherRepo = _MockTeacherRepository();
 
     when(() => studioRepo.myCourses()).thenAnswer((_) async => [
           {'id': 'course-1', 'title': 'Tarot Basics'}
         ]);
+    when(() => studioRepo.fetchStatus()).thenAnswer((_) async =>
+        const StudioStatus(
+            isTeacher: true, verifiedCertificates: 1, hasApplication: false));
     when(() => studioRepo.fetchCourseMeta('course-1')).thenAnswer((_) async => {
           'title': 'Tarot Basics',
           'slug': 'tarot-basics',
@@ -80,8 +110,8 @@ void main() {
           }
         ]);
 
-    const courseDetail = CourseDetailData(
-      course: CourseSummary(
+    final courseDetail = CourseDetailData(
+      course: const CourseSummary(
         id: 'course-1',
         slug: 'tarot-basics',
         title: 'Tarot Basics',
@@ -92,11 +122,11 @@ void main() {
         isPublished: true,
         priceCents: 1200,
       ),
-      modules: [
+      modules: const [
         CourseModule(id: 'module-1', title: 'Intro', position: 1),
       ],
       lessonsByModule: {
-        'module-1': [
+        'module-1': const [
           LessonSummary(
             id: 'lesson-1',
             title: 'Välkommen',
@@ -116,12 +146,27 @@ void main() {
 
     await tester.pumpWidget(
       ProviderScope(
+        overrides: [
+          appConfigProvider.overrideWithValue(const AppConfig(
+            apiBaseUrl: 'http://localhost:8000',
+            stripePublishableKey: 'pk_test_stub',
+            stripeMerchantDisplayName: 'Test Merchant',
+          )),
+          authControllerProvider.overrideWith((ref) => _FakeAuthController()),
+          studioRepositoryProvider.overrideWithValue(studioRepo),
+          coursesRepositoryProvider.overrideWithValue(coursesRepo),
+          studioStatusProvider.overrideWith((ref) async => const StudioStatus(
+                isTeacher: true,
+                verifiedCertificates: 1,
+                hasApplication: false,
+              )),
+          studioUploadQueueProvider.overrideWith(
+            (ref) => _NoopUploadQueueNotifier(studioRepo),
+          ),
+        ],
         child: MaterialApp(
           home: CourseEditorScreen(
-            supabaseClient: supabase,
-            authService: authService,
             studioRepository: studioRepo,
-            teacherRepository: teacherRepo,
             coursesRepository: coursesRepo,
           ),
         ),

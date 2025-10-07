@@ -4,8 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:wisdom/core/errors/app_failure.dart';
 import 'package:wisdom/features/community/application/community_providers.dart';
 import 'package:wisdom/shared/widgets/app_scaffold.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:wisdom/core/supabase_ext.dart';
 import 'package:wisdom/shared/utils/snack.dart';
 
 class TarotPage extends ConsumerStatefulWidget {
@@ -88,34 +86,32 @@ class _TarotPageState extends ConsumerState<TarotPage> {
   }
 
   Future<void> _create() async {
-    final sb = Supabase.instance.client;
-    final user = sb.auth.currentUser;
-    if (user == null) {
-      showSnack(context, 'Logga in för att skicka en förfrågan.');
-      return;
-    }
     final text = _question.text.trim();
     if (text.isEmpty) return;
     setState(() => _sending = true);
     try {
-      await sb.app.from('tarot_requests').insert({
-        'requester_id': user.id,
-        'question': text,
-      });
+      final repo = ref.read(communityRepositoryProvider);
+      await repo.createTarotRequest(text);
       _question.clear();
       ref.invalidate(tarotRequestsProvider);
       if (!mounted || !context.mounted) return;
       showSnack(context, 'Förfrågan skickad.');
     } catch (error) {
       if (!mounted || !context.mounted) return;
-      showSnack(context, 'Kunde inte skicka: ${_friendlyError(error)}');
+      final friendly = _friendlyError(error);
+      showSnack(context, 'Kunde inte skicka: $friendly');
     } finally {
       if (mounted) setState(() => _sending = false);
     }
   }
 
   String _friendlyError(Object error) {
-    if (error is AppFailure) return error.message;
+    if (error is AppFailure) {
+      if (error.kind == AppFailureKind.unauthorized) {
+        return 'Logga in för att skicka en förfrågan.';
+      }
+      return error.message;
+    }
     return error.toString();
   }
 }

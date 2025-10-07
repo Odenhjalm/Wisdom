@@ -1,30 +1,32 @@
-import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:wisdom/core/supabase_ext.dart';
+import 'package:wisdom/api/api_client.dart';
 
 class ReviewsRepository {
-  final _sb = Supabase.instance.client;
+  ReviewsRepository(this._client);
+
+  final ApiClient _client;
 
   Future<List<Map<String, dynamic>>> listByService(String serviceId) async {
-    final rows = await _sb.app
-        .from('reviews')
-        .select('id, service_id, reviewer_id, rating, comment, created_at')
-        .eq('service_id', serviceId)
-        .order('created_at', ascending: false);
-    return (rows as List? ?? [])
-        .map((e) => Map<String, dynamic>.from(e as Map))
-        .toList();
+    final response = await _client.get<Map<String, dynamic>>(
+      '/community/services/$serviceId/reviews',
+    );
+    final items = (response['items'] as List? ?? [])
+        .map((item) => Map<String, dynamic>.from(item as Map))
+        .toList(growable: false);
+    return items;
   }
 
-  Future<void> add(
-      {required String serviceId, required int rating, String? comment}) async {
-    final uid = _sb.auth.currentUser?.id;
-    if (uid == null) throw Exception('Inte inloggad');
-    await _sb.app.from('reviews').insert({
-      'service_id': serviceId,
-      'reviewer_id': uid,
-      'rating': rating.clamp(1, 5),
-      if (comment != null && comment.trim().isNotEmpty)
-        'comment': comment.trim(),
-    });
+  Future<void> add({
+    required String serviceId,
+    required int rating,
+    String? comment,
+  }) async {
+    await _client.post(
+      '/community/services/$serviceId/reviews',
+      body: {
+        'rating': rating,
+        if (comment != null && comment.trim().isNotEmpty)
+          'comment': comment.trim(),
+      },
+    );
   }
 }

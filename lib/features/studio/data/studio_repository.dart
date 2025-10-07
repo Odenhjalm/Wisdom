@@ -1,108 +1,91 @@
 import 'dart:typed_data';
 
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:dio/dio.dart';
+import 'package:http_parser/http_parser.dart';
 
-import 'lesson_media_path.dart';
+import 'package:wisdom/api/api_client.dart';
 
 class StudioRepository {
-  final SupabaseClient _sb;
-  final LessonMediaPathBuilder _pathBuilder;
+  StudioRepository({required ApiClient client}) : _client = client;
 
-  StudioRepository({
-    SupabaseClient? client,
-    LessonMediaPathBuilder? pathBuilder,
-  })  : _sb = client ?? Supabase.instance.client,
-        _pathBuilder = pathBuilder ?? LessonMediaPathBuilder();
+  final ApiClient _client;
 
-  SupabaseClient get client => _sb;
+  Future<StudioStatus> fetchStatus() async {
+    final res = await _client.get<Map<String, dynamic>>('/studio/status');
+    return StudioStatus.fromJson(res);
+  }
 
-  SupabaseQuerySchema get _app => _sb.schema('app');
+  Future<void> applyAsTeacher() async {
+    await _client.post('/studio/apply');
+  }
 
-  String? get _uid => _sb.auth.currentUser?.id;
-
-  // ----- Courses (owned by teacher via created_by) -----
   Future<List<Map<String, dynamic>>> myCourses() async {
-    final uid = _uid;
-    if (uid == null) return [];
-    final rows = await _app
-        .from('courses')
-        .select(
-            'id, slug, title, description, is_free_intro, price_cents, is_published, updated_at')
-        .eq('created_by', uid)
-        .order('updated_at', ascending: false);
-    return (rows as List? ?? [])
-        .map((e) => Map<String, dynamic>.from(e))
-        .toList();
+    final res = await _client.get<Map<String, dynamic>>('/studio/courses');
+    final list = res['items'] as List? ?? const [];
+    return list
+        .map((e) => Map<String, dynamic>.from(e as Map))
+        .toList(growable: false);
   }
 
   Future<Map<String, dynamic>> createCourse({
     required String title,
     required String slug,
     String? description,
-    int priceCents = 0,
+    int? priceCents,
     bool isFreeIntro = false,
+    bool isPublished = false,
+    String? coverUrl,
+    String? videoUrl,
+    String? branch,
   }) async {
-    final uid = _uid;
-    if (uid == null) throw Exception('Not authenticated');
-    final row = await _app
-        .from('courses')
-        .insert({
-          'title': title,
-          'slug': slug,
-          'description': description,
-          'price_cents': priceCents,
-          'is_free_intro': isFreeIntro,
-          'is_published': false,
-          'created_by': uid,
-        })
-        .select()
-        .maybeSingle();
-    if (row == null) throw Exception('Insert failed');
-    return Map<String, dynamic>.from(row as Map);
-  }
-
-  Future<Map<String, dynamic>> updateCourse(
-      String id, Map<String, dynamic> patch) async {
-    final uid = _uid;
-    if (uid == null) throw Exception('Not authenticated');
-    final row = await _app
-        .from('courses')
-        .update(patch)
-        .eq('id', id)
-        .eq('created_by', uid)
-        .select()
-        .maybeSingle();
-    if (row == null) throw Exception('Update failed or not allowed');
-    return Map<String, dynamic>.from(row as Map);
+    final body = {
+      'title': title,
+      'slug': slug,
+      if (description != null) 'description': description,
+      if (priceCents != null) 'price_cents': priceCents,
+      'is_free_intro': isFreeIntro,
+      'is_published': isPublished,
+      if (coverUrl != null) 'cover_url': coverUrl,
+      if (videoUrl != null) 'video_url': videoUrl,
+      if (branch != null) 'branch': branch,
+    };
+    final res = await _client.post<Map<String, dynamic>>(
+      '/studio/courses',
+      body: body,
+    );
+    return Map<String, dynamic>.from(res);
   }
 
   Future<Map<String, dynamic>?> fetchCourseMeta(String courseId) async {
-    final row = await _app
-        .from('courses')
-        .select(
-            'title, slug, description, price_cents, is_free_intro, is_published')
-        .eq('id', courseId)
-        .maybeSingle();
-    if (row == null) return null;
-    return Map<String, dynamic>.from(row as Map);
+    final res = await _client.get<Map<String, dynamic>>(
+      '/studio/courses/$courseId',
+    );
+    return Map<String, dynamic>.from(res);
   }
 
-  Future<void> deleteCourse(String id) async {
-    final uid = _uid;
-    if (uid == null) throw Exception('Not authenticated');
-    await _app.from('courses').delete().eq('id', id).eq('created_by', uid);
+  Future<Map<String, dynamic>> updateCourse(
+    String courseId,
+    Map<String, dynamic> patch,
+  ) async {
+    final res = await _client.patch<Map<String, dynamic>>(
+      '/studio/courses/$courseId',
+      body: patch,
+    );
+    return Map<String, dynamic>.from(res!);
   }
 
-  // ----- Modules -----
+  Future<void> deleteCourse(String courseId) async {
+    await _client.delete('/studio/courses/$courseId');
+  }
+
   Future<List<Map<String, dynamic>>> listModules(String courseId) async {
-    final rows = await _app
-        .from('modules')
-        .select('id, title, position')
-        .eq('course_id', courseId)
-        .order('position');
-    return (rows as List? ?? [])
-        .map((e) => Map<String, dynamic>.from(e))
-        .toList();
+    final res = await _client.get<Map<String, dynamic>>(
+      '/studio/courses/$courseId/modules',
+    );
+    final list = res['items'] as List? ?? const [];
+    return list
+        .map((e) => Map<String, dynamic>.from(e as Map))
+        .toList(growable: false);
   }
 
   Future<Map<String, dynamic>> createModule({
@@ -110,48 +93,36 @@ class StudioRepository {
     required String title,
     int position = 0,
   }) async {
-    final row = await _app
-        .from('modules')
-        .insert({'course_id': courseId, 'title': title, 'position': position})
-        .select()
-        .maybeSingle();
-    if (row == null) throw Exception('Create module failed');
-    return Map<String, dynamic>.from(row as Map);
+    final res = await _client.post<Map<String, dynamic>>(
+      '/studio/modules',
+      body: {'course_id': courseId, 'title': title, 'position': position},
+    );
+    return Map<String, dynamic>.from(res);
   }
 
   Future<Map<String, dynamic>> updateModule(
-      String id, Map<String, dynamic> patch) async {
-    final row = await _app
-        .from('modules')
-        .update(patch)
-        .eq('id', id)
-        .select()
-        .maybeSingle();
-    if (row == null) throw Exception('Update module failed');
-    return Map<String, dynamic>.from(row as Map);
+    String moduleId,
+    Map<String, dynamic> patch,
+  ) async {
+    final res = await _client.patch<Map<String, dynamic>>(
+      '/studio/modules/$moduleId',
+      body: patch,
+    );
+    return Map<String, dynamic>.from(res!);
   }
 
-  Future<void> deleteModule(String id) async {
-    await _app.from('modules').delete().eq('id', id);
+  Future<void> deleteModule(String moduleId) async {
+    await _client.delete('/studio/modules/$moduleId');
   }
 
-  // ----- Lessons -----
   Future<List<Map<String, dynamic>>> listLessons(String moduleId) async {
-    final rows = await _app
-        .from('lessons')
-        .select('id, title, position, is_intro')
-        .eq('module_id', moduleId)
-        .order('position');
-    return (rows as List? ?? [])
-        .map((e) => Map<String, dynamic>.from(e))
-        .toList();
-  }
-
-  Future<void> updateLessonIntro({
-    required String lessonId,
-    required bool isIntro,
-  }) async {
-    await _app.from('lessons').update({'is_intro': isIntro}).eq('id', lessonId);
+    final res = await _client.get<Map<String, dynamic>>(
+      '/studio/modules/$moduleId/lessons',
+    );
+    final list = res['items'] as List? ?? const [];
+    return list
+        .map((e) => Map<String, dynamic>.from(e as Map))
+        .toList(growable: false);
   }
 
   Future<Map<String, dynamic>> upsertLesson({
@@ -162,49 +133,55 @@ class StudioRepository {
     int position = 0,
     bool isIntro = false,
   }) async {
-    final data = {
-      'module_id': moduleId,
-      'title': title,
-      'content_markdown': contentMarkdown,
-      'position': position,
-      'is_intro': isIntro,
-    };
-    final builder = id == null
-        ? _app.from('lessons').insert(data)
-        : _app.from('lessons').update(data).eq('id', id);
-    final row = await builder.select().maybeSingle();
-    if (row == null) throw Exception('Upsert lesson failed');
-    return Map<String, dynamic>.from(row as Map);
-  }
-
-  Future<void> deleteLesson(String id) async {
-    await _app.from('lessons').delete().eq('id', id);
-  }
-
-  // ----- Media -----
-  Future<List<Map<String, dynamic>>> listLessonMedia(String lessonId) async {
-    final rows = await _app
-        .from('lesson_media')
-        .select('id, kind, storage_path, storage_bucket, position, created_at')
-        .eq('lesson_id', lessonId)
-        .order('position');
-    return (rows as List? ?? [])
-        .map((e) => Map<String, dynamic>.from(e))
-        .toList();
-  }
-
-  Future<int> _nextMediaPosition(String lessonId) async {
-    final last = await _app
-        .from('lesson_media')
-        .select('position')
-        .eq('lesson_id', lessonId)
-        .order('position', ascending: false)
-        .limit(1);
-    if (last.isNotEmpty) {
-      final current = (last.first as Map)['position'] as int?;
-      if (current != null) return current + 1;
+    if (id == null) {
+      final res = await _client.post<Map<String, dynamic>>(
+        '/studio/lessons',
+        body: {
+          'module_id': moduleId,
+          'title': title,
+          'content_markdown': contentMarkdown,
+          'position': position,
+          'is_intro': isIntro,
+        },
+      );
+      return Map<String, dynamic>.from(res);
+    } else {
+      final body = <String, dynamic>{
+        'title': title,
+        if (contentMarkdown != null) 'content_markdown': contentMarkdown,
+        'position': position,
+        'is_intro': isIntro,
+      };
+      final res = await _client.patch<Map<String, dynamic>>(
+        '/studio/lessons/$id',
+        body: body,
+      );
+      return Map<String, dynamic>.from(res!);
     }
-    return 1;
+  }
+
+  Future<void> deleteLesson(String lessonId) async {
+    await _client.delete('/studio/lessons/$lessonId');
+  }
+
+  Future<void> updateLessonIntro({
+    required String lessonId,
+    required bool isIntro,
+  }) async {
+    await _client.patch(
+      '/studio/lessons/$lessonId/intro',
+      body: {'is_intro': isIntro},
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> listLessonMedia(String lessonId) async {
+    final res = await _client.get<Map<String, dynamic>>(
+      '/studio/lessons/$lessonId/media',
+    );
+    final list = res['items'] as List? ?? const [];
+    return list
+        .map((e) => Map<String, dynamic>.from(e as Map))
+        .toList(growable: false);
   }
 
   Future<Map<String, dynamic>> uploadLessonMedia({
@@ -214,78 +191,147 @@ class StudioRepository {
     required String filename,
     required String contentType,
     required bool isIntro,
+    void Function(UploadProgress progress)? onProgress,
+    CancelToken? cancelToken,
   }) async {
-    final uid = _uid;
-    if (uid == null) throw Exception('Not authenticated');
+    final formData = FormData.fromMap({
+      'is_intro': isIntro,
+      'file': MultipartFile.fromBytes(
+        data,
+        filename: filename,
+        contentType: MediaType.parse(contentType),
+      ),
+    });
 
-    final bucket = _pathBuilder.bucketFor(isIntro: isIntro);
-    final path = _pathBuilder.buildPath(
-      courseId: courseId,
-      lessonId: lessonId,
-      filename: filename,
+    final res = await _client.postForm<Map<String, dynamic>>(
+      '/studio/lessons/$lessonId/media',
+      formData,
+      onSendProgress: onProgress == null
+          ? null
+          : (sent, total) {
+              if (total <= 0) return;
+              onProgress(UploadProgress(sent: sent, total: total));
+            },
+      cancelToken: cancelToken,
     );
-
-    await _sb.storage.from(bucket).uploadBinary(
-          path,
-          data,
-          fileOptions: FileOptions(
-            upsert: true,
-            contentType: contentType,
-          ),
-        );
-
-    final nextPos = await _nextMediaPosition(lessonId);
-
-    final row = await _app
-        .from('lesson_media')
-        .insert({
-          'lesson_id': lessonId,
-          'kind': _pathBuilder.kindFromContentType(contentType),
-          'storage_path': path,
-          'storage_bucket': bucket,
-          'position': nextPos,
-        })
-        .select()
-        .maybeSingle();
-    if (row == null) throw Exception('Insert media failed');
-    return Map<String, dynamic>.from(row as Map);
+    return Map<String, dynamic>.from(res ?? const {});
   }
 
-  Future<void> deleteLessonMedia(String id) async {
-    final row = await _app
-        .from('lesson_media')
-        .select('storage_path, storage_bucket')
-        .eq('id', id)
-        .maybeSingle();
-    final map = (row as Map?)?.cast<String, dynamic>();
-    final path = map?['storage_path'] as String?;
-    final bucket = map?['storage_bucket'] as String? ?? 'course-media';
-    if (path != null && path.isNotEmpty) {
-      await _sb.storage.from(bucket).remove([path]);
-    }
-    await _app.from('lesson_media').delete().eq('id', id);
-  }
-
-  Future<Uint8List> downloadMedia({
-    required String bucket,
-    required String path,
-  }) async {
-    return _sb.storage.from(bucket).download(path);
+  Future<void> deleteLessonMedia(String mediaId) async {
+    await _client.delete('/studio/media/$mediaId');
   }
 
   Future<void> reorderLessonMedia(
     String lessonId,
     List<String> orderedMediaIds,
   ) async {
-    if (orderedMediaIds.isEmpty) return;
-    final payload = <Map<String, dynamic>>[];
-    for (var i = 0; i < orderedMediaIds.length; i++) {
-      payload.add({
-        'id': orderedMediaIds[i],
-        'lesson_id': lessonId,
-        'position': i + 1,
-      });
-    }
-    await _app.from('lesson_media').upsert(payload, onConflict: 'id');
+    await _client.patch(
+      '/studio/lessons/$lessonId/media/reorder',
+      body: {'media_ids': orderedMediaIds},
+    );
   }
+
+  Future<Uint8List> downloadMedia(String mediaId) {
+    return _client.getBytes('/studio/media/$mediaId');
+  }
+
+  Future<Map<String, dynamic>> ensureQuiz(String courseId) async {
+    final res = await _client.post<Map<String, dynamic>>(
+      '/studio/courses/$courseId/quiz',
+    );
+    return Map<String, dynamic>.from(res['quiz'] as Map);
+  }
+
+  Future<List<Map<String, dynamic>>> myCertificates({
+    bool verifiedOnly = false,
+  }) async {
+    final res = await _client.get<Map<String, dynamic>>(
+      '/studio/certificates',
+      queryParameters: {'verified_only': verifiedOnly},
+    );
+    final list = res['items'] as List? ?? const [];
+    return list
+        .map((e) => Map<String, dynamic>.from(e as Map))
+        .toList(growable: false);
+  }
+
+  Future<Map<String, dynamic>> addCertificate({
+    required String title,
+    String status = 'pending',
+    String? notes,
+    String? evidenceUrl,
+  }) async {
+    final res = await _client.post<Map<String, dynamic>>(
+      '/studio/certificates',
+      body: {
+        'title': title,
+        'status': status,
+        if (notes != null) 'notes': notes,
+        if (evidenceUrl != null) 'evidence_url': evidenceUrl,
+      },
+    );
+    return Map<String, dynamic>.from(res);
+  }
+
+  Future<List<Map<String, dynamic>>> quizQuestions(String quizId) async {
+    final res = await _client.get<Map<String, dynamic>>(
+      '/studio/quizzes/$quizId/questions',
+    );
+    final list = res['items'] as List? ?? const [];
+    return list
+        .map((e) => Map<String, dynamic>.from(e as Map))
+        .toList(growable: false);
+  }
+
+  Future<Map<String, dynamic>> upsertQuestion({
+    required String quizId,
+    String? id,
+    required Map<String, dynamic> data,
+  }) async {
+    final body = {...data}..remove('quiz_id');
+    if (id == null) {
+      final res = await _client.post<Map<String, dynamic>>(
+        '/studio/quizzes/$quizId/questions',
+        body: body,
+      );
+      return Map<String, dynamic>.from(res);
+    } else {
+      final res = await _client.patch<Map<String, dynamic>>(
+        '/studio/quizzes/$quizId/questions/$id',
+        body: body,
+      );
+      return Map<String, dynamic>.from(res!);
+    }
+  }
+
+  Future<void> deleteQuestion(String quizId, String questionId) async {
+    await _client.delete('/studio/quizzes/$quizId/questions/$questionId');
+  }
+}
+
+class UploadProgress {
+  const UploadProgress({required this.sent, required this.total});
+
+  final int sent;
+  final int total;
+
+  double get fraction => total == 0 ? 0 : sent / total;
+}
+
+class StudioStatus {
+  const StudioStatus({
+    required this.isTeacher,
+    required this.verifiedCertificates,
+    required this.hasApplication,
+  });
+
+  final bool isTeacher;
+  final int verifiedCertificates;
+  final bool hasApplication;
+
+  factory StudioStatus.fromJson(Map<String, dynamic> json) => StudioStatus(
+    isTeacher: json['is_teacher'] == true,
+    verifiedCertificates: (json['verified_certificates'] as num?)?.toInt() ?? 0,
+    hasApplication: json['has_application'] == true,
+  );
 }

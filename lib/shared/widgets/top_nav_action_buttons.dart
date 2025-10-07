@@ -2,9 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import 'package:wisdom/domain/services/auth_service.dart';
-import 'package:wisdom/gate.dart';
-import 'package:wisdom/supabase_client.dart';
+import 'package:wisdom/core/auth/auth_controller.dart';
 import 'package:wisdom/shared/utils/snack.dart';
 
 class TopNavActionButtons extends ConsumerWidget {
@@ -14,15 +12,20 @@ class TopNavActionButtons extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final sb = ref.watch(supabaseMaybeProvider);
-    final user = sb?.auth.currentUser;
-    if (user == null) {
-      return const SizedBox.shrink();
+    final authState = ref.watch(authControllerProvider);
+    final profile = authState.profile;
+    if (profile == null) {
+      return IconButton(
+        tooltip: 'Logga in',
+        icon: Icon(Icons.login,
+            color: iconColor ?? Theme.of(context).colorScheme.onSurface),
+        onPressed: () => context.go('/login'),
+      );
     }
-    if (!gate.allowed) {
-      gate.allow();
-    }
+
     final color = iconColor ?? Theme.of(context).colorScheme.onSurface;
+    final isTeacher = profile.isTeacher || profile.isAdmin;
+
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -34,9 +37,7 @@ class TopNavActionButtons extends ConsumerWidget {
         IconButton(
           tooltip: 'Teacher Home',
           icon: Icon(Icons.home_work_outlined, color: color),
-          onPressed: () async {
-            final isTeacher = await userIsTeacher(client: sb);
-            if (!context.mounted) return;
+          onPressed: () {
             if (!isTeacher) {
               showSnack(context, 'Endast för lärare');
               return;

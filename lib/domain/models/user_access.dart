@@ -1,3 +1,4 @@
+import 'package:wisdom/core/auth/auth_claims.dart';
 import 'package:wisdom/data/models/certificate.dart';
 import 'package:wisdom/data/models/profile.dart';
 
@@ -44,17 +45,21 @@ class UserAccessState {
     required this.effectiveProfile,
     required this.approval,
     required this.application,
+    required this.claims,
   });
 
   final Profile? profile;
   final Profile? effectiveProfile;
   final TeacherApprovalInfo approval;
   final TeacherApplication? application;
+  final AuthClaims? claims;
 
-  bool get isAuthenticated => effectiveProfile != null;
-  bool get isAdmin => effectiveProfile?.isAdmin ?? false;
-  UserRole get role => effectiveProfile?.userRole ?? UserRole.user;
-  bool get isTeacher => role == UserRole.teacher;
+  bool get isAuthenticated => effectiveProfile != null || claims != null;
+  bool get isAdmin => effectiveProfile?.isAdmin ?? claims?.isAdmin ?? false;
+  UserRole get role =>
+      effectiveProfile?.userRole ?? claims?.userRole ?? UserRole.user;
+  bool get isTeacher =>
+      effectiveProfile?.isTeacher ?? claims?.isTeacher ?? false;
   bool get isProfessional => isTeacher || role == UserRole.professional;
 
   CertificateStatus get applicationStatus =>
@@ -66,12 +71,15 @@ class UserAccessState {
     Profile? effectiveProfile,
     TeacherApprovalInfo? approval,
     TeacherApplication? application,
+    AuthClaims? claims,
+    bool clearClaims = false,
   }) {
     return UserAccessState(
       profile: profile ?? this.profile,
       effectiveProfile: effectiveProfile ?? this.effectiveProfile,
       approval: approval ?? this.approval,
       application: application ?? this.application,
+      claims: clearClaims ? null : (claims ?? this.claims),
     );
   }
 
@@ -80,5 +88,6 @@ class UserAccessState {
     effectiveProfile: null,
     approval: TeacherApprovalInfo.empty,
     application: null,
+    claims: null,
   );
 }

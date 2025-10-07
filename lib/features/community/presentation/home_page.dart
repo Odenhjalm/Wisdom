@@ -1,15 +1,13 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:wisdom/core/errors/app_failure.dart';
 import 'package:wisdom/features/community/application/community_providers.dart';
 import 'package:wisdom/features/courses/application/course_providers.dart';
 import 'package:wisdom/features/courses/data/courses_repository.dart';
 import 'package:wisdom/features/community/data/posts_repository.dart';
+import 'package:wisdom/core/auth/auth_controller.dart';
 import 'package:wisdom/shared/utils/snack.dart';
 import 'package:wisdom/shared/widgets/app_scaffold.dart';
 import 'package:wisdom/shared/widgets/courses_grid.dart';
@@ -24,38 +22,17 @@ class HomePage extends ConsumerStatefulWidget {
 
 class _HomePageState extends ConsumerState<HomePage> {
   final _composer = TextEditingController();
-  RealtimeChannel? _postsChannel;
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _subscribeToPosts());
-  }
-
-  Future<void> _subscribeToPosts() async {
-    try {
-      final repo = ref.read(postsRepositoryProvider);
-      _postsChannel = await repo.subscribeToFeed(
-        onChanged: () => ref.invalidate(postsProvider),
-      );
-    } catch (_) {
-      // Ignore subscription errors; feed still available via manual refresh.
-    }
-  }
 
   @override
   void dispose() {
     _composer.dispose();
-    if (_postsChannel != null) {
-      Supabase.instance.client.removeChannel(_postsChannel!);
-    }
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final coursesAsync = ref.watch(myCoursesProvider);
-    final profileAsync = ref.watch(myProfileProvider);
+    final authState = ref.watch(authControllerProvider);
     final postsAsync = ref.watch(postsProvider);
     final feedPublisher = ref.watch(postPublisherProvider);
 
@@ -102,16 +79,14 @@ class _HomePageState extends ConsumerState<HomePage> {
         onRefresh: () async {
           ref.invalidate(postsProvider);
           ref.invalidate(myCoursesProvider);
-          ref.invalidate(myProfileProvider);
+          ref.invalidate(myCertificatesProvider);
+          await ref.read(authControllerProvider.notifier).loadSession();
         },
         child: ListView(
           children: [
-            profileAsync.maybeWhen(
-              data: (profile) => HomeHeroPanel(
-                displayName: (profile?['display_name'] as String?) ??
-                    (profile?['email'] as String?),
-              ),
-              orElse: () => const HomeHeroPanel(),
+            HomeHeroPanel(
+              displayName:
+                  authState.profile?.displayName ?? authState.profile?.email,
             ),
             _ComposerCard(
               controller: _composer,
@@ -154,10 +129,7 @@ class _HomePageState extends ConsumerState<HomePage> {
       },
       error: (error, _) {
         if (!mounted || !context.mounted) return;
-        showSnack(
-          context,
-          'Kunde inte publicera: ${_errorText(error)}',
-        );
+        showSnack(context, 'Kunde inte publicera: ${_errorText(error)}');
       },
       loading: () {},
     );
@@ -191,22 +163,26 @@ class _ComposerCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Dela något i communityt',
-                style: t.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+            Text(
+              'Dela något i communityt',
+              style: t.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+            ),
             const SizedBox(height: 8),
             TextField(
               controller: controller,
               minLines: 2,
               maxLines: 4,
-              decoration:
-                  const InputDecoration(hintText: 'Skriv ett inlägg...'),
+              decoration: const InputDecoration(
+                hintText: 'Skriv ett inlägg...',
+              ),
             ),
             const SizedBox(height: 8),
             Align(
               alignment: Alignment.centerRight,
               child: ElevatedButton(
-                onPressed:
-                    isPublishing ? null : () => onPublish(controller.text),
+                onPressed: isPublishing
+                    ? null
+                    : () => onPublish(controller.text),
                 child: isPublishing
                     ? const SizedBox(
                         height: 18,
@@ -222,8 +198,8 @@ class _ComposerCard extends StatelessWidget {
                 child: Text(
                   _errorMessage(error),
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(context).colorScheme.error,
-                      ),
+                    color: Theme.of(context).colorScheme.error,
+                  ),
                 ),
               ),
           ],
@@ -246,13 +222,13 @@ class _FeedCard extends StatelessWidget {
   });
 
   const _FeedCard({required List<CommunityPost> posts})
-      : this._(posts: posts, loading: false, errorMessage: null);
+    : this._(posts: posts, loading: false, errorMessage: null);
 
   const _FeedCard.loading()
-      : this._(posts: const [], loading: true, errorMessage: null);
+    : this._(posts: const [], loading: true, errorMessage: null);
 
   const _FeedCard.error({required String message})
-      : this._(posts: const [], loading: false, errorMessage: message);
+    : this._(posts: const [], loading: false, errorMessage: message);
 
   final List<CommunityPost> posts;
   final bool loading;
@@ -291,8 +267,10 @@ class _FeedCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Nyligen i communityt',
-                style: t.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
+            Text(
+              'Nyligen i communityt',
+              style: t.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+            ),
             const SizedBox(height: 8),
             ...posts.map(
               (post) => ListTile(
@@ -318,8 +296,10 @@ class _ShortcutCards extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Välkommen hem.',
-                style: t.displaySmall?.copyWith(fontWeight: FontWeight.w800)),
+            Text(
+              'Välkommen hem.',
+              style: t.displaySmall?.copyWith(fontWeight: FontWeight.w800),
+            ),
             const SizedBox(height: 8),
             Text(
               'Utforska introduktionskurser (gratis förhandsvisningar).',
@@ -360,10 +340,7 @@ class _ShortcutCards extends StatelessWidget {
 }
 
 class _CoursesCard extends StatelessWidget {
-  const _CoursesCard({
-    required this.coursesAsync,
-    required this.progressAsync,
-  });
+  const _CoursesCard({required this.coursesAsync, required this.progressAsync});
 
   final AsyncValue<List<CourseSummary>> coursesAsync;
   final AsyncValue<Map<String, double>> progressAsync;
@@ -377,8 +354,10 @@ class _CoursesCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Mina kurser',
-                style: t.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
+            Text(
+              'Mina kurser',
+              style: t.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+            ),
             const SizedBox(height: 10),
             coursesAsync.when(
               loading: () => const Center(
@@ -393,8 +372,10 @@ class _CoursesCard extends StatelessWidget {
               ),
               data: (courses) {
                 if (courses.isEmpty) {
-                  return Text('Du är ännu inte anmäld till någon kurs.',
-                      style: t.bodyMedium);
+                  return Text(
+                    'Du är ännu inte anmäld till någon kurs.',
+                    style: t.bodyMedium,
+                  );
                 }
                 return progressAsync.when(
                   loading: () => const Padding(
@@ -405,10 +386,8 @@ class _CoursesCard extends StatelessWidget {
                     error is AppFailure ? error.message : error.toString(),
                     style: t.bodyMedium,
                   ),
-                  data: (progress) => CoursesGrid(
-                    courses: courses,
-                    progress: progress,
-                  ),
+                  data: (progress) =>
+                      CoursesGrid(courses: courses, progress: progress),
                 );
               },
             ),

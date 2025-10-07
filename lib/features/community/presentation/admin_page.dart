@@ -1,9 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
-
 import 'package:wisdom/core/errors/app_failure.dart';
-import 'package:wisdom/core/supabase_ext.dart';
 import 'package:wisdom/features/community/application/community_providers.dart';
 import 'package:wisdom/shared/utils/snack.dart';
 import 'package:wisdom/shared/widgets/app_scaffold.dart';
@@ -188,8 +185,7 @@ class _AdminPageState extends ConsumerState<AdminPage> {
   Future<void> _approve(String userId) async {
     setState(() => _busy = true);
     try {
-      final client = Supabase.instance.client;
-      await client.rpc('app.approve_teacher', params: {'p_user': userId});
+      await ref.read(adminRepositoryProvider).approveTeacher(userId);
       ref.invalidate(adminDashboardProvider);
     } catch (error) {
       _showError('Kunde inte godkänna: ${_friendlyError(error)}');
@@ -201,8 +197,7 @@ class _AdminPageState extends ConsumerState<AdminPage> {
   Future<void> _reject(String userId) async {
     setState(() => _busy = true);
     try {
-      final client = Supabase.instance.client;
-      await client.rpc('app.reject_teacher', params: {'p_user': userId});
+      await ref.read(adminRepositoryProvider).rejectTeacher(userId);
       ref.invalidate(adminDashboardProvider);
     } catch (error) {
       _showError('Kunde inte avslå: ${_friendlyError(error)}');
@@ -214,10 +209,9 @@ class _AdminPageState extends ConsumerState<AdminPage> {
   Future<void> _updateCertificateStatus(String certId, String status) async {
     setState(() => _busy = true);
     try {
-      final client = Supabase.instance.client;
-      await client.app
-          .from('certificates')
-          .update({'status': status}).eq('id', certId);
+      await ref
+          .read(adminRepositoryProvider)
+          .updateCertificateStatus(certificateId: certId, status: status);
       ref.invalidate(adminDashboardProvider);
     } catch (error) {
       _showError('Misslyckades: ${_friendlyError(error)}');

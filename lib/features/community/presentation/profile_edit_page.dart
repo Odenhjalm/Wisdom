@@ -1,11 +1,16 @@
+import 'dart:typed_data';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
-
-import 'package:wisdom/shared/widgets/top_nav_action_buttons.dart';
-import 'package:wisdom/supabase_client.dart';
-import 'package:wisdom/shared/widgets/go_router_back_button.dart';
+import 'package:wisdom/core/auth/auth_controller.dart';
+import 'package:wisdom/core/env/app_config.dart';
+import 'package:wisdom/core/errors/app_failure.dart';
+import 'package:wisdom/data/models/profile.dart';
+import 'package:wisdom/data/repositories/profile_repository.dart';
 import 'package:wisdom/shared/utils/snack.dart';
+import 'package:wisdom/shared/widgets/go_router_back_button.dart';
+import 'package:wisdom/shared/widgets/top_nav_action_buttons.dart';
 import 'package:wisdom/widgets/base_page.dart';
 
 class ProfileEditScreen extends ConsumerStatefulWidget {
@@ -16,57 +21,147 @@ class ProfileEditScreen extends ConsumerStatefulWidget {
 }
 
 class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
+  static const _maxAvatarBytes = 5 * 1024 * 1024;
+
+  final _displayNameCtrl = TextEditingController();
   final _photoCtrl = TextEditingController();
   final _bioCtrl = TextEditingController();
   bool _loading = false;
-  String? _displayName;
+
+  Uint8List? _avatarDraft;
+  String? _avatarDraftName;
+  String? _avatarDraftContentType;
+  String? _currentPhotoUrl;
 
   @override
   void initState() {
     super.initState();
-    _loadProfile();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadProfile());
   }
 
   @override
   void dispose() {
+    _displayNameCtrl.dispose();
     _photoCtrl.dispose();
     _bioCtrl.dispose();
     super.dispose();
   }
 
   Future<void> _loadProfile() async {
-    final sb = ref.read(supabaseMaybeProvider);
-    final user = sb?.auth.currentUser;
-    if (sb == null || user == null) return;
-    try {
-      final res = await sb
-          .schema('app')
-          .from('profiles')
-          .select('display_name, photo_url, bio')
-          .eq('user_id', user.id)
-          .maybeSingle();
-      if (!mounted) return;
-      final data = (res as Map?)?.cast<String, dynamic>();
-      if (data != null) {
-        _displayName = data['display_name'] as String?;
-        _photoCtrl.text = (data['photo_url'] ?? '') as String;
-        _bioCtrl.text = (data['bio'] ?? '') as String;
-        setState(() {});
-      }
-    } on PostgrestException catch (e) {
-      debugPrint('Profile load error: ${e.message}');
+    final profile = ref.read(authControllerProvider).profile;
+    if (profile != null) {
+      _applyProfile(profile);
     }
+
+    try {
+      final repo = ref.read(profileRepositoryProvider);
+      final fresh = await repo.getMe();
+      if (fresh != null) {
+        if (!mounted) return;
+        _applyProfile(fresh);
+      }
+    } catch (error, stackTrace) {
+      final failure = AppFailure.from(error, stackTrace);
+      if (!mounted) return;
+      showSnack(context, 'Kunde inte läsa profilen: ${failure.message}');
+    }
+  }
+
+  void _applyProfile(Profile profile) {
+    _displayNameCtrl.text = profile.displayName ?? '';
+    _photoCtrl.text = profile.photoUrl ?? '';
+    _bioCtrl.text = profile.bio ?? '';
+    if (!mounted) {
+      _currentPhotoUrl = profile.photoUrl;
+      _avatarDraft = null;
+      _avatarDraftName = null;
+      _avatarDraftContentType = null;
+      return;
+    }
+    setState(() {
+      _currentPhotoUrl = profile.photoUrl;
+      _avatarDraft = null;
+      _avatarDraftName = null;
+      _avatarDraftContentType = null;
+    });
+  }
+
+  String? _resolvePhotoUrl(String? path, AppConfig config) {
+    if (path == null || path.isEmpty) return null;
+    return Uri.parse(config.apiBaseUrl).resolve(path).toString();
+  }
+
+  Future<void> _pickAvatar() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.image,
+        allowMultiple: false,
+        withData: true,
+      );
+      if (result == null || result.files.isEmpty) return;
+      final file = result.files.first;
+      final Uint8List? data = file.bytes;
+      if (data == null) {
+        if (mounted) {
+          showSnack(context, 'Kunde inte läsa den valda filen.');
+        }
+        return;
+      }
+      if (data.length > _maxAvatarBytes) {
+        if (mounted) {
+          showSnack(context, 'Bildfilen är större än 5 MB.');
+        }
+        return;
+      }
+
+      final contentType = _detectContentType(file.name);
+      setState(() {
+        _avatarDraft = data;
+        _avatarDraftName = file.name;
+        _avatarDraftContentType = contentType;
+      });
+    } catch (error) {
+      if (mounted) {
+        showSnack(context, 'Kunde inte välja bild: $error');
+      }
+    }
+  }
+
+  void _clearAvatarDraft() {
+    if (!mounted) return;
+    setState(() {
+      _avatarDraft = null;
+      _avatarDraftName = null;
+      _avatarDraftContentType = null;
+    });
+  }
+
+  String _detectContentType(String filename) {
+    final lower = filename.toLowerCase();
+    if (lower.endsWith('.png')) return 'image/png';
+    if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) {
+      return 'image/jpeg';
+    }
+    if (lower.endsWith('.gif')) return 'image/gif';
+    if (lower.endsWith('.webp')) return 'image/webp';
+    if (lower.endsWith('.bmp')) return 'image/bmp';
+    if (lower.endsWith('.heic')) return 'image/heic';
+    return 'image/jpeg';
   }
 
   @override
   Widget build(BuildContext context) {
-    final sb = ref.read(supabaseMaybeProvider);
-    final user = sb?.auth.currentUser;
-    final metadata = user?.userMetadata;
-    final metadataName = metadata is Map<String, dynamic>
-        ? metadata['full_name'] as String?
-        : null;
-    final displayName = _displayName ?? metadataName ?? user?.email ?? user?.id;
+    final profile = ref.watch(authControllerProvider).profile;
+    final config = ref.watch(appConfigProvider);
+    final nameFallback = profile?.displayName ?? profile?.email ?? 'Profil';
+    final effectivePhotoPath = _photoCtrl.text.trim().isNotEmpty
+        ? _photoCtrl.text.trim()
+        : _currentPhotoUrl;
+    final resolvedPhotoUrl =
+        _avatarDraft != null ? null : _resolvePhotoUrl(effectivePhotoPath, config);
+    final ImageProvider<Object>? avatarImage = _avatarDraft != null
+        ? MemoryImage(_avatarDraft!)
+        : (resolvedPhotoUrl != null ? NetworkImage(resolvedPhotoUrl) : null);
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -102,20 +197,80 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                               ?.copyWith(fontWeight: FontWeight.w700),
                         ),
                         const SizedBox(height: 12),
-                        if (displayName != null) ...[
-                          Text('Namn',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .titleSmall
-                                  ?.copyWith(fontWeight: FontWeight.w600)),
-                          const SizedBox(height: 4),
-                          Text(displayName),
-                          const SizedBox(height: 12),
-                        ],
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            CircleAvatar(
+                              radius: 44,
+                              backgroundImage: avatarImage,
+                              child: avatarImage == null
+                                  ? const Icon(Icons.person_outline, size: 36)
+                                  : null,
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  FilledButton.icon(
+                                    onPressed: _loading ? null : _pickAvatar,
+                                    icon: const Icon(Icons.image_outlined),
+                                    label: Text(
+                                      _avatarDraft != null
+                                          ? 'Byt vald bild'
+                                          : 'Välj bild',
+                                    ),
+                                  ),
+                                  if (_avatarDraftName != null)
+                                    Padding(
+                                      padding: const EdgeInsets.only(top: 8),
+                                      child: Text(
+                                        _avatarDraftName!,
+                                        style:
+                                            Theme.of(context).textTheme.bodySmall,
+                                      ),
+                                    )
+                                  else if (resolvedPhotoUrl != null)
+                                    Padding(
+                                      padding: const EdgeInsets.only(top: 8),
+                                      child: Text(
+                                        resolvedPhotoUrl,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style:
+                                            Theme.of(context).textTheme.bodySmall,
+                                      ),
+                                    ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'Max 5 MB, format: PNG/JPG/WebP.',
+                                    style: Theme.of(context).textTheme.bodySmall,
+                                  ),
+                                  if (_avatarDraft != null)
+                                    TextButton.icon(
+                                      onPressed:
+                                          _loading ? null : _clearAvatarDraft,
+                                      icon: const Icon(Icons.delete_outline),
+                                      label: const Text('Ångra vald bild'),
+                                    ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        TextField(
+                          controller: _displayNameCtrl,
+                          decoration: InputDecoration(
+                            labelText: 'Visningsnamn',
+                            hintText: nameFallback,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
                         TextField(
                           controller: _photoCtrl,
                           decoration: const InputDecoration(
-                            labelText: 'Bild-URL',
+                            labelText: 'Extern bild-URL (valfritt)',
                             hintText: 'https://…',
                           ),
                         ),
@@ -131,9 +286,17 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                         Align(
                           alignment: Alignment.centerRight,
                           child: FilledButton.icon(
-                            onPressed: _loading ? null : _save,
+                            onPressed: _loading ? null : () => _save(context),
                             icon: const Icon(Icons.save),
-                            label: const Text('Spara'),
+                            label: _loading
+                                ? const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : const Text('Spara'),
                           ),
                         ),
                       ],
@@ -148,25 +311,45 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
     );
   }
 
-  Future<void> _save() async {
-    final sb = ref.read(supabaseMaybeProvider);
-    final user = sb?.auth.currentUser;
-    if (sb == null || user == null) return;
+  Future<void> _save(BuildContext context) async {
     setState(() => _loading = true);
     try {
-      final photo = _photoCtrl.text.trim();
-      final bio = _bioCtrl.text.trim();
-      await sb.schema('app').from('profiles').update({
-        'photo_url': photo.isEmpty ? null : photo,
-        'bio': bio.isEmpty ? null : bio,
-      }).eq('user_id', user.id);
-      if (!mounted) return;
-      showSnack(context, 'Profil uppdaterad');
-    } on PostgrestException catch (e) {
-      if (!mounted) return;
-      showSnack(context, 'Fel: ${e.message}');
+      final repo = ref.read(profileRepositoryProvider);
+      var updated = await repo.updateMe(
+        displayName: _displayNameCtrl.text.trim().isEmpty
+            ? null
+            : _displayNameCtrl.text.trim(),
+        photoUrl:
+            _photoCtrl.text.trim().isEmpty ? null : _photoCtrl.text.trim(),
+        bio: _bioCtrl.text.trim().isEmpty ? null : _bioCtrl.text.trim(),
+      );
+
+      final draft = _avatarDraft;
+      final draftName = _avatarDraftName;
+      final draftType = _avatarDraftContentType;
+      if (draft != null && draftName != null && draftType != null) {
+        final avatarProfile = await repo.uploadAvatar(
+          bytes: draft,
+          filename: draftName,
+          contentType: draftType,
+        );
+        updated = avatarProfile;
+      }
+
+      await ref.read(authControllerProvider.notifier).loadSession();
+      if (!context.mounted) return;
+
+      final refreshed = ref.read(authControllerProvider).profile ?? updated;
+      _applyProfile(refreshed);
+      showSnack(context, 'Profilen sparades.');
+    } catch (error, stackTrace) {
+      final failure = AppFailure.from(error, stackTrace);
+      if (!context.mounted) return;
+      showSnack(context, 'Kunde inte spara: ${failure.message}');
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (context.mounted) {
+        setState(() => _loading = false);
+      }
     }
   }
 }

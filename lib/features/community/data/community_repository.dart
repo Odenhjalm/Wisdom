@@ -1,113 +1,129 @@
-import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:wisdom/core/supabase_ext.dart';
+import 'package:wisdom/api/api_client.dart';
+import 'package:wisdom/core/errors/app_failure.dart';
 
 class CommunityRepository {
-  final _sb = Supabase.instance.client;
+  CommunityRepository(this._client);
 
-  Future<List<Map<String, dynamic>>> listTeachers() async {
-    final rows = await _sb.app
-        .from('teacher_directory')
-        .select('user_id, headline, specialties, rating, created_at')
-        .order('created_at', ascending: false)
-        .limit(100);
-    final list =
-        (rows as List? ?? []).map((e) => Map<String, dynamic>.from(e)).toList();
-    final ids =
-        list.map((e) => e['user_id'] as String?).whereType<String>().toList();
-    if (ids.isNotEmpty) {
-      final inList = '(${ids.map((e) => '"$e"').join(',')})';
-      final profs = await _sb.app
-          .from('profiles')
-          .select('user_id, display_name, photo_url')
-          .filter('user_id', 'in', inList);
-      final profMap = <String, Map<String, dynamic>>{
-        for (final p in (profs as List? ?? []))
-          (p['user_id'] as String): Map<String, dynamic>.from(p as Map)
-      };
-      for (final t in list) {
-        final id = t['user_id'] as String?;
-        if (id != null && profMap.containsKey(id)) {
-          t['profile'] = profMap[id];
-        }
-      }
-    }
-    return list;
+  final ApiClient _client;
+
+  Future<List<Map<String, dynamic>>> listTeachers({int limit = 100}) async {
+    final response = await _client.get<Map<String, dynamic>>(
+      '/community/teachers',
+      queryParameters: {'limit': limit},
+    );
+    final items = (response['items'] as List? ?? [])
+        .map((item) => Map<String, dynamic>.from(item as Map))
+        .toList(growable: false);
+    return items;
   }
 
   Future<Map<String, dynamic>?> getTeacher(String userId) async {
-    final dir = await _sb.app
-        .from('teacher_directory')
-        .select('user_id, headline, specialties, rating')
-        .eq('user_id', userId)
-        .maybeSingle();
-    if (dir == null) return null;
-    final prof = await _sb.app
-        .from('profiles')
-        .select('user_id, display_name, photo_url')
-        .eq('user_id', userId)
-        .maybeSingle();
-    final map = Map<String, dynamic>.from(dir as Map);
-    map['profile'] =
-        prof == null ? null : Map<String, dynamic>.from(prof as Map);
-    return map;
+    final response = await _client.get<Map<String, dynamic>>(
+      '/community/teachers/$userId',
+    );
+    final teacher = response['teacher'];
+    if (teacher is Map) {
+      return Map<String, dynamic>.from(teacher);
+    }
+    return null;
   }
 
   Future<List<Map<String, dynamic>>> listServices(String userId) async {
-    final rows = await _sb.app
-        .from('services')
-        .select('id, title, description, price_cents, active')
-        .eq('provider_id', userId)
-        .order('created_at', ascending: false);
-    return (rows as List? ?? [])
-        .map((e) => Map<String, dynamic>.from(e))
-        .toList();
+    final response = await _client.get<List<dynamic>>(
+      '/community/teachers/$userId/services',
+    );
+    return response
+        .map((item) => Map<String, dynamic>.from(item as Map))
+        .toList(growable: false);
+  }
+
+  Future<Map<String, dynamic>> serviceDetail(String serviceId) async {
+    try {
+      final response = await _client.get<Map<String, dynamic>>(
+        '/community/services/$serviceId',
+      );
+      final service = (response['service'] as Map?)?.cast<String, dynamic>();
+      final provider = (response['provider'] as Map?)?.cast<String, dynamic>();
+      return {
+        'service': service,
+        'provider': provider,
+      };
+    } catch (error, stackTrace) {
+      throw AppFailure.from(error, stackTrace);
+    }
   }
 
   Future<List<Map<String, dynamic>>> listMeditations(String userId) async {
-    final rows = await _sb.app
-        .from('meditations')
-        .select(
-            'id, title, description, audio_path, duration_seconds, is_public')
-        .eq('teacher_id', userId)
-        .order('created_at', ascending: false);
-    return (rows as List? ?? [])
-        .map((e) => Map<String, dynamic>.from(e))
-        .toList();
-  }
-
-  Future<Map<String, int>> listVerifiedCertCount(List<String> userIds) async {
-    if (userIds.isEmpty) return {};
-    final inList = '(${userIds.map((e) => '"$e"').join(',')})';
-    final rows = await _sb.app
-        .from('certificates')
-        .select('user_id')
-        .filter('user_id', 'in', inList)
-        .eq('status', 'verified');
-    final map = <String, int>{};
-    for (final r in (rows as List? ?? [])) {
-      final id = (r as Map)['user_id'] as String?;
-      if (id != null) map[id] = (map[id] ?? 0) + 1;
-    }
-    return map;
+    final response = await _client.get<List<dynamic>>(
+      '/community/teachers/$userId/meditations',
+    );
+    final base = _client.raw.options.baseUrl;
+    return response.map((item) {
+      final map = Map<String, dynamic>.from(item as Map);
+      final url = map['audio_url'] as String?;
+      if (url != null && url.isNotEmpty) {
+        map['audio_url'] = Uri.parse(base).resolve(url).toString();
+      }
+      return map;
+    }).toList(growable: false);
   }
 
   Future<Map<String, List<String>>> listVerifiedCertSpecialties(
       List<String> userIds) async {
-    if (userIds.isEmpty) return {};
-    // Specialties hanteras inte i nya certificates-schemat.
-    return {};
+    // Specialiteter hanteras inte i backend ännu.
+    return const {};
   }
 
-  Future<Map<String, dynamic>> startServiceOrder(
-      {required String serviceId, required int amountCents}) async {
-    final res = await _sb.schema('app').rpc('start_service_order', params: {
-      'p_service_id': serviceId,
-      'p_amount_cents': amountCents,
-    });
-    if (res is Map<String, dynamic>) return res;
-    if (res is List && res.isNotEmpty) {
-      return Map<String, dynamic>.from(res.first as Map);
+  Future<List<Map<String, dynamic>>> tarotRequests() async {
+    try {
+      final response = await _client.get<Map<String, dynamic>>(
+        '/community/tarot/requests',
+      );
+      return (response['items'] as List? ?? [])
+          .map((item) => Map<String, dynamic>.from(item as Map))
+          .toList(growable: false);
+    } catch (error, stackTrace) {
+      throw AppFailure.from(error, stackTrace);
     }
-    throw Exception('Kunde inte skapa order');
+  }
+
+  Future<Map<String, dynamic>> createTarotRequest(String question) async {
+    try {
+      final response = await _client.post<Map<String, dynamic>>(
+        '/community/tarot/requests',
+        body: {'question': question},
+      );
+      return response.cast<String, dynamic>();
+    } catch (error, stackTrace) {
+      throw AppFailure.from(error, stackTrace);
+    }
+  }
+
+  Future<Map<String, dynamic>> profileDetail(String userId) async {
+    try {
+      final response = await _client.get<Map<String, dynamic>>(
+        '/community/profiles/$userId',
+      );
+      final base = _client.raw.options.baseUrl;
+      final services = (response['services'] as List? ?? [])
+          .map((item) => Map<String, dynamic>.from(item as Map))
+          .toList(growable: false);
+      final meditations = (response['meditations'] as List? ?? []).map((item) {
+        final map = Map<String, dynamic>.from(item as Map);
+        final url = map['audio_url'] as String?;
+        if (url != null && url.isNotEmpty) {
+          map['audio_url'] = Uri.parse(base).resolve(url).toString();
+        }
+        return map;
+      }).toList(growable: false);
+      return {
+        'profile': (response['profile'] as Map?)?.cast<String, dynamic>(),
+        'is_following': response['is_following'] == true,
+        'services': services,
+        'meditations': meditations,
+      };
+    } catch (error, stackTrace) {
+      throw AppFailure.from(error, stackTrace);
+    }
   }
 }

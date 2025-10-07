@@ -1,49 +1,39 @@
-typedef TimestampBuilder = int Function();
-
 class LessonMediaPathBuilder {
-  LessonMediaPathBuilder({TimestampBuilder? timestampBuilder})
-      : _nowMillis = timestampBuilder ?? _defaultTimestamp;
+  LessonMediaPathBuilder({int Function()? timestampBuilder})
+      : _timestampBuilder =
+            timestampBuilder ?? (() => DateTime.now().millisecondsSinceEpoch);
 
-  final TimestampBuilder _nowMillis;
+  final int Function() _timestampBuilder;
+
+  String bucketFor({required bool isIntro}) {
+    return isIntro ? 'public-media' : 'course-media';
+  }
 
   String buildPath({
     required String courseId,
     required String lessonId,
     required String filename,
   }) {
-    final safeName = _sanitizeFilename(filename);
-    final ts = _nowMillis();
-    return '$courseId/$lessonId/${ts}_$safeName';
-  }
-
-  String bucketFor({required bool isIntro}) {
-    return isIntro ? 'public-media' : 'course-media';
+    final sanitized = _sanitizeFilename(filename);
+    final ts = _timestampBuilder();
+    return '$courseId/$lessonId/${ts}_$sanitized';
   }
 
   String kindFromContentType(String contentType) {
-    final lower = contentType.toLowerCase();
-    if (lower.startsWith('image/')) return 'image';
-    if (lower.startsWith('video/')) return 'video';
-    if (lower.startsWith('audio/')) return 'audio';
-    if (lower == 'application/pdf') return 'pdf';
+    final normalized = contentType.toLowerCase();
+    if (normalized.startsWith('image/')) return 'image';
+    if (normalized.startsWith('video/')) return 'video';
+    if (normalized.startsWith('audio/')) return 'audio';
+    if (normalized.contains('pdf')) return 'pdf';
     return 'other';
   }
 
-  static int _defaultTimestamp() => DateTime.now().toUtc().millisecondsSinceEpoch;
-
-  String _sanitizeFilename(String filename) {
-    final trimmed = filename.trim();
-    if (trimmed.isEmpty) return 'media.bin';
-    final parts = trimmed.split('.');
-    if (parts.length > 1) {
-      final ext = parts.removeLast().toLowerCase();
-      final base = parts
-          .join('.')
-          .toLowerCase()
-          .replaceAll(RegExp(r'[^a-z0-9_-]'), '_');
-      return '${base.isEmpty ? 'media' : base}.$ext';
-    }
-    final base = trimmed.toLowerCase().replaceAll(RegExp(r'[^a-z0-9_-]'), '_');
-    return base.isEmpty ? 'media' : base;
+  String _sanitizeFilename(String input) {
+    final trimmed = input.trim().toLowerCase();
+    if (trimmed.isEmpty) return 'media';
+    final sanitized = trimmed.replaceAll(RegExp(r'[^a-z0-9._-]+'), '_');
+    final collapsed = sanitized.replaceAll(RegExp(r'_+'), '_');
+    final cleaned = collapsed.replaceAll(RegExp(r'^_|_$'), '');
+    return cleaned.isEmpty ? 'media' : cleaned;
   }
 }

@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:dio/dio.dart';
 
 /// High-level error classification used across repositories and providers.
 enum AppFailureKind {
@@ -43,67 +43,14 @@ sealed class AppFailure implements Exception {
 
     if (_looksLikeConfigError(error)) {
       return ConfigurationFailure(
-        message: 'Supabase är inte korrekt konfigurerat.',
+        message: 'API är inte korrekt konfigurerat.',
         original: error,
         stackTrace: stackTrace,
       );
     }
 
-    if (error is PostgrestException) {
-      return _fromPostgrest(error, stackTrace);
-    }
-
-    if (error is AuthException) {
-      final status = int.tryParse(error.statusCode ?? '') ?? 400;
-      if (status == 401 || status == 403) {
-        return UnauthorizedFailure(
-          message: error.message,
-          code: error.code,
-          original: error,
-          stackTrace: stackTrace,
-        );
-      }
-      return ValidationFailure(
-        message: error.message,
-        code: error.code,
-        original: error,
-        stackTrace: stackTrace,
-      );
-    }
-
-    if (error is StorageException) {
-      final status = error.statusCode ?? 500;
-      if (status == 404) {
-        return NotFoundFailure(
-          message: error.message,
-          code: error.error,
-          original: error,
-          stackTrace: stackTrace,
-        );
-      }
-      if (status == 401 || status == 403) {
-        return UnauthorizedFailure(
-          message: error.message,
-          code: error.error,
-          original: error,
-          stackTrace: stackTrace,
-        );
-      }
-      return ServerFailure(
-        message: error.message,
-        code: error.error,
-        original: error,
-        stackTrace: stackTrace,
-      );
-    }
-
-    final typeName = error.runtimeType.toString();
-    if (typeName.contains('Realtime') || typeName.contains('Function')) {
-      return ServerFailure(
-        message: error.toString(),
-        original: error,
-        stackTrace: stackTrace,
-      );
+    if (error is DioException) {
+      return _fromDio(error, stackTrace);
     }
 
     if (_looksLikeNetworkIssue(error)) {
@@ -121,64 +68,59 @@ sealed class AppFailure implements Exception {
     );
   }
 
-  static AppFailure _fromPostgrest(
-    PostgrestException error,
-    StackTrace? stackTrace,
-  ) {
-    final status = _tryParseStatus(error.code);
-    if (status == 404) {
-      return NotFoundFailure(
-        message: error.message,
-        code: error.code,
+  static AppFailure _fromDio(DioException error, StackTrace? stackTrace) {
+    final status = error.response?.statusCode ?? 0;
+    final payload = error.response?.data;
+    final detail = _extractDetail(payload);
+    if (status == 0) {
+      return NetworkFailure(
+        message: 'Kunde inte nå servern. Försök igen.',
         original: error,
         stackTrace: stackTrace,
       );
     }
     if (status == 401 || status == 403) {
+      final message = detail != null
+          ? _localizeDetail(detail)
+          : 'Behörighet saknas. Logga in igen.';
       return UnauthorizedFailure(
-        message: error.message,
-        code: error.code,
+        message: message,
         original: error,
         stackTrace: stackTrace,
       );
     }
-    if (status != null && status >= 400 && status < 500) {
+    if (status == 404) {
+      return NotFoundFailure(
+        message: detail != null
+            ? _localizeDetail(detail)
+            : 'Resursen kunde inte hittas.',
+        original: error,
+        stackTrace: stackTrace,
+      );
+    }
+    if (status >= 400 && status < 500) {
       return ValidationFailure(
-        message: error.message,
-        code: error.code,
-        original: error,
-        stackTrace: stackTrace,
-      );
-    }
-    if (_looksLikeNetworkIssue(error)) {
-      return NetworkFailure(
-        message: 'Kunde inte nå databasen. Försök igen.',
-        code: error.code,
+        message:
+            detail != null ? _localizeDetail(detail) : 'Ogiltig förfrågan.',
         original: error,
         stackTrace: stackTrace,
       );
     }
     return ServerFailure(
-      message: error.message,
-      code: error.code,
+      message: 'Serverfel ($status). Försök igen senare.',
       original: error,
       stackTrace: stackTrace,
     );
   }
 
-  static int? _tryParseStatus(String? code) {
-    if (code == null) return null;
-    final maybeInt = int.tryParse(code);
-    if (maybeInt != null) return maybeInt;
-    final digits = RegExp(r'\d+').firstMatch(code)?.group(0);
-    return digits == null ? null : int.tryParse(digits);
-  }
-
   static bool _looksLikeConfigError(Object error) {
     final text = error.toString().toLowerCase();
-    return text.contains('supabase') &&
-        (text.contains('init') || text.contains('configure')) &&
-        text.contains('saknas');
+    final mentionsApi =
+        text.contains('api_base_url') || text.contains('api base url') || text.contains('api');
+    final mentionsConfig =
+        text.contains('konfig') || text.contains('config') || text.contains('init');
+    final mentionsMissing = text.contains('saknas') || text.contains('missing');
+    return mentionsApi && mentionsConfig && mentionsMissing;
   }
 
   static bool _looksLikeNetworkIssue(Object error) {
@@ -191,6 +133,37 @@ sealed class AppFailure implements Exception {
   @override
   String toString() =>
       'AppFailure(kind: $kind, message: $message, code: $code)';
+}
+
+String? _extractDetail(dynamic data) {
+  if (data == null) return null;
+  if (data is String && data.trim().isNotEmpty) {
+    return data.trim();
+  }
+  if (data is Map) {
+    for (final key in ['detail', 'message', 'error', 'description']) {
+      final value = data[key];
+      if (value is String && value.trim().isNotEmpty) {
+        return value.trim();
+      }
+    }
+  }
+  return null;
+}
+
+String _localizeDetail(String detail) {
+  switch (detail.toLowerCase()) {
+    case 'invalid credentials':
+      return 'Fel e-postadress eller lösenord.';
+    case 'email already registered':
+      return 'E-postadressen är redan registrerad.';
+    case 'user not found':
+      return 'Kontot kunde inte hittas.';
+    case 'unauthorized':
+      return 'Behörighet saknas. Logga in igen.';
+    default:
+      return detail;
+  }
 }
 
 class NetworkFailure extends AppFailure {

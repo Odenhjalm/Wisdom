@@ -4,9 +4,8 @@ import 'package:go_router/go_router.dart';
 
 import 'package:wisdom/shared/widgets/top_nav_action_buttons.dart';
 import 'package:wisdom/shared/theme/ui_consts.dart';
+import 'package:wisdom/core/auth/auth_controller.dart';
 import 'package:wisdom/shared/utils/snack.dart';
-import 'package:wisdom/gate.dart';
-import 'package:wisdom/supabase_client.dart';
 import 'package:wisdom/widgets/base_page.dart';
 
 const _wisdomBrandGradient = LinearGradient(
@@ -144,32 +143,10 @@ class _ProfileTab extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final sb = ref.read(supabaseMaybeProvider);
-    if (sb == null) {
-      return Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 500),
-          child: const Card(
-            child: Padding(
-              padding: p20,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text('Supabase ej konfigurerat.'),
-                  SizedBox(height: 8),
-                  Text(
-                    'Starta appen med --dart-define=SUPABASE_URL och SUPABASE_ANON_KEY.',
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      );
-    }
-    final user = sb.auth.currentUser;
-    if (user == null) {
-      final emailCtrl = TextEditingController();
+    final auth = ref.watch(authControllerProvider);
+    final profile = auth.profile;
+
+    if (profile == null) {
       return Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 500),
@@ -187,24 +164,16 @@ class _ProfileTab extends ConsumerWidget {
                         ?.copyWith(fontWeight: FontWeight.w700),
                   ),
                   gap12,
-                  TextField(
-                    controller: emailCtrl,
-                    keyboardType: TextInputType.emailAddress,
-                    decoration: const InputDecoration(labelText: 'E-post'),
-                  ),
+                  const Text('Du behöver ett konto för att se din profil.'),
                   gap12,
                   FilledButton(
-                    onPressed: () async {
-                      final email = emailCtrl.text.trim();
-                      if (email.isEmpty) return;
-                      await sb.auth.signInWithOtp(email: email);
-                      if (!context.mounted) return;
-                      showSnack(
-                        context,
-                        'Magisk länk skickad (kontrollera din e-post).',
-                      );
-                    },
-                    child: const Text('Skicka magisk länk'),
+                    onPressed: () => context.go('/login'),
+                    child: const Text('Logga in'),
+                  ),
+                  gap8,
+                  OutlinedButton(
+                    onPressed: () => context.go('/signup'),
+                    child: const Text('Skapa konto'),
                   ),
                 ],
               ),
@@ -229,18 +198,30 @@ class _ProfileTab extends ConsumerWidget {
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
                 gap6,
-                Text(user.email ?? user.id),
+                Text(profile.displayName ?? profile.email),
                 gap12,
-                FilledButton.icon(
-                  onPressed: () async {
-                    await sb.auth.signOut();
-                    gate.reset();
-                    if (!context.mounted) return;
-                    showSnack(context, 'Utloggad');
-                    context.go('/landing');
-                  },
-                  icon: const Icon(Icons.logout),
-                  label: const Text('Logga ut'),
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
+                  children: [
+                    FilledButton.icon(
+                      onPressed: () => context.push('/profile'),
+                      icon: const Icon(Icons.person_outline_rounded),
+                      label: const Text('Öppna profil'),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: () async {
+                        await ref
+                            .read(authControllerProvider.notifier)
+                            .logout();
+                        if (!context.mounted) return;
+                        showSnack(context, 'Utloggad');
+                        context.go('/landing');
+                      },
+                      icon: const Icon(Icons.logout),
+                      label: const Text('Logga ut'),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -265,8 +246,7 @@ class _ServicesTab extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final sb = ref.read(supabaseMaybeProvider);
-    final user = sb?.auth.currentUser;
+    final profile = ref.watch(authControllerProvider).profile;
     return Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 500),
@@ -292,7 +272,7 @@ class _ServicesTab extends ConsumerWidget {
                   onPressed: () => context.go('/subscribe'),
                   child: const Text('Gå till abonnemang'),
                 ),
-                if (user == null)
+                if (profile == null)
                   const Padding(
                     padding: EdgeInsets.only(top: 8),
                     child: Text(

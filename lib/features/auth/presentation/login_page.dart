@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:wisdom/core/env/env_state.dart';
-import 'package:wisdom/gate.dart';
+import 'package:wisdom/core/auth/auth_controller.dart';
+import 'package:wisdom/core/errors/app_failure.dart';
 import 'package:wisdom/shared/theme/ui_consts.dart';
 import 'package:wisdom/shared/utils/snack.dart';
 import 'package:wisdom/shared/widgets/gradient_text.dart';
@@ -23,7 +23,6 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   final _formKey = GlobalKey<FormState>();
   final _emailCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
-  bool _busy = false;
 
   @override
   void dispose() {
@@ -35,6 +34,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   @override
   Widget build(BuildContext context) {
     final envInfo = ref.watch(envInfoProvider);
+    final auth = ref.watch(authControllerProvider);
     final envBlocked = envInfo.hasIssues;
     final textTheme = Theme.of(context).textTheme;
 
@@ -77,6 +77,24 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                               style: textTheme.headlineSmall
                                   ?.copyWith(fontWeight: FontWeight.w700),
                             ),
+                            AnimatedSwitcher(
+                              duration: const Duration(milliseconds: 200),
+                              child: auth.error != null
+                                  ? Padding(
+                                      key: const ValueKey('login-error'),
+                                      padding: const EdgeInsets.only(top: 12),
+                                      child: Text(
+                                        auth.error!,
+                                        style: textTheme.bodyMedium?.copyWith(
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .error,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    )
+                                  : const SizedBox(key: ValueKey('login-ok')),
+                            ),
                             gap24,
                             TextFormField(
                               controller: _emailCtrl,
@@ -97,7 +115,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                               obscureText: true,
                               autofillHints: const [AutofillHints.password],
                               textInputAction: TextInputAction.done,
-                              onFieldSubmitted: _busy || envBlocked
+                              onFieldSubmitted: auth.isLoading || envBlocked
                                   ? null
                                   : (_) => _submit(context),
                               decoration: const InputDecoration(
@@ -108,10 +126,10 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                             ),
                             gap24,
                             FilledButton(
-                              onPressed: _busy || envBlocked
+                              onPressed: auth.isLoading || envBlocked
                                   ? null
                                   : () => _submit(context),
-                              child: _busy
+                              child: auth.isLoading
                                   ? const SizedBox(
                                       width: 18,
                                       height: 18,
@@ -123,7 +141,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                             ),
                             gap12,
                             TextButton(
-                              onPressed: _busy || envBlocked
+                              onPressed: auth.isLoading || envBlocked
                                   ? null
                                   : () => context.go('/signup'),
                               child: GradientText(
@@ -133,7 +151,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                               ),
                             ),
                             TextButton(
-                              onPressed: _busy || envBlocked
+                              onPressed: auth.isLoading || envBlocked
                                   ? null
                                   : () => context.go('/forgot-password'),
                               child: GradientText(
@@ -172,11 +190,9 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     final email = _emailCtrl.text.trim();
     final password = _passwordCtrl.text;
 
-    setState(() => _busy = true);
+    final controller = ref.read(authControllerProvider.notifier);
     try {
-      await Supabase.instance.client.auth
-          .signInWithPassword(email: email, password: password);
-      gate.allow();
+      await controller.login(email, password);
       if (!mounted || !context.mounted) return;
       showSnack(context, 'Inloggad som $email');
       final redirect = widget.redirectPath;
@@ -185,14 +201,13 @@ class _LoginPageState extends ConsumerState<LoginPage> {
       } else {
         context.go('/');
       }
-    } on AuthException catch (e) {
+    } catch (error) {
       if (!mounted || !context.mounted) return;
-      showSnack(context, e.message);
-    } catch (e) {
-      if (!mounted || !context.mounted) return;
-      showSnack(context, 'Något gick fel. Försök igen.');
-    } finally {
-      if (mounted) setState(() => _busy = false);
+      final message = error is AppFailure
+          ? error.message
+          : ref.read(authControllerProvider).error ??
+              'Inloggning misslyckades.';
+      showSnack(context, message);
     }
   }
 

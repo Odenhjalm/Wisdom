@@ -10,7 +10,7 @@ import 'package:wisdom/features/courses/data/courses_repository.dart';
 import 'package:wisdom/features/courses/presentation/course_access_gate.dart';
 import 'package:wisdom/shared/theme/ui_consts.dart';
 import 'package:wisdom/shared/utils/snack.dart';
-import 'package:wisdom/supabase_client.dart';
+import 'package:wisdom/core/auth/auth_controller.dart';
 import 'package:wisdom/shared/widgets/go_router_back_button.dart';
 import 'package:wisdom/widgets/base_page.dart';
 
@@ -137,12 +137,8 @@ class _QuizTakePageState extends ConsumerState<QuizTakePage> {
       showSnack(context, 'Quiz saknas.');
       return;
     }
-    final sb = ref.read(supabaseMaybeProvider);
-    if (sb == null) {
-      showSnack(context, 'Supabase ej konfigurerat.');
-      return;
-    }
-    if (sb.auth.currentUser == null) {
+    final auth = ref.read(authControllerProvider);
+    if (!auth.isAuthenticated) {
       final redirect = '/course-quiz?quizId=$_quizId';
       if (!mounted || !context.mounted) return;
       context.go('/login?redirect=${Uri.encodeComponent(redirect)}');

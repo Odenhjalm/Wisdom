@@ -2,18 +2,13 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:wisdom/api/auth_repository.dart';
 import 'package:wisdom/core/errors/app_failure.dart';
 import 'package:wisdom/features/courses/data/courses_repository.dart';
 import 'package:wisdom/features/courses/data/progress_repository.dart';
-import 'package:wisdom/supabase_client.dart';
 
 final coursesRepositoryProvider = Provider<CoursesRepository>((ref) {
-  final client = ref.watch(supabaseMaybeProvider);
-  if (client == null) {
-    throw ConfigurationFailure(
-      message: 'Supabase ej konfigurerat.',
-    );
-  }
+  final client = ref.watch(apiClientProvider);
   return CoursesRepository(client: client);
 });
 

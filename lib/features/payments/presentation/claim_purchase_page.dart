@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:wisdom/data/supabase/supabase_client.dart';
-import 'package:wisdom/domain/services/payments/payments_service.dart';
 import 'package:wisdom/features/auth/application/user_access_provider.dart';
+import 'package:wisdom/features/payments/application/payments_providers.dart';
+import 'package:wisdom/core/auth/auth_controller.dart';
+import 'package:wisdom/core/errors/app_failure.dart';
 
 class ClaimPurchasePage extends ConsumerStatefulWidget {
   const ClaimPurchasePage({super.key, required this.token});
@@ -38,15 +39,15 @@ class _ClaimPurchasePageState extends ConsumerState<ClaimPurchasePage> {
       return;
     }
 
-    final user = Supa.client.auth.currentUser;
-    if (user == null) {
+    final authState = ref.read(authControllerProvider);
+    if (authState.profile == null) {
       setState(() => _status = _ClaimStatus.requireLogin);
       return;
     }
 
     try {
-      final payments = PaymentsService();
-      final success = await payments.claimPurchase(token: token);
+      final repo = ref.read(paymentsRepositoryProvider);
+      final success = await repo.claimPurchase(token);
       if (!mounted) return;
       if (success) {
         ref.invalidate(userAccessProvider);
@@ -59,7 +60,7 @@ class _ClaimPurchasePageState extends ConsumerState<ClaimPurchasePage> {
       if (!mounted) return;
       setState(() {
         _status = _ClaimStatus.failed;
-        _error = error.toString();
+        _error = _mapError(error, stackTrace);
       });
     }
   }
@@ -128,6 +129,11 @@ class _ClaimPurchasePageState extends ConsumerState<ClaimPurchasePage> {
           onSecondary: _goHome,
         );
     }
+  }
+
+  String _mapError(Object error, StackTrace? stackTrace) {
+    final failure = AppFailure.from(error, stackTrace);
+    return failure.message;
   }
 
   @override

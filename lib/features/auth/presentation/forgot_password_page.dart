@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
-import 'package:wisdom/core/auth/oauth_redirect.dart';
+import 'package:wisdom/api/auth_repository.dart';
 import 'package:wisdom/core/env/env_state.dart';
+import 'package:wisdom/core/errors/app_failure.dart';
 import 'package:wisdom/shared/theme/ui_consts.dart';
 import 'package:wisdom/shared/utils/snack.dart';
 import 'package:wisdom/shared/widgets/gradient_text.dart';
@@ -21,6 +21,7 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   final TextEditingController _emailCtrl = TextEditingController();
   bool _busy = false;
+  String? _errorMessage;
 
   @override
   void dispose() {
@@ -57,24 +58,39 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
                                 padding: const EdgeInsets.only(bottom: 16),
                                 child: Text(
                                   '${envInfo.message} Återställning av lösenord är avstängd tills konfigurationen är klar.',
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .bodyMedium
-                                      ?.copyWith(
-                                        color:
-                                            Theme.of(context).colorScheme.error,
-                                        fontWeight: FontWeight.w600,
-                                      ),
+                                  style: textTheme.bodyMedium?.copyWith(
+                                    color: Theme.of(context).colorScheme.error,
+                                    fontWeight: FontWeight.w600,
+                                  ),
                                 ),
                               ),
                             Text(
                               'Glömt lösenord?',
-                              style: textTheme.headlineSmall
-                                  ?.copyWith(fontWeight: FontWeight.w700),
+                              style: textTheme.headlineSmall?.copyWith(
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            AnimatedSwitcher(
+                              duration: const Duration(milliseconds: 200),
+                              child: _errorMessage != null
+                                  ? Padding(
+                                      key: const ValueKey('forgot-error'),
+                                      padding: const EdgeInsets.only(top: 12),
+                                      child: Text(
+                                        _errorMessage!,
+                                        style: textTheme.bodyMedium?.copyWith(
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .error,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    )
+                                  : const SizedBox(key: ValueKey('forgot-ok')),
                             ),
                             gap16,
                             const Text(
-                              'Ange din e-postadress så skickar vi en länk för att återställa ditt lösenord.',
+                              'Ange din e-postadress så skickar vi instruktioner för hur du återställer ditt lösenord.',
                             ),
                             gap24,
                             TextFormField(
@@ -104,7 +120,8 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
                                       child: CircularProgressIndicator(
                                           strokeWidth: 2),
                                     )
-                                  : const Text('Skicka återställningslänk'),
+                                  : const Text(
+                                      'Skicka återställningsinstruktioner'),
                             ),
                             gap12,
                             TextButton(
@@ -146,22 +163,26 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
 
     final email = _emailCtrl.text.trim();
 
-    setState(() => _busy = true);
+    setState(() {
+      _busy = true;
+      _errorMessage = null;
+    });
     try {
-      final redirectTo = oauthRedirect();
-      await Supabase.instance.client.auth.resetPasswordForEmail(
-        email,
-        redirectTo: redirectTo,
+      final repo = ref.read(authRepositoryProvider);
+      await repo.requestPasswordReset(email);
+      if (!mounted || !context.mounted) return;
+      showSnack(
+        context,
+        'Om adressen finns skickar vi nu instruktioner till $email.',
       );
-      if (!mounted || !context.mounted) return;
-      showSnack(context, 'Om adressen finns skickas en länk nu.');
       context.go('/login');
-    } on AuthException catch (e) {
+    } catch (error, stackTrace) {
       if (!mounted || !context.mounted) return;
-      showSnack(context, e.message);
-    } catch (e) {
-      if (!mounted || !context.mounted) return;
-      showSnack(context, 'Något gick fel. Försök igen.');
+      final failure = AppFailure.from(error, stackTrace);
+      setState(() {
+        _errorMessage = failure.message;
+      });
+      showSnack(context, failure.message);
     } finally {
       if (mounted) setState(() => _busy = false);
     }

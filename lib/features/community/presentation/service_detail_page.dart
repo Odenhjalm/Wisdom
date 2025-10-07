@@ -4,10 +4,10 @@ import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher_string.dart';
 
 import 'package:wisdom/core/errors/app_failure.dart';
-import 'package:wisdom/domain/services/payments/payments_service.dart';
 import 'package:wisdom/features/community/application/community_providers.dart';
 import 'package:wisdom/shared/utils/snack.dart';
 import 'package:wisdom/shared/widgets/app_scaffold.dart';
+import 'package:wisdom/features/payments/application/payments_providers.dart';
 
 class ServiceDetailPage extends ConsumerStatefulWidget {
   const ServiceDetailPage({super.key, required this.id});
@@ -112,19 +112,18 @@ class _ServiceDetailPageState extends ConsumerState<ServiceDetailPage> {
     final id = service['id'] as String;
     setState(() => _buying = true);
     try {
-      final payments = PaymentsService();
-      final order = await payments.startServiceOrder(
+      final repo = ref.read(paymentsRepositoryProvider);
+      final order = await repo.startServiceOrder(
         serviceId: id,
         amountCents: price,
       );
-      final url = await payments.createCheckoutSession(
+      final url = await repo.checkoutUrl(
         orderId: order['id'] as String,
-        amountCents: price,
         successUrl:
             'https://andlig.app/payment/success?order_id=${order['id']}',
         cancelUrl: 'https://andlig.app/payment/cancel?order_id=${order['id']}',
       );
-      if (url != null) {
+      if (url.isNotEmpty) {
         await launchUrlString(url);
       } else {
         _showSnack('Kunde inte initiera betalning.');

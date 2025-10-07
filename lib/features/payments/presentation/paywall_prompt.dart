@@ -15,10 +15,7 @@ class PaywallPrompt extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final summary = ref.watch(courseByIdProvider(courseId));
     final access = ref.watch(userAccessProvider);
-    final isAuthenticated = access.maybeWhen(
-      data: (value) => value.isAuthenticated,
-      orElse: () => false,
-    );
+    final isAuthenticated = access.isAuthenticated;
 
     return summary.when(
       data: (course) => _PaywallBody(

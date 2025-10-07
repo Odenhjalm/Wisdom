@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'package:wisdom/api/auth_repository.dart';
 import 'package:wisdom/core/env/env_state.dart';
+import 'package:wisdom/core/errors/app_failure.dart';
 import 'package:wisdom/shared/utils/snack.dart';
 import 'package:wisdom/widgets/base_page.dart';
 
@@ -16,12 +17,15 @@ class NewPasswordPage extends ConsumerStatefulWidget {
 
 class _NewPasswordPageState extends ConsumerState<NewPasswordPage> {
   final _formKey = GlobalKey<FormState>();
+  final _emailCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
   final _confirmCtrl = TextEditingController();
   bool _busy = false;
+  String? _errorMessage;
 
   @override
   void dispose() {
+    _emailCtrl.dispose();
     _passwordCtrl.dispose();
     _confirmCtrl.dispose();
     super.dispose();
@@ -73,11 +77,45 @@ class _NewPasswordPageState extends ConsumerState<NewPasswordPage> {
                                   .headlineSmall
                                   ?.copyWith(fontWeight: FontWeight.w700),
                             ),
+                            AnimatedSwitcher(
+                              duration: const Duration(milliseconds: 200),
+                              child: _errorMessage != null
+                                  ? Padding(
+                                      key: const ValueKey('newpass-error'),
+                                      padding: const EdgeInsets.only(top: 12),
+                                      child: Text(
+                                        _errorMessage!,
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodyMedium
+                                            ?.copyWith(
+                                              color: Theme.of(context)
+                                                  .colorScheme
+                                                  .error,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                      ),
+                                    )
+                                  : const SizedBox(key: ValueKey('newpass-ok')),
+                            ),
                             const SizedBox(height: 16),
                             const Text(
-                              'Välj ett nytt lösenord för ditt konto. Det måste vara minst 6 tecken långt.',
+                              'Ange den e-postadress som är kopplad till kontot och välj ett nytt lösenord. '
+                              'För lokala konton krävs inget e-poststeg.',
                             ),
                             const SizedBox(height: 24),
+                            TextFormField(
+                              controller: _emailCtrl,
+                              enabled: !envBlocked,
+                              keyboardType: TextInputType.emailAddress,
+                              autofillHints: const [AutofillHints.email],
+                              decoration: const InputDecoration(
+                                labelText: 'E-postadress',
+                              ),
+                              textInputAction: TextInputAction.next,
+                              validator: _validateEmail,
+                            ),
+                            const SizedBox(height: 16),
                             TextFormField(
                               controller: _passwordCtrl,
                               enabled: !envBlocked,
@@ -97,7 +135,7 @@ class _NewPasswordPageState extends ConsumerState<NewPasswordPage> {
                               obscureText: true,
                               autofillHints: const [AutofillHints.newPassword],
                               decoration: const InputDecoration(
-                                labelText: 'Upprepa lösenord',
+                                labelText: 'Bekräfta nytt lösenord',
                               ),
                               textInputAction: TextInputAction.done,
                               onFieldSubmitted: _busy || envBlocked
@@ -147,29 +185,41 @@ class _NewPasswordPageState extends ConsumerState<NewPasswordPage> {
     final form = _formKey.currentState;
     if (form == null || !form.validate()) return;
 
+    final email = _emailCtrl.text.trim();
     final password = _passwordCtrl.text;
 
-    setState(() => _busy = true);
+    setState(() {
+      _busy = true;
+      _errorMessage = null;
+    });
     try {
-      await Supabase.instance.client.auth.updateUser(
-        UserAttributes(password: password),
-      );
+      final repo = ref.read(authRepositoryProvider);
+      await repo.resetPassword(email: email, newPassword: password);
       if (!mounted || !context.mounted) return;
-      showSnack(context, 'Lösenord uppdaterat.');
-      context.go('/');
-    } on AuthException catch (e) {
+      showSnack(context, 'Lösenord uppdaterat. Du kan nu logga in.');
+      context.go('/login');
+    } catch (error, stackTrace) {
       if (!mounted || !context.mounted) return;
-      _showError(context, e.message);
-    } catch (e) {
-      if (!mounted || !context.mounted) return;
-      _showError(context, 'Något gick fel. Försök igen.');
+      final failure = AppFailure.from(error, stackTrace);
+      setState(() {
+        _errorMessage = failure.message;
+      });
+      showSnack(context, failure.message);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
   }
 
-  void _showError(BuildContext context, String message) {
-    showSnack(context, message);
+  String? _validateEmail(String? value) {
+    final email = value?.trim() ?? '';
+    if (email.isEmpty) {
+      return 'Ange din e-postadress.';
+    }
+    final regex = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$');
+    if (!regex.hasMatch(email)) {
+      return 'Ogiltig e-postadress.';
+    }
+    return null;
   }
 
   String? _validatePassword(String? value) {

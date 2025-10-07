@@ -1,94 +1,48 @@
 import 'dart:async';
 
-import 'package:supabase_flutter/supabase_flutter.dart';
-
+import 'package:wisdom/api/api_client.dart';
 import 'package:wisdom/core/errors/app_failure.dart';
-import 'package:wisdom/core/supabase_ext.dart';
 
 import 'course_access_api.dart';
 
 class CoursesRepository {
-  CoursesRepository({SupabaseClient? client, CourseAccessApi? accessApi})
-      : _client = client ?? Supabase.instance.client,
-        _accessApi = accessApi ?? SupabaseCourseAccessApi(client ?? Supabase.instance.client);
+  CoursesRepository({required ApiClient client, CourseAccessApi? accessApi})
+      : _client = client,
+        _accessApi = accessApi ?? CourseAccessApi(client);
 
-  final SupabaseClient _client;
+  final ApiClient _client;
   final CourseAccessApi _accessApi;
 
-  Future<CourseDetailData> fetchCourseDetailBySlug(String slug) async {
+  Future<List<CourseSummary>> fetchPublishedCourses({
+    bool onlyFreeIntro = false,
+  }) async {
     try {
-      final row = await _client.app
-          .from('courses')
-          .select(
-              'id, slug, title, description, cover_url, video_url, is_free_intro, is_published, price_cents')
-          .eq('slug', slug)
-          .limit(1)
-          .maybeSingle();
-      if (row == null) {
-        throw NotFoundFailure(message: 'Kursen kunde inte hittas.');
-      }
-      final course = CourseSummary.fromJson(row);
-      final modules = await listModules(course.id);
-      final lessons = <String, List<LessonSummary>>{};
-      for (final module in modules) {
-        lessons[module.id] = await listLessonsForModule(module.id);
-      }
-
-      final freeCountFuture = freeConsumedCount();
-      final isEnrolledFuture = isEnrolled(course.id);
-      final latestOrderFuture = latestOrderForCourse(course.id);
-      final freeLimitFuture = _fetchFreeLimit();
-
-      final freeCount = await freeCountFuture;
-      final enrolled = await isEnrolledFuture;
-      final latestOrder = await latestOrderFuture;
-      final freeLimit = await freeLimitFuture;
-
-      return CourseDetailData(
-        course: course,
-        modules: modules,
-        lessonsByModule: lessons,
-        freeConsumed: freeCount,
-        freeLimit: freeLimit,
-        isEnrolled: enrolled,
-        latestOrder: latestOrder,
+      final params = <String, dynamic>{
+        'published_only': true,
+      };
+      if (onlyFreeIntro) params['free_intro'] = true;
+      final res = await _client.get<Map<String, dynamic>>(
+        '/courses',
+        queryParameters: params,
       );
+      final items = (res['items'] as List? ?? [])
+          .map((e) =>
+              CourseSummary.fromJson(Map<String, dynamic>.from(e as Map)))
+          .toList();
+      return items;
     } catch (error, stackTrace) {
       throw AppFailure.from(error, stackTrace);
     }
   }
 
-  Future<int> _fetchFreeLimit() async {
+  Future<List<CourseSummary>> myEnrolledCourses() async {
     try {
-      final row = await _client.app
-          .from('app_config')
-          .select('free_course_limit')
-          .eq('id', 1)
-          .maybeSingle();
-      if (row == null) return 5;
-      final raw = (row as Map)['free_course_limit'];
-      if (raw is int) return raw;
-      if (raw is num) return raw.toInt();
-      if (raw is String) return int.tryParse(raw) ?? 5;
-      return 5;
-    } catch (_) {
-      return 5;
-    }
-  }
-
-  Future<CourseSummary?> firstFreeIntroCourse() async {
-    try {
-      final res = await _client.app
-          .from('courses')
-          .select(
-              'id, slug, title, description, cover_url, video_url, is_free_intro, is_published, price_cents')
-          .eq('is_published', true)
-          .eq('is_free_intro', true)
-          .order('created_at')
-          .limit(1)
-          .maybeSingle();
-      if (res == null) return null;
-      return CourseSummary.fromJson(res);
+      final res = await _client.get<Map<String, dynamic>>('/courses/me');
+      final items = (res['items'] as List? ?? [])
+          .map((e) =>
+              CourseSummary.fromJson(Map<String, dynamic>.from(e as Map)))
+          .toList();
+      return items;
     } catch (error, stackTrace) {
       throw AppFailure.from(error, stackTrace);
     }
@@ -96,30 +50,98 @@ class CoursesRepository {
 
   Future<CourseSummary?> getCourseById(String courseId) async {
     try {
-      final row = await _client.app
-          .from('courses')
-          .select(
-              'id, slug, title, description, cover_url, video_url, is_free_intro, is_published, price_cents')
-          .eq('id', courseId)
-          .maybeSingle();
-      if (row == null) return null;
-      return CourseSummary.fromJson(row);
+      final res = await _client.get<Map<String, dynamic>>('/courses/$courseId');
+      final course = res['course'];
+      if (course is Map<String, dynamic>) {
+        return CourseSummary.fromJson(course);
+      }
+      return null;
+    } catch (error, stackTrace) {
+      if (error is AppFailure && error.kind == AppFailureKind.notFound) {
+        return null;
+      }
+      throw AppFailure.from(error, stackTrace);
+    }
+  }
+
+  Future<CourseDetailData> fetchCourseDetailBySlug(String slug) async {
+    try {
+      final res =
+          await _client.get<Map<String, dynamic>>('/courses/by-slug/$slug');
+      final detail = _mapCourseDetail(res);
+      return _augmentCourseDetail(detail);
     } catch (error, stackTrace) {
       throw AppFailure.from(error, stackTrace);
     }
   }
 
-  Future<List<CourseSummary>> fetchPublishedCourses(
-      {bool onlyFreeIntro = false}) async {
+  Future<CourseDetailData> fetchCourseDetailById(String courseId) async {
     try {
-      final query = _client.app.from('courses').select(
-          'id, slug, title, description, cover_url, video_url, is_free_intro, is_published, price_cents');
-      final res = await query.eq('is_published', true);
-      final list = (res as List? ?? [])
-          .map((row) => CourseSummary.fromJson(row as Map<String, dynamic>))
-          .toList();
-      if (!onlyFreeIntro) return list;
-      return list.where((c) => c.isFreeIntro).toList();
+      final res = await _client.get<Map<String, dynamic>>('/courses/$courseId');
+      final detail = _mapCourseDetail(res);
+      return _augmentCourseDetail(detail);
+    } catch (error, stackTrace) {
+      throw AppFailure.from(error, stackTrace);
+    }
+  }
+
+  CourseDetailData _mapCourseDetail(Map<String, dynamic> payload) {
+    final course = CourseSummary.fromJson(
+        Map<String, dynamic>.from(payload['course'] as Map));
+    final modules = (payload['modules'] as List? ?? [])
+        .map((e) => CourseModule.fromJson(Map<String, dynamic>.from(e as Map)))
+        .toList();
+    final lessonsMap = <String, List<LessonSummary>>{};
+    final lessonsRaw = payload['lessons'];
+    if (lessonsRaw is Map) {
+      lessonsRaw.forEach((key, value) {
+        final list = (value as List? ?? [])
+            .map((e) =>
+                LessonSummary.fromJson(Map<String, dynamic>.from(e as Map)))
+            .toList();
+        lessonsMap[key.toString()] = list;
+      });
+    }
+    return CourseDetailData(
+      course: course,
+      modules: modules,
+      lessonsByModule: lessonsMap,
+    );
+  }
+
+  Future<CourseDetailData> _augmentCourseDetail(
+    CourseDetailData detail,
+  ) async {
+    final courseId = detail.course.id;
+
+    try {
+      final snapshot = await _fetchCourseAccess(courseId);
+      return detail.copyWith(
+        hasAccess: snapshot.hasAccess,
+        isEnrolled: snapshot.enrolled,
+        hasActiveSubscription: snapshot.hasActiveSubscription,
+        freeConsumed: snapshot.freeConsumed,
+        freeLimit: snapshot.freeLimit,
+        latestOrder: snapshot.latestOrder,
+      );
+    } catch (error, stackTrace) {
+      final failure = AppFailure.from(error, stackTrace);
+      if (failure.kind == AppFailureKind.unauthorized) {
+        return detail;
+      }
+      throw failure;
+    }
+  }
+
+  Future<CourseSummary?> firstFreeIntroCourse() async {
+    try {
+      final res =
+          await _client.get<Map<String, dynamic>>('/courses/intro-first');
+      final course = res['course'];
+      if (course is Map) {
+        return CourseSummary.fromJson(Map<String, dynamic>.from(course));
+      }
+      return null;
     } catch (error, stackTrace) {
       throw AppFailure.from(error, stackTrace);
     }
@@ -127,49 +149,24 @@ class CoursesRepository {
 
   Future<List<CourseModule>> listModules(String courseId) async {
     try {
-      final rows = await _client.app
-          .from('modules')
-          .select('id, title, position')
-          .eq('course_id', courseId)
-          .order('position');
-      final list = (rows as List? ?? [])
-          .map((row) => CourseModule.fromJson(row as Map<String, dynamic>))
+      final res =
+          await _client.get<Map<String, dynamic>>('/courses/$courseId/modules');
+      return (res['items'] as List? ?? [])
+          .map(
+              (e) => CourseModule.fromJson(Map<String, dynamic>.from(e as Map)))
           .toList();
-      return list;
     } catch (error, stackTrace) {
       throw AppFailure.from(error, stackTrace);
     }
   }
 
-  Future<CourseModule?> getModule(String moduleId) async {
+  Future<List<LessonSummary>> listLessonsForModule(String moduleId) async {
     try {
-      final row = await _client.app
-          .from('modules')
-          .select('id, course_id, title, position')
-          .eq('id', moduleId)
-          .maybeSingle();
-      if (row == null) return null;
-      return CourseModule.fromJson(row);
-    } catch (error, stackTrace) {
-      throw AppFailure.from(error, stackTrace);
-    }
-  }
-
-  Future<List<LessonSummary>> listLessonsForModule(
-    String moduleId, {
-    bool onlyIntro = false,
-  }) async {
-    try {
-      var query = _client.app
-          .from('lessons')
-          .select('id, title, position, is_intro, content_markdown')
-          .eq('module_id', moduleId);
-      if (onlyIntro) {
-        query = query.eq('is_intro', true);
-      }
-      final rows = await query.order('position');
-      return (rows as List? ?? [])
-          .map((row) => LessonSummary.fromJson(row as Map<String, dynamic>))
+      final res = await _client
+          .get<Map<String, dynamic>>('/courses/modules/$moduleId/lessons');
+      return (res['items'] as List? ?? [])
+          .map((e) =>
+              LessonSummary.fromJson(Map<String, dynamic>.from(e as Map)))
           .toList();
     } catch (error, stackTrace) {
       throw AppFailure.from(error, stackTrace);
@@ -178,39 +175,27 @@ class CoursesRepository {
 
   Future<LessonDetailData> fetchLessonDetail(String lessonId) async {
     try {
-      final lessonRow = await _client.app
-          .from('lessons')
-          .select('id, title, content_markdown, is_intro, module_id, position')
-          .eq('id', lessonId)
-          .maybeSingle();
-      if (lessonRow == null) {
-        throw NotFoundFailure(message: 'Lektionen kunde inte hittas.');
-      }
-
+      final res =
+          await _client.get<Map<String, dynamic>>('/courses/lessons/$lessonId');
       final lesson = LessonDetail.fromJson(
-        Map<String, dynamic>.from(lessonRow as Map),
-      );
-      final moduleId = lesson.moduleId;
+          Map<String, dynamic>.from(res['lesson'] as Map));
+      final moduleRaw = res['module'];
       CourseModule? module;
-      List<CourseModule> modules = const [];
-      if (moduleId != null) {
-        module = await getModule(moduleId);
-        if (module != null) {
-          modules = await listModules(module.courseId!);
-        }
+      if (moduleRaw is Map) {
+        module = CourseModule.fromJson(Map<String, dynamic>.from(moduleRaw));
       }
-      List<LessonSummary> moduleLessons = const [];
-      if (moduleId != null) {
-        moduleLessons = await listLessonsForModule(moduleId);
-      }
-      final media = await listLessonMedia(lesson.id);
-
-      final courseLessons = <LessonSummary>[];
-      for (final m in modules) {
-        final moduleLessonList = await listLessonsForModule(m.id);
-        courseLessons.addAll(moduleLessonList);
-      }
-
+      final moduleLessons = (res['module_lessons'] as List? ?? [])
+          .map((e) =>
+              LessonSummary.fromJson(Map<String, dynamic>.from(e as Map)))
+          .toList();
+      final courseLessons = (res['course_lessons'] as List? ?? [])
+          .map((e) =>
+              LessonSummary.fromJson(Map<String, dynamic>.from(e as Map)))
+          .toList();
+      final media = (res['media'] as List? ?? [])
+          .map((e) =>
+              LessonMediaItem.fromJson(Map<String, dynamic>.from(e as Map)))
+          .toList();
       return LessonDetailData(
         lesson: lesson,
         module: module,
@@ -223,135 +208,74 @@ class CoursesRepository {
     }
   }
 
-  Future<List<LessonMediaItem>> listLessonMedia(String lessonId) async {
-    try {
-      final rows = await _client.app
-          .from('lesson_media')
-          .select('id, kind, storage_path, storage_bucket, position')
-          .eq('lesson_id', lessonId)
-          .order('position');
-      return (rows as List? ?? [])
-          .map((row) => LessonMediaItem.fromJson(row as Map<String, dynamic>))
-          .toList();
-    } catch (error, stackTrace) {
-      throw AppFailure.from(error, stackTrace);
-    }
-  }
-
   Future<void> enrollFreeIntro(String courseId) async {
     try {
-      await _client.schema('app').rpc('enroll_free_intro', params: {
-        'p_course_id': courseId,
-      });
+      await _client.post('/courses/$courseId/enroll');
     } catch (error, stackTrace) {
       throw AppFailure.from(error, stackTrace);
     }
   }
 
   Future<int> freeConsumedCount() async {
-    try {
-      final res = await _client.schema('app').rpc('free_consumed_count');
-      if (res is int) return res;
-      if (res is num) return res.toInt();
-      if (res is String) return int.tryParse(res) ?? 0;
-      return 0;
-    } catch (error, stackTrace) {
-      throw AppFailure.from(error, stackTrace);
-    }
+    final quota = await fetchFreeQuota();
+    return quota.consumed;
   }
 
   Future<bool> hasAccess(String courseId) async {
     try {
-      final primary = await _accessApi.hasAccess(courseId);
-      if (primary) return true;
-      return await _accessApi.fallbackHasAccess(courseId);
-    } catch (error) {
+      final snapshot = await _fetchCourseAccess(courseId);
+      return snapshot.hasAccess;
+    } catch (error, stackTrace) {
       try {
         return await _accessApi.fallbackHasAccess(courseId);
       } catch (_) {
-        // Both primary and fallback failed – treat as no access instead of throwing.
+        final failure = AppFailure.from(error, stackTrace);
+        if (failure.kind == AppFailureKind.unauthorized) {
+          return false;
+        }
         return false;
       }
     }
   }
 
   Future<bool> isEnrolled(String courseId) async {
-    try {
-      return await hasAccess(courseId);
-    } catch (error, stackTrace) {
-      throw AppFailure.from(error, stackTrace);
-    }
+    return hasAccess(courseId);
   }
 
   Future<CourseOrderSummary?> latestOrderForCourse(String courseId) async {
     try {
-      final uid = _client.auth.currentUser?.id;
-      if (uid == null) return null;
-      final rows = await _client.app
-          .from('orders')
-          .select('id, status, amount_cents, created_at')
-          .eq('user_id', uid)
-          .eq('course_id', courseId)
-          .order('created_at', ascending: false)
-          .limit(1);
-      if (rows.isNotEmpty) {
-        return CourseOrderSummary.fromJson(rows.first);
+      final snapshot = await _fetchCourseAccess(courseId);
+      return snapshot.latestOrder;
+    } catch (error, stackTrace) {
+      final failure = AppFailure.from(error, stackTrace);
+      if (failure.kind == AppFailureKind.unauthorized) {
+        return null;
       }
-      return null;
+      throw failure;
+    }
+  }
+
+  Future<FreeQuota> fetchFreeQuota() async {
+    try {
+      final res =
+          await _client.get<Map<String, dynamic>>('/courses/free-consumed');
+      return FreeQuota.fromJson(res);
     } catch (error, stackTrace) {
       throw AppFailure.from(error, stackTrace);
     }
   }
 
-  Future<List<CourseSummary>> myEnrolledCourses() async {
-    try {
-      final uid = _client.auth.currentUser?.id;
-      if (uid == null) return const [];
-      final enr = await _client.app
-          .from('enrollments')
-          .select('course_id')
-          .eq('user_id', uid);
-      final ids = (enr as List? ?? [])
-          .map((row) => (row as Map)['course_id'] as String?)
-          .whereType<String>()
-          .toList();
-      if (ids.isEmpty) return const [];
-      final inList = '(${ids.map((e) => '"$e"').join(',')})';
-      final rows = await _client.app
-          .from('courses')
-          .select(
-              'id, slug, title, description, cover_url, video_url, is_free_intro, is_published, price_cents')
-          .filter('id', 'in', inList);
-      return (rows as List? ?? [])
-          .map((row) => CourseSummary.fromJson(row as Map<String, dynamic>))
-          .toList();
-    } catch (error, stackTrace) {
-      throw AppFailure.from(error, stackTrace);
-    }
+  Future<CourseAccessData> _fetchCourseAccess(String courseId) async {
+    final res =
+        await _client.get<Map<String, dynamic>>('/courses/$courseId/access');
+    return CourseAccessData.fromJson(res);
   }
 
   Future<CourseQuizInfo> fetchQuizInfo(String courseId) async {
     try {
-      final client = _client;
-      final quizRow = await client
-          .from('course_quizzes')
-          .select('id')
-          .eq('course_id', courseId)
-          .limit(1)
-          .maybeSingle();
-      final quizId = (quizRow as Map?)?['id'] as String?;
-      bool certified = false;
-      final uid = client.auth.currentUser?.id;
-      if (uid != null) {
-        final certRes = await client
-            .from('certificates')
-            .select('id')
-            .eq('user_id', uid)
-            .eq('course_id', courseId)
-            .limit(1);
-        certified = (certRes as List?)?.isNotEmpty ?? false;
-      }
-      return CourseQuizInfo(quizId: quizId, certified: certified);
+      final res =
+          await _client.get<Map<String, dynamic>>('/courses/$courseId/quiz');
+      return CourseQuizInfo.fromJson(res);
     } catch (error, stackTrace) {
       throw AppFailure.from(error, stackTrace);
     }
@@ -359,13 +283,11 @@ class CoursesRepository {
 
   Future<List<QuizQuestion>> fetchQuizQuestions(String quizId) async {
     try {
-      final rows = await _client
-          .from('quiz_questions')
-          .select('id, position, kind, prompt, options')
-          .eq('quiz_id', quizId)
-          .order('position');
-      return (rows as List? ?? [])
-          .map((row) => QuizQuestion.fromJson(row as Map<String, dynamic>))
+      final res = await _client
+          .get<Map<String, dynamic>>('/courses/quiz/$quizId/questions');
+      return (res['items'] as List? ?? [])
+          .map(
+              (e) => QuizQuestion.fromJson(Map<String, dynamic>.from(e as Map)))
           .toList();
     } catch (error, stackTrace) {
       throw AppFailure.from(error, stackTrace);
@@ -377,22 +299,121 @@ class CoursesRepository {
     required Map<String, dynamic> answers,
   }) async {
     try {
-      final res = await _client
-          .schema('app')
-          .rpc('grade_quiz_and_issue_certificate', params: {
-        'p_quiz': quizId,
-        'p_answers': answers,
-      });
-      if (res is Map<String, dynamic>) return res;
-      if (res is Map) return Map<String, dynamic>.from(res);
-      if (res is List && res.isNotEmpty) {
-        return Map<String, dynamic>.from(res.first as Map);
-      }
-      return const {};
+      final res = await _client.post<Map<String, dynamic>>(
+        '/courses/quiz/$quizId/submit',
+        body: {'answers': answers},
+      );
+      return res;
     } catch (error, stackTrace) {
       throw AppFailure.from(error, stackTrace);
     }
   }
+}
+
+class CourseDetailData {
+  CourseDetailData({
+    required this.course,
+    required this.modules,
+    required this.lessonsByModule,
+    this.hasAccess = false,
+    this.isEnrolled = false,
+    this.hasActiveSubscription = false,
+    this.freeConsumed = 0,
+    this.freeLimit = 0,
+    this.latestOrder,
+  });
+
+  final CourseSummary course;
+  final List<CourseModule> modules;
+  final Map<String, List<LessonSummary>> lessonsByModule;
+  final bool hasAccess;
+  final bool isEnrolled;
+  final bool hasActiveSubscription;
+  final int freeConsumed;
+  final int freeLimit;
+  final CourseOrderSummary? latestOrder;
+
+  CourseDetailData copyWith({
+    bool? hasAccess,
+    bool? isEnrolled,
+    bool? hasActiveSubscription,
+    int? freeConsumed,
+    int? freeLimit,
+    CourseOrderSummary? latestOrder,
+  }) {
+    return CourseDetailData(
+      course: course,
+      modules: modules,
+      lessonsByModule: lessonsByModule,
+      hasAccess: hasAccess ?? this.hasAccess,
+      isEnrolled: isEnrolled ?? this.isEnrolled,
+      hasActiveSubscription:
+          hasActiveSubscription ?? this.hasActiveSubscription,
+      freeConsumed: freeConsumed ?? this.freeConsumed,
+      freeLimit: freeLimit ?? this.freeLimit,
+      latestOrder: latestOrder ?? this.latestOrder,
+    );
+  }
+}
+
+class FreeQuota {
+  const FreeQuota({required this.consumed, required this.limit});
+
+  final int consumed;
+  final int limit;
+
+  factory FreeQuota.fromJson(Map<String, dynamic> json) => FreeQuota(
+        consumed: (json['consumed'] as num?)?.toInt() ?? 0,
+        limit: (json['limit'] as num?)?.toInt() ?? 0,
+      );
+}
+
+class CourseAccessData {
+  const CourseAccessData({
+    required this.hasAccess,
+    required this.enrolled,
+    required this.hasActiveSubscription,
+    required this.freeConsumed,
+    required this.freeLimit,
+    this.latestOrder,
+  });
+
+  final bool hasAccess;
+  final bool enrolled;
+  final bool hasActiveSubscription;
+  final int freeConsumed;
+  final int freeLimit;
+  final CourseOrderSummary? latestOrder;
+
+  factory CourseAccessData.fromJson(Map<String, dynamic> json) {
+    final order = json['latest_order'];
+    final orderMap = order is Map ? Map<String, dynamic>.from(order) : null;
+    return CourseAccessData(
+      hasAccess: json['has_access'] == true,
+      enrolled: json['enrolled'] == true,
+      hasActiveSubscription: json['has_active_subscription'] == true,
+      freeConsumed: CourseSummary._asInt(json['free_consumed']) ?? 0,
+      freeLimit: CourseSummary._asInt(json['free_limit']) ?? 0,
+      latestOrder:
+          orderMap != null ? CourseOrderSummary.fromJson(orderMap) : null,
+    );
+  }
+}
+
+class LessonDetailData {
+  const LessonDetailData({
+    required this.lesson,
+    this.module,
+    this.moduleLessons = const [],
+    this.courseLessons = const [],
+    this.media = const [],
+  });
+
+  final LessonDetail lesson;
+  final CourseModule? module;
+  final List<LessonSummary> moduleLessons;
+  final List<LessonSummary> courseLessons;
+  final List<LessonMediaItem> media;
 }
 
 class CourseSummary {
@@ -418,19 +439,17 @@ class CourseSummary {
   final bool isPublished;
   final int? priceCents;
 
-  factory CourseSummary.fromJson(Map<String, dynamic> json) {
-    return CourseSummary(
-      id: json['id'] as String,
-      slug: json['slug'] as String?,
-      title: (json['title'] ?? '') as String,
-      description: json['description'] as String?,
-      coverUrl: json['cover_url'] as String?,
-      videoUrl: json['video_url'] as String?,
-      isFreeIntro: json['is_free_intro'] == true,
-      isPublished: json['is_published'] == true,
-      priceCents: _asInt(json['price_cents']),
-    );
-  }
+  factory CourseSummary.fromJson(Map<String, dynamic> json) => CourseSummary(
+        id: json['id'] as String,
+        slug: json['slug'] as String?,
+        title: (json['title'] ?? '') as String,
+        description: json['description'] as String?,
+        coverUrl: json['cover_url'] as String?,
+        videoUrl: json['video_url'] as String?,
+        isFreeIntro: json['is_free_intro'] == true,
+        isPublished: json['is_published'] == true,
+        priceCents: _asInt(json['price_cents']),
+      );
 
   static int? _asInt(dynamic value) {
     if (value is int) return value;
@@ -453,14 +472,12 @@ class CourseModule {
   final int position;
   final String? courseId;
 
-  factory CourseModule.fromJson(Map<String, dynamic> json) {
-    return CourseModule(
-      id: json['id'] as String,
-      title: (json['title'] ?? '') as String,
-      position: CourseSummary._asInt(json['position']) ?? 0,
-      courseId: json['course_id'] as String?,
-    );
-  }
+  factory CourseModule.fromJson(Map<String, dynamic> json) => CourseModule(
+        id: json['id'] as String,
+        title: (json['title'] ?? '') as String,
+        position: CourseSummary._asInt(json['position']) ?? 0,
+        courseId: json['course_id'] as String?,
+      );
 }
 
 class LessonSummary {
@@ -470,6 +487,7 @@ class LessonSummary {
     required this.position,
     this.isIntro = false,
     this.contentMarkdown,
+    this.moduleId,
   });
 
   final String id;
@@ -477,16 +495,16 @@ class LessonSummary {
   final int position;
   final bool isIntro;
   final String? contentMarkdown;
+  final String? moduleId;
 
-  factory LessonSummary.fromJson(Map<String, dynamic> json) {
-    return LessonSummary(
-      id: json['id'] as String,
-      title: (json['title'] ?? '') as String,
-      position: CourseSummary._asInt(json['position']) ?? 0,
-      isIntro: json['is_intro'] == true,
-      contentMarkdown: json['content_markdown'] as String?,
-    );
-  }
+  factory LessonSummary.fromJson(Map<String, dynamic> json) => LessonSummary(
+        id: json['id'] as String,
+        title: (json['title'] ?? '') as String,
+        position: CourseSummary._asInt(json['position']) ?? 0,
+        isIntro: json['is_intro'] == true,
+        contentMarkdown: json['content_markdown'] as String?,
+        moduleId: json['module_id'] as String?,
+      );
 }
 
 class LessonDetail {
@@ -506,16 +524,14 @@ class LessonDetail {
   final String? moduleId;
   final int position;
 
-  factory LessonDetail.fromJson(Map<String, dynamic> json) {
-    return LessonDetail(
-      id: json['id'] as String,
-      title: (json['title'] ?? '') as String,
-      contentMarkdown: json['content_markdown'] as String?,
-      isIntro: json['is_intro'] == true,
-      moduleId: json['module_id'] as String?,
-      position: CourseSummary._asInt(json['position']) ?? 0,
-    );
-  }
+  factory LessonDetail.fromJson(Map<String, dynamic> json) => LessonDetail(
+        id: json['id'] as String,
+        title: (json['title'] ?? '') as String,
+        contentMarkdown: json['content_markdown'] as String?,
+        isIntro: json['is_intro'] == true,
+        moduleId: json['module_id'] as String?,
+        position: CourseSummary._asInt(json['position']) ?? 0,
+      );
 }
 
 class LessonMediaItem {
@@ -523,114 +539,88 @@ class LessonMediaItem {
     required this.id,
     required this.kind,
     required this.storagePath,
-    required this.storageBucket,
-    required this.position,
+    this.storageBucket,
+    this.downloadUrl,
+    this.mediaId,
+    this.byteSize,
+    this.contentType,
+    this.originalName,
+    this.position = 0,
   });
 
   final String id;
   final String kind;
   final String storagePath;
-  final String storageBucket;
+  final String? storageBucket;
+  final String? downloadUrl;
+  final String? mediaId;
+  final int? byteSize;
+  final String? contentType;
+  final String? originalName;
   final int position;
 
-  factory LessonMediaItem.fromJson(Map<String, dynamic> json) {
-    return LessonMediaItem(
-      id: json['id'] as String,
-      kind: (json['kind'] ?? '') as String,
-      storagePath: (json['storage_path'] ?? '') as String,
-      storageBucket: (json['storage_bucket'] ?? 'course-media') as String,
-      position: CourseSummary._asInt(json['position']) ?? 0,
-    );
-  }
+  factory LessonMediaItem.fromJson(Map<String, dynamic> json) =>
+      LessonMediaItem(
+        id: json['id'] as String,
+        kind: (json['kind'] ?? '') as String,
+        storagePath: (json['storage_path'] ?? '') as String,
+        storageBucket: json['storage_bucket'] as String?,
+        downloadUrl: json['download_url'] as String?,
+        mediaId: json['media_id'] as String?,
+        byteSize: CourseSummary._asInt(json['byte_size']),
+        contentType: json['content_type'] as String?,
+        originalName: json['original_name'] as String?,
+        position: CourseSummary._asInt(json['position']) ?? 0,
+      );
+
+  bool get isPublicBucket => (storageBucket ?? '').startsWith('public');
+
+  String get fileName =>
+      (originalName == null || originalName!.isEmpty)
+          ? storagePath.split('/').last
+          : originalName!;
 }
 
 class CourseOrderSummary {
   const CourseOrderSummary({
     required this.id,
     required this.status,
-    required this.amountCents,
+    this.amountCents,
     required this.createdAt,
   });
 
   final String id;
   final String status;
-  final int amountCents;
+  final int? amountCents;
   final DateTime createdAt;
 
-  factory CourseOrderSummary.fromJson(Map<String, dynamic> json) {
-    final created = json['created_at'];
-    return CourseOrderSummary(
-      id: json['id'] as String,
-      status: (json['status'] ?? '') as String,
-      amountCents: CourseSummary._asInt(json['amount_cents']) ?? 0,
-      createdAt: created is String
-          ? DateTime.tryParse(created) ?? DateTime.fromMillisecondsSinceEpoch(0)
-          : DateTime.fromMillisecondsSinceEpoch(0),
-    );
-  }
-}
+  factory CourseOrderSummary.fromJson(Map<String, dynamic> json) =>
+      CourseOrderSummary(
+        id: json['id'] as String,
+        status: (json['status'] ?? '') as String,
+        amountCents: CourseSummary._asInt(json['amount_cents']),
+        createdAt: _parseDate(json['created_at']),
+      );
 
-class CourseDetailData {
-  const CourseDetailData({
-    required this.course,
-    required this.modules,
-    required this.lessonsByModule,
-    required this.freeConsumed,
-    required this.freeLimit,
-    required this.isEnrolled,
-    required this.latestOrder,
-  });
-
-  final CourseSummary course;
-  final List<CourseModule> modules;
-  final Map<String, List<LessonSummary>> lessonsByModule;
-  final int freeConsumed;
-  final int freeLimit;
-  final bool isEnrolled;
-  final CourseOrderSummary? latestOrder;
-
-  List<LessonSummary> get allLessons => [
-        for (final module in modules) ...?lessonsByModule[module.id],
-      ];
-}
-
-class LessonDetailData {
-  const LessonDetailData({
-    required this.lesson,
-    required this.module,
-    required this.moduleLessons,
-    required this.courseLessons,
-    required this.media,
-  });
-
-  final LessonDetail lesson;
-  final CourseModule? module;
-  final List<LessonSummary> moduleLessons;
-  final List<LessonSummary> courseLessons;
-  final List<LessonMediaItem> media;
-
-  LessonSummary? get previousLesson {
-    final index = courseLessons.indexWhere((l) => l.id == lesson.id);
-    if (index <= 0) return null;
-    return courseLessons[index - 1];
-  }
-
-  LessonSummary? get nextLesson {
-    final index = courseLessons.indexWhere((l) => l.id == lesson.id);
-    if (index < 0) return null;
-    if (index + 1 >= courseLessons.length) return null;
-    return courseLessons[index + 1];
+  static DateTime _parseDate(dynamic value) {
+    if (value is DateTime) return value;
+    if (value is String) {
+      return DateTime.tryParse(value) ?? DateTime.now();
+    }
+    return DateTime.now();
   }
 }
 
 class CourseQuizInfo {
-  const CourseQuizInfo({
-    required this.quizId,
-    required this.certified,
-  });
+  const CourseQuizInfo({this.quizId, this.certified = false});
 
   final String? quizId;
   final bool certified;
+
+  factory CourseQuizInfo.fromJson(Map<String, dynamic> json) => CourseQuizInfo(
+        quizId: json['quiz_id'] as String?,
+        certified: json['certified'] == true,
+      );
 }
 
 class QuizQuestion {
@@ -648,16 +638,26 @@ class QuizQuestion {
   final String prompt;
   final List<String> options;
 
-  factory QuizQuestion.fromJson(Map<String, dynamic> json) {
-    return QuizQuestion(
-      id: json['id'] as String,
-      position: CourseSummary._asInt(json['position']) ?? 0,
-      kind: (json['kind'] ?? 'single') as String,
-      prompt: (json['prompt'] ?? '') as String,
-      options: (json['options'] as List?)
-              ?.map((option) => option.toString())
-              .toList() ??
-          const [],
-    );
+  factory QuizQuestion.fromJson(Map<String, dynamic> json) => QuizQuestion(
+        id: json['id'] as String,
+        position: CourseSummary._asInt(json['position']) ?? 0,
+        kind: (json['kind'] ?? '') as String,
+        prompt: (json['prompt'] ?? '') as String,
+        options: _parseOptions(json['options']),
+      );
+}
+
+List<String> _parseOptions(Object? rawOptions) {
+  if (rawOptions is List) {
+    return rawOptions.map((value) => value.toString()).toList(growable: false);
   }
+  if (rawOptions is Map) {
+    return rawOptions.values
+        .map((value) => value.toString())
+        .toList(growable: false);
+  }
+  if (rawOptions is String && rawOptions.trim().isNotEmpty) {
+    return rawOptions.split('\n').map((value) => value.trim()).toList();
+  }
+  return const <String>[];
 }

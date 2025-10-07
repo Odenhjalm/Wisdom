@@ -1,39 +1,68 @@
+import 'dart:async';
 import 'dart:math';
+import 'dart:typed_data';
 
 import 'package:file_selector/file_selector.dart' as fs;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:wisdom/shared/widgets/top_nav_action_buttons.dart';
 import 'package:wisdom/shared/theme/ui_consts.dart';
 import 'package:wisdom/shared/utils/snack.dart';
 import 'package:wisdom/shared/widgets/glass_card.dart';
-import 'package:wisdom/features/studio/data/teacher_repository.dart';
 import 'package:wisdom/features/studio/data/studio_repository.dart';
+import 'package:wisdom/features/studio/application/studio_providers.dart';
+import 'package:wisdom/features/studio/application/studio_upload_queue.dart';
+import 'package:wisdom/features/media/application/media_providers.dart';
+import 'package:wisdom/features/courses/application/course_providers.dart'
+    as course_providers;
 import 'package:wisdom/features/courses/data/courses_repository.dart';
 import 'package:wisdom/features/payments/presentation/paywall_prompt.dart';
-import 'package:wisdom/domain/services/auth_service.dart';
-import 'package:wisdom/supabase_client.dart';
+import 'package:wisdom/core/auth/auth_controller.dart';
+import 'package:wisdom/core/errors/app_failure.dart';
 import 'package:wisdom/widgets/base_page.dart';
+
+enum _UploadKind { image, video, audio, pdf }
+
+extension _UploadKindExtension on _UploadKind {
+  String get label {
+    switch (this) {
+      case _UploadKind.image:
+        return 'Bild';
+      case _UploadKind.video:
+        return 'Video';
+      case _UploadKind.audio:
+        return 'Ljud';
+      case _UploadKind.pdf:
+        return 'PDF';
+    }
+  }
+
+  IconData get icon {
+    switch (this) {
+      case _UploadKind.image:
+        return Icons.image_outlined;
+      case _UploadKind.video:
+        return Icons.movie_creation_outlined;
+      case _UploadKind.audio:
+        return Icons.audiotrack_outlined;
+      case _UploadKind.pdf:
+        return Icons.picture_as_pdf_outlined;
+    }
+  }
+}
 
 class CourseEditorScreen extends ConsumerStatefulWidget {
   final String? courseId;
-  final TeacherRepository? teacherRepository;
   final StudioRepository? studioRepository;
   final CoursesRepository? coursesRepository;
-  final AuthService? authService;
-  final SupabaseClient? supabaseClient;
 
   const CourseEditorScreen({
     super.key,
     this.courseId,
-    this.teacherRepository,
     this.studioRepository,
     this.coursesRepository,
-    this.authService,
-    this.supabaseClient,
   });
 
   @override
@@ -43,10 +72,8 @@ class CourseEditorScreen extends ConsumerStatefulWidget {
 class _CourseEditorScreenState extends ConsumerState<CourseEditorScreen> {
   bool _checking = true;
   bool _allowed = false;
-  late final TeacherRepository _repo;
   late final StudioRepository _studioRepo;
   late final CoursesRepository _courseRepo;
-  AuthService? _authService;
   List<Map<String, dynamic>> _courses = <Map<String, dynamic>>[];
   String? _selectedCourseId;
   List<Map<String, dynamic>> _modules = <Map<String, dynamic>>[];
@@ -61,8 +88,9 @@ class _CourseEditorScreenState extends ConsumerState<CourseEditorScreen> {
 
   List<Map<String, dynamic>> _lessonMedia = <Map<String, dynamic>>[];
   bool _mediaLoading = false;
-  bool _uploadingMedia = false;
   String? _mediaStatus;
+  bool _downloadingMedia = false;
+  String? _downloadStatus;
   bool _moduleActionBusy = false;
   bool _lessonActionBusy = false;
 
@@ -81,6 +109,8 @@ class _CourseEditorScreenState extends ConsumerState<CourseEditorScreen> {
   String? _previewError;
   CourseDetailData? _previewDetail;
 
+  ProviderSubscription<List<UploadJob>>? _uploadSubscription;
+
   Map<String, dynamic>? _quiz;
   final TextEditingController _qPrompt = TextEditingController();
   final TextEditingController _qOptions = TextEditingController();
@@ -91,15 +121,19 @@ class _CourseEditorScreenState extends ConsumerState<CourseEditorScreen> {
   @override
   void initState() {
     super.initState();
-    _repo = widget.teacherRepository ?? TeacherRepository();
-    _studioRepo = widget.studioRepository ?? StudioRepository();
-    _courseRepo = widget.coursesRepository ?? CoursesRepository();
-    _authService = widget.authService;
+    _studioRepo = widget.studioRepository ?? ref.read(studioRepositoryProvider);
+    _courseRepo = widget.coursesRepository ??
+        ref.read(course_providers.coursesRepositoryProvider);
     _bootstrap();
+    _uploadSubscription = ref.listenManual<List<UploadJob>>(
+      studioUploadQueueProvider,
+      _onUploadQueueChanged,
+    );
   }
 
   @override
   void dispose() {
+    _uploadSubscription?.close();
     _qPrompt.dispose();
     _qOptions.dispose();
     _qCorrect.dispose();
@@ -113,15 +147,16 @@ class _CourseEditorScreenState extends ConsumerState<CourseEditorScreen> {
   }
 
   Future<void> _bootstrap() async {
-    final sb = widget.supabaseClient ?? ref.read(supabaseMaybeProvider);
-    if (sb == null || sb.auth.currentUser == null) {
+    final authState = ref.read(authControllerProvider);
+    final profile = authState.profile;
+    if (profile == null) {
       if (!mounted || !context.mounted) return;
       context.go('/login');
       return;
     }
     try {
-      final authSvc = _authService ?? AuthService(client: sb);
-      final allowed = await authSvc.isTeacher();
+      final status = await ref.read(studioRepositoryProvider).fetchStatus();
+      final allowed = status.isTeacher || profile.isTeacher || profile.isAdmin;
       List<Map<String, dynamic>> myCourses = <Map<String, dynamic>>[];
       if (allowed) {
         myCourses = await _studioRepo.myCourses();
@@ -285,7 +320,9 @@ class _CourseEditorScreenState extends ConsumerState<CourseEditorScreen> {
   }
 
   Widget _buildFullAccessPreview(
-      BuildContext context, CourseDetailData detail) {
+    BuildContext context,
+    CourseDetailData detail,
+  ) {
     return ListView(
       padding: const EdgeInsets.all(12),
       children: [
@@ -305,28 +342,33 @@ class _CourseEditorScreenState extends ConsumerState<CourseEditorScreen> {
     final result = <Widget>[];
     for (final module in detail.modules) {
       final lessons = detail.lessonsByModule[module.id] ?? const [];
-      result.add(Text(
-        module.title,
-        style:
-            theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
-      ));
+      result.add(
+        Text(
+          module.title,
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      );
       result.add(const SizedBox(height: 6));
       for (final lesson in lessons) {
         final locked = !hasAccess && !lesson.isIntro;
-        result.add(ListTile(
-          dense: true,
-          leading: Icon(
-            locked ? Icons.lock_outline_rounded : Icons.play_circle_outline,
+        result.add(
+          ListTile(
+            dense: true,
+            leading: Icon(
+              locked ? Icons.lock_outline_rounded : Icons.play_circle_outline,
+            ),
+            title: Text(lesson.title),
+            subtitle: Text(
+              lesson.isIntro ? 'Intro (gratis)' : 'Betalt innehåll',
+            ),
+            trailing: Chip(
+              label: Text(lesson.isIntro ? 'Intro' : 'Betalt'),
+              visualDensity: VisualDensity.compact,
+            ),
           ),
-          title: Text(lesson.title),
-          subtitle: Text(
-            lesson.isIntro ? 'Intro (gratis)' : 'Betalt innehåll',
-          ),
-          trailing: Chip(
-            label: Text(lesson.isIntro ? 'Intro' : 'Betalt'),
-            visualDensity: VisualDensity.compact,
-          ),
-        ));
+        );
       }
       result.add(const SizedBox(height: 12));
     }
@@ -684,19 +726,15 @@ class _CourseEditorScreenState extends ConsumerState<CourseEditorScreen> {
       });
     }
     try {
-      await _studioRepo.updateLessonIntro(
-        lessonId: lessonId,
-        isIntro: value,
-      );
+      await _studioRepo.updateLessonIntro(lessonId: lessonId, isIntro: value);
       if (mounted) {
         setState(() {
           _lessons = _lessons
-              .map((lesson) => lesson['id'] == lessonId
-                  ? {
-                      ...lesson,
-                      'is_intro': value,
-                    }
-                  : lesson)
+              .map(
+                (lesson) => lesson['id'] == lessonId
+                    ? {...lesson, 'is_intro': value}
+                    : lesson,
+              )
               .toList();
         });
       }
@@ -712,57 +750,95 @@ class _CourseEditorScreenState extends ConsumerState<CourseEditorScreen> {
   }
 
   Future<void> _pickAndUploadWith(List<String> extensions) async {
-    if (_selectedCourseId == null ||
-        _selectedLessonId == null ||
-        _uploadingMedia) {
+    final courseId = _selectedCourseId;
+    final lessonId = _selectedLessonId;
+    if (courseId == null || lessonId == null) {
+      showSnack(context, 'Välj kurs och lektion innan du laddar upp.');
       return;
     }
-    if (mounted) {
-      setState(() {
-        _uploadingMedia = true;
-        _mediaStatus = null;
-      });
-    }
-    try {
-      final typeGroup = fs.XTypeGroup(label: 'media', extensions: extensions);
-      final file = await fs.openFile(acceptedTypeGroups: [typeGroup]);
-      if (file == null) {
-        if (mounted) {
-          setState(() {
-            _uploadingMedia = false;
-            _mediaStatus = 'Ingen fil vald.';
-          });
-        }
-        return;
+
+    final typeGroup = fs.XTypeGroup(label: 'media', extensions: extensions);
+    final file = await fs.openFile(acceptedTypeGroups: [typeGroup]);
+    if (file == null) {
+      if (mounted) {
+        setState(() => _mediaStatus = 'Ingen fil vald.');
       }
+      return;
+    }
+
+    try {
       final bytes = await file.readAsBytes();
       final contentType = _guessContentType(file.name);
-      await _studioRepo.uploadLessonMedia(
-        courseId: _selectedCourseId!,
-        lessonId: _selectedLessonId!,
-        data: bytes,
-        filename: file.name,
-        contentType: contentType,
-        isIntro: _lessonIntro,
-      );
-      await _loadLessonMedia();
-      await _loadPreviewDetail();
+      ref.read(studioUploadQueueProvider.notifier).enqueueUpload(
+            courseId: courseId,
+            lessonId: lessonId,
+            data: bytes,
+            filename: file.name,
+            contentType: contentType,
+            isIntro: _lessonIntro,
+          );
       if (mounted) {
-        setState(() {
-          _uploadingMedia = false;
-          _mediaStatus = 'Uppladdning klar.';
-        });
+        setState(() => _mediaStatus = 'Köade ${file.name}');
       }
     } catch (e) {
       if (mounted) {
-        setState(() {
-          _uploadingMedia = false;
-          _mediaStatus = 'Fel vid uppladdning: $e';
-        });
+        setState(() => _mediaStatus = 'Fel vid läsning av fil: $e');
       }
       if (mounted && context.mounted) {
-        showSnack(context, 'Kunde inte ladda upp media: $e');
+        showSnack(context, 'Kunde inte läsa filen: $e');
       }
+    }
+  }
+
+  Future<void> _showUploadChooser() async {
+    final courseId = _selectedCourseId;
+    final lessonId = _selectedLessonId;
+    if (courseId == null || lessonId == null) {
+      showSnack(context, 'Välj kurs och lektion innan du laddar upp.');
+      return;
+    }
+
+    final choice = await showModalBottomSheet<_UploadKind>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const ListTile(
+                title: Text('Välj media att ladda upp'),
+                subtitle: Text('Filstorlek max 25 MB'),
+              ),
+              for (final option in _UploadKind.values)
+                ListTile(
+                  leading: Icon(option.icon),
+                  title: Text(option.label),
+                  onTap: () => Navigator.of(context).pop(option),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+
+    if (choice == null) {
+      return;
+    }
+
+    switch (choice) {
+      case _UploadKind.image:
+        await _pickAndUploadWith(const ['png', 'jpg', 'jpeg', 'gif', 'webp', 'heic']);
+        break;
+      case _UploadKind.video:
+        await _pickAndUploadWith(const ['mp4', 'mov', 'm4v', 'webm', 'mkv']);
+        break;
+      case _UploadKind.audio:
+        await _pickAndUploadWith(const ['mp3', 'wav', 'm4a', 'aac', 'ogg']);
+        break;
+      case _UploadKind.pdf:
+        await _pickAndUploadWith(const ['pdf']);
+        break;
     }
   }
 
@@ -805,6 +881,314 @@ class _CourseEditorScreenState extends ConsumerState<CourseEditorScreen> {
         return 'application/pdf';
       default:
         return 'application/octet-stream';
+    }
+  }
+
+  void _onUploadQueueChanged(
+    List<UploadJob>? previous,
+    List<UploadJob> next,
+  ) {
+    if (!mounted) return;
+    final lessonId = _selectedLessonId;
+    if (lessonId == null) return;
+
+    for (final job in next.where((job) => job.lessonId == lessonId)) {
+      final old = _findJob(previous, job.id);
+      if (job.status == UploadJobStatus.success &&
+          old?.status != UploadJobStatus.success) {
+        unawaited(_loadLessonMedia());
+        unawaited(_loadPreviewDetail());
+        if (context.mounted) {
+          showSnack(context, 'Media uppladdad: ${job.filename}');
+        }
+      } else if (job.status == UploadJobStatus.failed &&
+          old?.status != UploadJobStatus.failed) {
+        if (context.mounted) {
+          showSnack(context, 'Uppladdning misslyckades: ${job.filename}');
+        }
+      }
+    }
+  }
+
+  UploadJob? _findJob(List<UploadJob>? jobs, String id) {
+    if (jobs == null) return null;
+    for (final job in jobs) {
+      if (job.id == id) return job;
+    }
+    return null;
+  }
+
+  Widget _buildUploadJobCard(UploadJob job) {
+    final queue = ref.read(studioUploadQueueProvider.notifier);
+    final theme = Theme.of(context);
+    final status = job.status;
+    final now = DateTime.now();
+    final kind = _kindForContentType(job.contentType);
+    final icon = _iconForMedia(kind);
+
+    String statusText;
+    Color? statusColor;
+    Widget? progress;
+    final actions = <Widget>[];
+
+    switch (status) {
+      case UploadJobStatus.uploading:
+        final percent =
+            (job.progress * 100).clamp(0.0, 100.0).toStringAsFixed(0);
+        statusText = 'Laddar upp $percent%';
+        progress = LinearProgressIndicator(value: job.progress.clamp(0, 1));
+        actions.add(TextButton.icon(
+          onPressed: () => queue.cancelUpload(job.id),
+          icon: const Icon(Icons.cancel_outlined),
+          label: const Text('Avbryt'),
+        ));
+        break;
+      case UploadJobStatus.pending:
+        if (job.scheduledAt != null && job.scheduledAt!.isAfter(now)) {
+          final rawRemaining = job.scheduledAt!.difference(now).inSeconds;
+          final remaining = rawRemaining <= 0 ? 1 : rawRemaining;
+          statusText = 'Försök igen om ${remaining}s';
+        } else {
+          statusText = 'Köad';
+        }
+        actions.add(TextButton.icon(
+          onPressed: () => queue.cancelUpload(job.id),
+          icon: const Icon(Icons.cancel_outlined),
+          label: const Text('Avbryt'),
+        ));
+        break;
+      case UploadJobStatus.failed:
+        statusText = job.error ?? 'Uppladdningen misslyckades';
+        statusColor = theme.colorScheme.error;
+        actions.add(TextButton.icon(
+          onPressed: () => queue.retryUpload(job.id),
+          icon: const Icon(Icons.refresh),
+          label: const Text('Försök igen'),
+        ));
+        actions.add(IconButton(
+          tooltip: 'Rensa',
+          icon: const Icon(Icons.clear),
+          onPressed: () => queue.removeJob(job.id),
+        ));
+        break;
+      case UploadJobStatus.cancelled:
+        statusText = job.error ?? 'Avbruten';
+        statusColor = theme.colorScheme.outline;
+        actions.add(IconButton(
+          tooltip: 'Rensa',
+          icon: const Icon(Icons.clear),
+          onPressed: () => queue.removeJob(job.id),
+        ));
+        break;
+      case UploadJobStatus.success:
+        statusText = 'Uppladdning klar';
+        statusColor = theme.colorScheme.secondary;
+        actions.add(IconButton(
+          tooltip: 'Rensa',
+          icon: const Icon(Icons.check_circle_outline),
+          onPressed: () => queue.removeJob(job.id),
+        ));
+        break;
+    }
+
+    final attemptInfo =
+        'Försök ${job.attempts}/${job.maxAttempts} • ${job.createdAt.toLocal()}';
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(icon, size: 32),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    job.filename,
+                    style: theme.textTheme.titleMedium,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                for (final action in actions) ...[
+                  const SizedBox(width: 8),
+                  action,
+                ],
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              statusText,
+              style: theme.textTheme.bodyMedium?.copyWith(color: statusColor),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              attemptInfo,
+              style: theme.textTheme.labelSmall,
+            ),
+            if (progress != null) ...[
+              const SizedBox(height: 8),
+              progress,
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _downloadMedia(Map<String, dynamic> media) async {
+    if (_downloadingMedia) return;
+    final name = _fileNameFromMedia(media);
+    setState(() {
+      _downloadingMedia = true;
+      _downloadStatus = 'Hämtar $name…';
+    });
+    try {
+      Uint8List bytes;
+      final downloadPath = media['download_url'] as String?;
+      if (downloadPath != null && downloadPath.isNotEmpty) {
+        final cacheKey = (media['media_id'] ?? media['id']).toString();
+        final extension = _extensionFromFileName(name);
+        bytes = await ref.read(mediaRepositoryProvider).cacheMediaBytes(
+              cacheKey: cacheKey,
+              downloadPath: downloadPath,
+              fileExtension: extension,
+            );
+      } else {
+        bytes = await _studioRepo.downloadMedia(media['id'] as String);
+      }
+      final location = await fs.getSaveLocation(suggestedName: name);
+      if (location == null) {
+        if (mounted) {
+          setState(() {
+            _downloadingMedia = false;
+            _downloadStatus = 'Hämtning avbruten.';
+          });
+        }
+        return;
+      }
+      final file = fs.XFile.fromData(
+        bytes,
+        mimeType: _mimeForKind(media['kind'] as String?),
+        name: name,
+      );
+      await file.saveTo(location.path);
+      if (mounted) {
+        setState(() {
+          _downloadingMedia = false;
+          _downloadStatus = 'Sparad till ${location.path}';
+        });
+      }
+      if (mounted && context.mounted) {
+        showSnack(context, 'Media sparad till ${location.path}');
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _downloadingMedia = false;
+          _downloadStatus = 'Fel vid hämtning: $e';
+        });
+      }
+      if (mounted && context.mounted) {
+        showSnack(context, 'Kunde inte hämta media: $e');
+      }
+    }
+  }
+
+  String? _resolveMediaUrl(String? path) {
+    if (path == null || path.isEmpty) return null;
+    try {
+      return ref.read(mediaRepositoryProvider).resolveUrl(path);
+    } catch (_) {
+      return path;
+    }
+  }
+
+  String _fileNameFromMedia(Map<String, dynamic> media) {
+    final originalName = media['original_name'] as String?;
+    if (originalName != null && originalName.isNotEmpty) {
+      return originalName;
+    }
+    final storagePath = media['storage_path'] as String?;
+    if (storagePath != null && storagePath.isNotEmpty) {
+      final segments = storagePath.split('/');
+      return segments.isNotEmpty ? segments.last : storagePath;
+    }
+    final download = media['download_url'] as String?;
+    if (download != null && download.isNotEmpty) {
+      final uri = Uri.parse(download);
+      if (uri.pathSegments.isNotEmpty) {
+        return uri.pathSegments.last;
+      }
+    }
+    final id = media['id'];
+    return id != null ? 'media_$id' : 'media.bin';
+  }
+
+  String? _extensionFromFileName(String name) {
+    final index = name.lastIndexOf('.');
+    if (index <= 0 || index == name.length - 1) return null;
+    final ext = name.substring(index + 1).toLowerCase();
+    return ext.isEmpty ? null : ext;
+  }
+
+  String _mimeForKind(String? kind) {
+    switch (kind) {
+      case 'image':
+        return 'image/*';
+      case 'video':
+        return 'video/*';
+      case 'audio':
+        return 'audio/*';
+      case 'pdf':
+        return 'application/pdf';
+      default:
+        return 'application/octet-stream';
+    }
+  }
+
+  String _kindForContentType(String contentType) {
+    if (contentType.startsWith('image/')) return 'image';
+    if (contentType.startsWith('video/')) return 'video';
+    if (contentType.startsWith('audio/')) return 'audio';
+    if (contentType == 'application/pdf') return 'pdf';
+    return 'other';
+  }
+
+  IconData _iconForMedia(String? kind) {
+    switch (kind) {
+      case 'image':
+        return Icons.image_outlined;
+      case 'video':
+        return Icons.movie_creation_outlined;
+      case 'audio':
+        return Icons.audiotrack_outlined;
+      case 'pdf':
+        return Icons.picture_as_pdf_outlined;
+      default:
+        return Icons.insert_drive_file_outlined;
+    }
+  }
+
+  Future<void> _previewMedia(Map<String, dynamic> media) async {
+    final kind = media['kind'] as String? ?? 'other';
+    final url = _resolveMediaUrl(media['download_url'] as String?);
+    if (!mounted) return;
+    if (kind == 'image' && url != null) {
+      await showDialog<void>(
+        context: context,
+        builder: (context) => Dialog(
+          insetPadding: const EdgeInsets.all(24),
+          child: InteractiveViewer(
+            child: Image.network(url, fit: BoxFit.contain),
+          ),
+        ),
+      );
+    } else {
+      await _downloadMedia(media);
     }
   }
 
@@ -884,10 +1268,13 @@ class _CourseEditorScreenState extends ConsumerState<CourseEditorScreen> {
       final map = Map<String, dynamic>.from(updated);
       setState(() {
         _courses = _courses
-            .map((course) =>
-                course['id'] == courseId ? {...course, ...map} : course)
+            .map(
+              (course) =>
+                  course['id'] == courseId ? {...course, ...map} : course,
+            )
             .toList();
       });
+      ref.invalidate(myCoursesProvider);
       await _loadCourseMeta();
       if (!mounted || !context.mounted) return;
       showSnack(context, 'Kursinformation sparad.');
@@ -923,9 +1310,8 @@ class _CourseEditorScreenState extends ConsumerState<CourseEditorScreen> {
   }
 
   Future<void> _createCourse() async {
-    final sb = ref.read(supabaseMaybeProvider);
-    final user = sb?.auth.currentUser;
-    if (sb == null || user == null) {
+    final profile = ref.read(authControllerProvider).profile;
+    if (profile == null) {
       if (!mounted || !context.mounted) return;
       context.go('/login');
       return;
@@ -949,13 +1335,14 @@ class _CourseEditorScreenState extends ConsumerState<CourseEditorScreen> {
         _courses = <Map<String, dynamic>>[row, ..._courses];
         _selectedCourseId = row['id'] as String;
       });
+      ref.invalidate(myCoursesProvider);
       _newCourseTitle.clear();
       _newCourseDesc.clear();
       await _loadCourseMeta();
       await _loadModules();
       if (!mounted || !context.mounted) return;
       showSnack(context, 'Kurs skapad.');
-    } on PostgrestException catch (e) {
+    } on AppFailure catch (e) {
       if (!mounted || !context.mounted) return;
       showSnack(context, 'Kunde inte skapa: ${e.message}');
     } catch (e) {
@@ -968,16 +1355,16 @@ class _CourseEditorScreenState extends ConsumerState<CourseEditorScreen> {
     final cid = _selectedCourseId;
     if (cid == null) return;
     try {
-      final quiz = await _repo.ensureQuiz(cid);
-      final qs = await _repo.quizQuestions(quiz['id'] as String);
+      final quiz = await _studioRepo.ensureQuiz(cid);
+      final qs = await _studioRepo.quizQuestions(quiz['id'] as String);
       if (!mounted) return;
       setState(() {
         _quiz = quiz;
         _questions = qs;
       });
-    } on PostgrestException catch (e) {
+    } on AppFailure catch (e) {
       if (!mounted || !context.mounted) return;
-      showSnack(context, 'Quiz stöds bara för äldre kurser: ${e.message}');
+      showSnack(context, 'Kunde inte ladda quiz: ${e.message}');
     } catch (e) {
       if (!mounted || !context.mounted) return;
       showSnack(context, 'Kunde inte ladda quiz: $e');
@@ -1052,13 +1439,13 @@ class _CourseEditorScreenState extends ConsumerState<CourseEditorScreen> {
       'correct': correct,
     };
     try {
-      await _repo.upsertQuestion(data);
+      await _studioRepo.upsertQuestion(quizId: quizId, data: data);
       _qPrompt.clear();
       _qOptions.clear();
       _qCorrect.clear();
-      final qs = await _repo.quizQuestions(quizId);
+      final qs = await _studioRepo.quizQuestions(quizId);
       if (mounted) setState(() => _questions = qs);
-    } on PostgrestException catch (e) {
+    } on AppFailure catch (e) {
       if (!mounted || !context.mounted) return;
       showSnack(context, 'Kunde inte spara quizfråga: ${e.message}');
     } catch (e) {
@@ -1069,13 +1456,13 @@ class _CourseEditorScreenState extends ConsumerState<CourseEditorScreen> {
 
   Future<void> _deleteQuestion(String id) async {
     try {
-      await _repo.deleteQuestion(id);
+      await _studioRepo.deleteQuestion(_quiz!['id'] as String, id);
       if (_quiz != null) {
-        final qs = await _repo.quizQuestions(_quiz!['id'] as String);
+        final qs = await _studioRepo.quizQuestions(_quiz!['id'] as String);
         if (!mounted) return;
         setState(() => _questions = qs);
       }
-    } on PostgrestException catch (e) {
+    } on AppFailure catch (e) {
       if (!mounted || !context.mounted) return;
       showSnack(context, 'Kunde inte ta bort fråga: ${e.message}');
     } catch (e) {
@@ -1088,9 +1475,7 @@ class _CourseEditorScreenState extends ConsumerState<CourseEditorScreen> {
   Widget build(BuildContext context) {
     if (_checking) {
       return const Scaffold(
-        body: BasePage(
-          child: Center(child: CircularProgressIndicator()),
-        ),
+        body: BasePage(child: Center(child: CircularProgressIndicator())),
       );
     }
     if (!_allowed) {
@@ -1099,6 +1484,12 @@ class _CourseEditorScreenState extends ConsumerState<CourseEditorScreen> {
         child: const Center(child: Text('Behörighet krävs (läraråtkomst).')),
       );
     }
+    final uploadJobs = ref.watch(studioUploadQueueProvider);
+    final lessonUploadJobs = _selectedLessonId == null
+        ? const <UploadJob>[]
+        : (uploadJobs.where((job) => job.lessonId == _selectedLessonId).toList()
+          ..sort((a, b) => b.createdAt.compareTo(a.createdAt)));
+
     return _GlassScaffold(
       appBar: _buildAppBar(),
       child: SingleChildScrollView(
@@ -1112,10 +1503,12 @@ class _CourseEditorScreenState extends ConsumerState<CourseEditorScreen> {
                 key: ValueKey('course-${_selectedCourseId ?? 'none'}'),
                 initialValue: _selectedCourseId,
                 items: _courses
-                    .map((c) => DropdownMenuItem<String>(
-                          value: c['id'] as String,
-                          child: Text('${c['title']}'),
-                        ))
+                    .map(
+                      (c) => DropdownMenuItem<String>(
+                        value: c['id'] as String,
+                        child: Text('${c['title']}'),
+                      ),
+                    )
                     .toList(),
                 onChanged: (value) async {
                   setState(() => _selectedCourseId = value);
@@ -1144,21 +1537,24 @@ class _CourseEditorScreenState extends ConsumerState<CourseEditorScreen> {
                         children: [
                           TextField(
                             controller: _courseTitleCtrl,
-                            decoration:
-                                const InputDecoration(labelText: 'Titel'),
+                            decoration: const InputDecoration(
+                              labelText: 'Titel',
+                            ),
                           ),
                           gap12,
                           TextField(
                             controller: _courseSlugCtrl,
-                            decoration:
-                                const InputDecoration(labelText: 'Slug'),
+                            decoration: const InputDecoration(
+                              labelText: 'Slug',
+                            ),
                           ),
                           gap12,
                           TextField(
                             controller: _courseDescCtrl,
                             maxLines: 3,
-                            decoration:
-                                const InputDecoration(labelText: 'Beskrivning'),
+                            decoration: const InputDecoration(
+                              labelText: 'Beskrivning',
+                            ),
                           ),
                           gap12,
                           TextField(
@@ -1202,7 +1598,8 @@ class _CourseEditorScreenState extends ConsumerState<CourseEditorScreen> {
                                         width: 16,
                                         height: 16,
                                         child: CircularProgressIndicator(
-                                            strokeWidth: 2),
+                                          strokeWidth: 2,
+                                        ),
                                       )
                                     : const Icon(Icons.save_outlined),
                                 label: const Text('Spara kurs'),
@@ -1239,7 +1636,8 @@ class _CourseEditorScreenState extends ConsumerState<CourseEditorScreen> {
                         child: TextField(
                           controller: _newCourseDesc,
                           decoration: const InputDecoration(
-                              labelText: 'Beskrivning (valfri)'),
+                            labelText: 'Beskrivning (valfri)',
+                          ),
                           maxLines: 2,
                         ),
                       ),
@@ -1298,13 +1696,14 @@ class _CourseEditorScreenState extends ConsumerState<CourseEditorScreen> {
                           Row(
                             children: [
                               Expanded(
-                                  child: DropdownButtonFormField<String>(
-                                    key: ValueKey(
-                                        'module-${_selectedModuleId ?? 'none'}'),
-                                    initialValue: _selectedModuleId,
-                                    items: _modules
-                                        .map(
-                                          (module) => DropdownMenuItem<String>(
+                                child: DropdownButtonFormField<String>(
+                                  key: ValueKey(
+                                    'module-${_selectedModuleId ?? 'none'}',
+                                  ),
+                                  initialValue: _selectedModuleId,
+                                  items: _modules
+                                      .map(
+                                        (module) => DropdownMenuItem<String>(
                                           value: module['id'] as String,
                                           child: Text(
                                             (module['title'] as String?) ??
@@ -1345,7 +1744,8 @@ class _CourseEditorScreenState extends ConsumerState<CourseEditorScreen> {
                                 Expanded(
                                   child: DropdownButtonFormField<String>(
                                     key: ValueKey(
-                                        'lesson-${_selectedLessonId ?? 'none'}'),
+                                      'lesson-${_selectedLessonId ?? 'none'}',
+                                    ),
                                     initialValue: _selectedLessonId,
                                     items: _lessons
                                         .map(
@@ -1409,7 +1809,8 @@ class _CourseEditorScreenState extends ConsumerState<CourseEditorScreen> {
                                     ? null
                                     : (value) => _setLessonIntro(value),
                                 title: const Text(
-                                    'Lektionen är introduktion (gratis)'),
+                                  'Lektionen är introduktion (gratis)',
+                                ),
                                 subtitle: const Text(
                                   'Intro laddas upp till public-media, betalt till course-media.',
                                 ),
@@ -1417,77 +1818,107 @@ class _CourseEditorScreenState extends ConsumerState<CourseEditorScreen> {
                               gap12,
                               Builder(
                                 builder: (context) {
-                                  final canUpload = _selectedLessonId != null &&
-                                      !_uploadingMedia;
-                                  return Wrap(
-                                    spacing: 12,
-                                    runSpacing: 8,
+                                  final canUpload = _selectedLessonId != null;
+                                  return Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      OutlinedButton.icon(
-                                        onPressed: canUpload
-                                            ? () => _pickAndUploadWith(const [
-                                                  'png',
-                                                  'jpg',
-                                                  'jpeg',
-                                                  'gif',
-                                                  'webp',
-                                                  'heic'
-                                                ])
-                                            : null,
-                                        icon: const Icon(Icons.image_outlined),
-                                        label: const Text('Ladda upp bild'),
+                                      FilledButton.icon(
+                                        onPressed: canUpload ? _showUploadChooser : null,
+                                        icon: const Icon(Icons.file_upload_outlined),
+                                        label: const Text('Ladda upp media'),
                                       ),
-                                      OutlinedButton.icon(
-                                        onPressed: canUpload
-                                            ? () => _pickAndUploadWith(const [
-                                                  'mp4',
-                                                  'mov',
-                                                  'm4v',
-                                                  'webm',
-                                                  'mkv'
-                                                ])
-                                            : null,
-                                        icon: const Icon(
-                                            Icons.movie_creation_outlined),
-                                        label: const Text('Ladda upp video'),
-                                      ),
-                                      OutlinedButton.icon(
-                                        onPressed: canUpload
-                                            ? () => _pickAndUploadWith(const [
-                                                  'mp3',
-                                                  'wav',
-                                                  'm4a',
-                                                  'aac',
-                                                  'ogg'
-                                                ])
-                                            : null,
-                                        icon: const Icon(
-                                            Icons.audiotrack_outlined),
-                                        label: const Text('Ladda upp ljud'),
-                                      ),
-                                      OutlinedButton.icon(
-                                        onPressed: canUpload
-                                            ? () => _pickAndUploadWith(
-                                                const ['pdf'])
-                                            : null,
-                                        icon: const Icon(
-                                            Icons.picture_as_pdf_outlined),
-                                        label: const Text('Ladda upp PDF'),
+                                      const SizedBox(height: 8),
+                                      Wrap(
+                                        spacing: 12,
+                                        runSpacing: 8,
+                                        children: [
+                                          OutlinedButton.icon(
+                                            onPressed: canUpload
+                                                ? () => _pickAndUploadWith(const [
+                                                      'png',
+                                                      'jpg',
+                                                      'jpeg',
+                                                      'gif',
+                                                      'webp',
+                                                      'heic',
+                                                    ])
+                                                : null,
+                                            icon: const Icon(Icons.image_outlined),
+                                            label: const Text('Bild'),
+                                          ),
+                                          OutlinedButton.icon(
+                                            onPressed: canUpload
+                                                ? () => _pickAndUploadWith(const [
+                                                      'mp4',
+                                                      'mov',
+                                                      'm4v',
+                                                      'webm',
+                                                      'mkv',
+                                                    ])
+                                                : null,
+                                            icon: const Icon(Icons.movie_creation_outlined),
+                                            label: const Text('Video'),
+                                          ),
+                                          OutlinedButton.icon(
+                                            onPressed: canUpload
+                                                ? () => _pickAndUploadWith(const [
+                                                      'mp3',
+                                                      'wav',
+                                                      'm4a',
+                                                      'aac',
+                                                      'ogg',
+                                                    ])
+                                                : null,
+                                            icon: const Icon(Icons.audiotrack_outlined),
+                                            label: const Text('Ljud'),
+                                          ),
+                                          OutlinedButton.icon(
+                                            onPressed: canUpload
+                                                ? () => _pickAndUploadWith(const ['pdf'])
+                                                : null,
+                                            icon: const Icon(Icons.picture_as_pdf_outlined),
+                                            label: const Text('PDF'),
+                                          ),
+                                        ],
                                       ),
                                     ],
                                   );
                                 },
                               ),
+                              if (lessonUploadJobs.isNotEmpty) ...[
+                                gap8,
+                                Column(
+                                  children: [
+                                    for (final job in lessonUploadJobs)
+                                      _buildUploadJobCard(job),
+                                  ],
+                                ),
+                              ],
                               if (_mediaStatus != null) ...[
                                 gap8,
                                 Text(_mediaStatus!),
+                              ],
+                              if (_downloadStatus != null) ...[
+                                gap4,
+                                Text(
+                                  _downloadStatus!,
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodySmall
+                                      ?.copyWith(
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.secondary,
+                                      ),
+                                ),
                               ],
                               const Divider(height: 24),
                               if (_mediaLoading)
                                 const Padding(
                                   padding: EdgeInsets.all(12),
                                   child: Center(
-                                      child: CircularProgressIndicator()),
+                                    child: CircularProgressIndicator(),
+                                  ),
                                 )
                               else if (_lessonMedia.isEmpty)
                                 const Text('Inget media uppladdat ännu.')
@@ -1505,62 +1936,120 @@ class _CourseEditorScreenState extends ConsumerState<CourseEditorScreen> {
                                       final media = _lessonMedia[index];
                                       final bucket = (media['storage_bucket']
                                               as String?) ??
-                                          'course-media';
-                                      final intro = bucket == 'public-media';
+                                          '';
+                                      final intro = media['is_intro'] == true ||
+                                          bucket == 'public-media';
                                       final kind =
-                                          (media['kind'] as String?) ?? 'media';
-                                      final path =
-                                          media['storage_path'] as String? ??
-                                              '';
+                                          (media['kind'] as String?) ?? 'other';
                                       final position =
-                                          (media['position'] ?? '').toString();
+                                          media['position'] as int? ??
+                                              index + 1;
+                                      final downloadUrl = _resolveMediaUrl(
+                                        media['download_url'] as String?,
+                                      );
+                                      final fileName = _fileNameFromMedia(
+                                        media,
+                                      );
+
+                                      Widget leading;
+                                      if (kind == 'image' &&
+                                          downloadUrl != null) {
+                                        leading = ClipRRect(
+                                          borderRadius: const BorderRadius.all(
+                                            Radius.circular(8),
+                                          ),
+                                          child: Image.network(
+                                            downloadUrl,
+                                            fit: BoxFit.cover,
+                                            width: 64,
+                                            height: 64,
+                                            errorBuilder: (_, __, ___) => Icon(
+                                              _iconForMedia(kind),
+                                              size: 32,
+                                            ),
+                                          ),
+                                        );
+                                      } else {
+                                        leading = Icon(
+                                          _iconForMedia(kind),
+                                          size: 32,
+                                        );
+                                      }
+
                                       return Padding(
                                         key: ValueKey(media['id']),
-                                        padding:
-                                            const EdgeInsets.only(bottom: 8),
+                                        padding: const EdgeInsets.only(
+                                          bottom: 8,
+                                        ),
                                         child: Card(
                                           child: ListTile(
-                                            leading:
-                                                ReorderableDragStartListener(
-                                              index: index,
-                                              child: const Icon(
-                                                  Icons.drag_handle_rounded),
+                                            onTap: () => _previewMedia(media),
+                                            leading: SizedBox(
+                                              width: 64,
+                                              child: Center(child: leading),
                                             ),
-                                            title: Text(kind),
+                                            title: Text(
+                                              fileName,
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
                                             subtitle: Column(
                                               crossAxisAlignment:
                                                   CrossAxisAlignment.start,
                                               mainAxisSize: MainAxisSize.min,
                                               children: [
-                                                Text(
-                                                  path,
-                                                  maxLines: 1,
-                                                  overflow:
-                                                      TextOverflow.ellipsis,
-                                                ),
-                                                const SizedBox(height: 4),
-                                                Text(
-                                                  '$bucket • pos $position',
-                                                  style: Theme.of(context)
-                                                      .textTheme
-                                                      .labelSmall,
-                                                ),
-                                                const SizedBox(height: 4),
                                                 Chip(
-                                                  label: Text(intro
-                                                      ? 'Intro (gratis)'
-                                                      : 'Betalt'),
+                                                  label: Text(
+                                                    intro
+                                                        ? 'Intro (gratis)'
+                                                        : 'Premium',
+                                                  ),
                                                   visualDensity:
                                                       VisualDensity.compact,
                                                 ),
+                                                Text(
+                                                  bucket.isEmpty
+                                                      ? 'Intern lagring'
+                                                      : bucket,
+                                                  style: Theme.of(
+                                                    context,
+                                                  ).textTheme.labelSmall,
+                                                ),
+                                                Text(
+                                                  'Position $position • ${kind.toUpperCase()}',
+                                                  style: Theme.of(
+                                                    context,
+                                                  ).textTheme.labelSmall,
+                                                ),
                                               ],
                                             ),
-                                            trailing: IconButton(
-                                              tooltip: 'Ta bort',
-                                              icon: const Icon(
-                                                  Icons.delete_outline),
-                                              onPressed: () => _deleteMedia(
-                                                  media['id'] as String),
+                                            trailing: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                IconButton(
+                                                  tooltip: 'Ladda ner',
+                                                  icon: const Icon(
+                                                    Icons.download_outlined,
+                                                  ),
+                                                  onPressed: () =>
+                                                      _downloadMedia(media),
+                                                ),
+                                                IconButton(
+                                                  tooltip: 'Ta bort',
+                                                  icon: const Icon(
+                                                    Icons.delete_outline,
+                                                  ),
+                                                  onPressed: () => _deleteMedia(
+                                                    media['id'] as String,
+                                                  ),
+                                                ),
+                                                ReorderableDragStartListener(
+                                                  index: index,
+                                                  child: const Icon(
+                                                    Icons.drag_handle_rounded,
+                                                  ),
+                                                ),
+                                              ],
                                             ),
                                           ),
                                         ),
@@ -1590,7 +2079,8 @@ class _CourseEditorScreenState extends ConsumerState<CourseEditorScreen> {
                   if (_quiz == null) const Text('Inget quiz laddat.'),
                   if (_quiz != null) ...[
                     Text(
-                        'Quiz: ${_quiz!['title']} (gräns: ${_quiz!['pass_score']}%)'),
+                      'Quiz: ${_quiz!['title']} (gräns: ${_quiz!['pass_score']}%)',
+                    ),
                     gap12,
                     Wrap(
                       spacing: 8,
@@ -1598,13 +2088,14 @@ class _CourseEditorScreenState extends ConsumerState<CourseEditorScreen> {
                         for (final kind in <String>[
                           'single',
                           'multi',
-                          'boolean'
+                          'boolean',
                         ])
                           ChoiceChip(
                             label: Text(kind),
                             selected: _qKind == kind,
                             onSelected: (selected) => setState(
-                                () => _qKind = selected ? kind : _qKind),
+                              () => _qKind = selected ? kind : _qKind,
+                            ),
                           ),
                       ],
                     ),
@@ -1618,7 +2109,8 @@ class _CourseEditorScreenState extends ConsumerState<CourseEditorScreen> {
                       TextField(
                         controller: _qOptions,
                         decoration: const InputDecoration(
-                            labelText: 'Alternativ (komma-separerade)'),
+                          labelText: 'Alternativ (komma-separerade)',
+                        ),
                       ),
                       gap8,
                       TextField(
@@ -1632,7 +2124,8 @@ class _CourseEditorScreenState extends ConsumerState<CourseEditorScreen> {
                       TextField(
                         controller: _qCorrect,
                         decoration: const InputDecoration(
-                            labelText: 'Rätt svar (true/false)'),
+                          labelText: 'Rätt svar (true/false)',
+                        ),
                       ),
                     ],
                     gap10,
@@ -1660,7 +2153,8 @@ class _CourseEditorScreenState extends ConsumerState<CourseEditorScreen> {
                             leading: const Icon(Icons.help_outline),
                             title: Text('${q['prompt']}'),
                             subtitle: Text(
-                                'Typ: ${q['kind']} • Pos: ${q['position']}'),
+                              'Typ: ${q['kind']} • Pos: ${q['position']}',
+                            ),
                             trailing: IconButton(
                               icon: const Icon(Icons.delete_outline),
                               onPressed: () =>
@@ -1730,10 +2224,9 @@ class _SectionCard extends StatelessWidget {
             children: [
               Text(
                 title,
-                style: Theme.of(context)
-                    .textTheme
-                    .titleLarge
-                    ?.copyWith(fontWeight: FontWeight.w700),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
               ),
               const Spacer(),
               if (actions != null) ...actions!,

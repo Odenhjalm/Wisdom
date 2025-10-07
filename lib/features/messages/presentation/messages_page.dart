@@ -1,65 +1,72 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:wisdom/data/supabase/supabase_client.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import 'package:wisdom/api/auth_repository.dart';
+import 'package:wisdom/core/errors/app_failure.dart';
+import 'package:wisdom/core/auth/auth_controller.dart';
 import 'package:wisdom/features/community/data/messages_repository.dart';
 import 'package:wisdom/shared/utils/snack.dart';
 import 'package:wisdom/shared/widgets/app_scaffold.dart';
 
-class MessagesPage extends StatefulWidget {
-  final String kind; // 'dm' eller 'service'
-  final String id;
+class MessagesPage extends ConsumerStatefulWidget {
   const MessagesPage({super.key, required this.kind, required this.id});
 
+  /// 'dm' eller 'service'
+  final String kind;
+  final String id;
+
   @override
-  State<MessagesPage> createState() => _MessagesPageState();
+  ConsumerState<MessagesPage> createState() => _MessagesPageState();
 }
 
-class _MessagesPageState extends State<MessagesPage> {
-  final _svc = MessagesRepository();
+class _MessagesPageState extends ConsumerState<MessagesPage> {
+  late final MessagesRepository _repo;
   final _input = TextEditingController();
   bool _loading = true;
   bool _sending = false;
-  List<Map<String, dynamic>> _messages = [];
-  RealtimeChannel? _chan;
+  List<MessageRecord> _messages = const [];
+  Timer? _poller;
 
   String get _channel => '${widget.kind}:${widget.id}';
 
   @override
   void initState() {
     super.initState();
+    _repo = MessagesRepository(ref.read(apiClientProvider));
     _load();
-  }
-
-  Future<void> _load() async {
-    setState(() => _loading = true);
-    final rows = await _svc.listMessages(_channel);
-    if (!mounted) return;
-    setState(() {
-      _messages = rows;
-      _loading = false;
+    _poller = Timer.periodic(const Duration(seconds: 5), (_) {
+      _load(silent: true);
     });
-    _subscribe();
   }
 
-  void _subscribe() {
-    _chan?.unsubscribe();
-    final sb = Supa.client;
-    _chan = sb
-        .channel('msg-${widget.kind}-${widget.id}')
-        .onPostgresChanges(
-          event: PostgresChangeEvent.insert,
-          schema: 'app',
-          table: 'messages',
-          callback: (payload) {
-            final row = (payload.newRecord as Map?)?.cast<String, dynamic>();
-            if (row == null) return;
-            // Manual filter for SDKs lacking typed/string filter APIs
-            if (row['channel'] != _channel) return;
-            if (!mounted) return;
-            setState(() => _messages = [..._messages, row]);
-          },
-        )
-        .subscribe();
+  @override
+  void dispose() {
+    _poller?.cancel();
+    _input.dispose();
+    super.dispose();
+  }
+
+  Future<void> _load({bool silent = false}) async {
+    if (!silent) {
+      setState(() => _loading = true);
+    }
+    try {
+      final rows = await _repo.listMessages(_channel);
+      if (!mounted) return;
+      setState(() {
+        _messages = rows;
+        _loading = false;
+      });
+    } catch (error, stackTrace) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+      final failure = AppFailure.from(error, stackTrace);
+      if (!silent) {
+        showSnack(context, failure.message);
+      }
+    }
   }
 
   Future<void> _send() async {
@@ -67,29 +74,21 @@ class _MessagesPageState extends State<MessagesPage> {
     if (text.isEmpty) return;
     setState(() => _sending = true);
     try {
-      await _svc.sendMessage(channel: _channel, content: text);
+      await _repo.sendMessage(channel: _channel, content: text);
       _input.clear();
-      await _load();
-    } catch (e) {
-      if (!mounted || !context.mounted) return;
-      showSnack(context, 'Kunde inte skicka: $e');
+      await _load(silent: true);
+    } catch (error, stackTrace) {
+      if (!mounted) return;
+      final failure = AppFailure.from(error, stackTrace);
+      showSnack(context, 'Kunde inte skicka: ${failure.message}');
     } finally {
       if (mounted) setState(() => _sending = false);
     }
   }
 
   @override
-  void dispose() {
-    _input.dispose();
-    if (_chan != null) {
-      Supa.client.removeChannel(_chan!);
-    }
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final uid = Supa.client.auth.currentUser?.id;
+    final uid = ref.watch(authControllerProvider).profile?.id;
     return AppScaffold(
       title: 'Meddelanden',
       body: Column(
@@ -100,8 +99,8 @@ class _MessagesPageState extends State<MessagesPage> {
                 : ListView.builder(
                     itemCount: _messages.length,
                     itemBuilder: (_, i) {
-                      final m = _messages[i];
-                      final mine = m['sender_id'] == uid;
+                      final message = _messages[i];
+                      final mine = uid != null && message.senderId == uid;
                       return Align(
                         alignment:
                             mine ? Alignment.centerRight : Alignment.centerLeft,
@@ -116,7 +115,7 @@ class _MessagesPageState extends State<MessagesPage> {
                                 : Colors.grey.withValues(alpha: .2),
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          child: Text(m['content'] as String? ?? ''),
+                          child: Text(message.content),
                         ),
                       );
                     },
@@ -141,7 +140,8 @@ class _MessagesPageState extends State<MessagesPage> {
                       ? const SizedBox(
                           height: 18,
                           width: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2))
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
                       : const Text('Skicka'),
                 ),
               ],

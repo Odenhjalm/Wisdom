@@ -1,59 +1,18 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+
+import 'package:wisdom/core/auth/auth_controller.dart';
 import 'package:wisdom/shared/utils/snack.dart';
 import 'package:wisdom/shared/widgets/app_scaffold.dart';
 
-class SettingsPage extends StatelessWidget {
+class SettingsPage extends ConsumerWidget {
   const SettingsPage({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    Future<void> exportData() async {
-      final sb = Supabase.instance.client;
-      try {
-        final res = await sb.rpc('app.export_user_data');
-        final json = (res == null) ? '{}' : res.toString();
-        await Clipboard.setData(ClipboardData(text: json));
-        if (!context.mounted) return;
-        showSnack(context, 'Data exporterad till urklipp');
-      } catch (e) {
-        if (!context.mounted) return;
-        showSnack(context, 'Kunde inte exportera: $e');
-      }
-    }
-
-    Future<void> deleteAccount() async {
-      final sb = Supabase.instance.client;
-      final u = sb.auth.currentUser;
-      if (u == null) return;
-      final ok = await showDialog<bool>(
-        context: context,
-        builder: (_) => AlertDialog(
-          title: const Text('Radera konto?'),
-          content: const Text(
-              'Detta raderar din appdata permanent (ej auth-konto). Är du säker?'),
-          actions: [
-            TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('Avbryt')),
-            ElevatedButton(
-                onPressed: () => Navigator.pop(context, true),
-                child: const Text('Radera')),
-          ],
-        ),
-      );
-      if (ok != true) return;
-      try {
-        await sb.rpc('app.delete_user_data', params: {'p_user': u.id});
-        if (!context.mounted) return;
-        showSnack(context, 'Data raderad.');
-      } catch (e) {
-        if (!context.mounted) return;
-        showSnack(context, 'Kunde inte radera: $e');
-      }
-    }
+  Widget build(BuildContext context, WidgetRef ref) {
+    final authState = ref.watch(authControllerProvider);
+    final profile = authState.profile;
 
     return AppScaffold(
       title: 'Inställningar',
@@ -62,33 +21,67 @@ class SettingsPage extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Tema, språk (sv först), AI-läge (via Remote Config).'),
-            const SizedBox(height: 16),
-            Wrap(
-              spacing: 12,
-              runSpacing: 12,
-              children: [
-                ElevatedButton.icon(
-                  onPressed: exportData,
-                  icon: const Icon(Icons.download_rounded),
-                  label: const Text('Exportera min data'),
-                ),
-                OutlinedButton.icon(
-                  onPressed: deleteAccount,
-                  icon: const Icon(Icons.delete_forever_rounded),
-                  label: const Text('Radera mitt konto (data)'),
-                ),
-                OutlinedButton.icon(
-                  onPressed: () => GoRouter.of(context).push('/legal/privacy'),
-                  icon: const Icon(Icons.policy_rounded),
-                  label: const Text('Integritetspolicy'),
-                ),
-                OutlinedButton.icon(
-                  onPressed: () => GoRouter.of(context).push('/legal/terms'),
-                  icon: const Icon(Icons.description_rounded),
-                  label: const Text('Villkor'),
-                ),
-              ],
+            Text(
+              'Konto',
+              style: Theme.of(
+                context,
+              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 12),
+            if (profile != null) ...[
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.person_outline_rounded),
+                title: Text(profile.displayName ?? profile.email),
+                subtitle: Text(profile.email),
+              ),
+              const SizedBox(height: 12),
+              FilledButton.icon(
+                onPressed: () => context.push('/profile/edit'),
+                icon: const Icon(Icons.edit_rounded),
+                label: const Text('Redigera profil'),
+              ),
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: () async {
+                  await ref.read(authControllerProvider.notifier).logout();
+                  if (!context.mounted) return;
+                  showSnack(context, 'Utloggad');
+                  context.go('/landing');
+                },
+                icon: const Icon(Icons.logout_rounded),
+                label: const Text('Logga ut'),
+              ),
+            ] else ...[
+              const Text('Du är inte inloggad.'),
+              const SizedBox(height: 12),
+              FilledButton(
+                onPressed: () => context.go('/login'),
+                child: const Text('Logga in'),
+              ),
+            ],
+            const SizedBox(height: 24),
+            Text(
+              'Integritet',
+              style: Theme.of(
+                context,
+              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: () => context.push('/legal/privacy'),
+              icon: const Icon(Icons.policy_rounded),
+              label: const Text('Integritetspolicy'),
+            ),
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              onPressed: () => context.push('/legal/terms'),
+              icon: const Icon(Icons.description_rounded),
+              label: const Text('Villkor'),
+            ),
+            const SizedBox(height: 24),
+            const Text(
+              'Export och radering av data kommer i nästa iteration av backend-endpoints.',
             ),
           ],
         ),

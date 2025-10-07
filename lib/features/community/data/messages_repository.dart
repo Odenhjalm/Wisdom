@@ -1,80 +1,76 @@
-import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:wisdom/core/supabase_ext.dart';
+import 'package:wisdom/api/api_client.dart';
+import 'package:wisdom/core/errors/app_failure.dart';
 
 class MessagesRepository {
-  final _sb = Supabase.instance.client;
+  MessagesRepository(this._client);
 
-  Future<List<Map<String, dynamic>>> listDmChannels() async {
-    final uid = _sb.auth.currentUser?.id;
-    if (uid == null) return [];
-    final rows = await _sb.app
-        .from('messages')
-        .select('channel, created_at')
-        .like('channel', 'dm:%')
-        .order('created_at', ascending: false);
-    final set = <String, DateTime>{};
-    for (final r in (rows as List? ?? [])) {
-      final m = Map<String, dynamic>.from(r as Map);
-      final ch = m['channel'] as String?;
-      final at =
-          DateTime.tryParse(m['created_at'] as String? ?? '') ?? DateTime.now();
-      if (ch == null) continue;
-      set[ch] = (set[ch] == null || at.isAfter(set[ch]!)) ? at : set[ch]!;
+  final ApiClient _client;
+
+  Future<List<MessageRecord>> listMessages(String channel) async {
+    try {
+      final response = await _client.get<Map<String, dynamic>>(
+        '/community/messages',
+        queryParameters: {
+          'channel': channel,
+        },
+      );
+      final items = (response['items'] as List? ?? [])
+          .map((item) => MessageRecord.fromJson(
+                Map<String, dynamic>.from(item as Map),
+              ))
+          .toList(growable: false);
+      return items;
+    } catch (error, stackTrace) {
+      throw AppFailure.from(error, stackTrace);
     }
-    final list = set.entries.toList()
-      ..sort((a, b) => b.value.compareTo(a.value));
-    return [
-      for (final e in list)
-        {'channel': e.key, 'last_at': e.value.toIso8601String()}
-    ];
   }
 
-  Future<List<Map<String, dynamic>>> listServiceChannels() async {
-    final rows = await _sb.app
-        .from('messages')
-        .select('channel, created_at')
-        .like('channel', 'service:%')
-        .order('created_at', ascending: false);
-    final set = <String, DateTime>{};
-    for (final r in (rows as List? ?? [])) {
-      final m = Map<String, dynamic>.from(r as Map);
-      final ch = m['channel'] as String?;
-      final at =
-          DateTime.tryParse(m['created_at'] as String? ?? '') ?? DateTime.now();
-      if (ch == null) continue;
-      set[ch] = (set[ch] == null || at.isAfter(set[ch]!)) ? at : set[ch]!;
-    }
-    final list = set.entries.toList()
-      ..sort((a, b) => b.value.compareTo(a.value));
-    return [
-      for (final e in list)
-        {'channel': e.key, 'last_at': e.value.toIso8601String()}
-    ];
-  }
-
-  Future<List<Map<String, dynamic>>> listMessages(String channel) async {
-    final rows = await _sb.app
-        .from('messages')
-        .select('id, sender_id, content, created_at')
-        .eq('channel', channel)
-        .order('created_at');
-    return (rows as List? ?? [])
-        .map((e) => Map<String, dynamic>.from(e as Map))
-        .toList();
-  }
-
-  Future<void> sendMessage({
+  Future<MessageRecord> sendMessage({
     required String channel,
     required String content,
   }) async {
-    final uid = _sb.auth.currentUser?.id;
-    if (uid == null) throw Exception('Inte inloggad');
-    await _sb.app
-        .from('messages')
-        .insert({'channel': channel, 'sender_id': uid, 'content': content});
+    try {
+      final response = await _client.post<Map<String, dynamic>>(
+        '/community/messages',
+        body: {
+          'channel': channel,
+          'content': content,
+        },
+      );
+      return MessageRecord.fromJson(response);
+    } catch (error, stackTrace) {
+      throw AppFailure.from(error, stackTrace);
+    }
   }
+}
 
-  @Deprecated('Use sendMessage instead')
-  Future<void> send(String channel, String content) =>
-      sendMessage(channel: channel, content: content);
+class MessageRecord {
+  const MessageRecord({
+    required this.id,
+    required this.channel,
+    required this.senderId,
+    required this.content,
+    required this.createdAt,
+  });
+
+  final String id;
+  final String channel;
+  final String senderId;
+  final String content;
+  final DateTime createdAt;
+
+  factory MessageRecord.fromJson(Map<String, dynamic> json) {
+    final created = json['created_at'];
+    return MessageRecord(
+      id: json['id'] as String,
+      channel: json['channel'] as String,
+      senderId: json['sender_id'] as String,
+      content: (json['content'] ?? '') as String,
+      createdAt: created is String
+          ? DateTime.tryParse(created) ?? DateTime.fromMillisecondsSinceEpoch(0)
+          : created is DateTime
+              ? created
+              : DateTime.fromMillisecondsSinceEpoch(0),
+    );
+  }
 }

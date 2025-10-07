@@ -1,34 +1,24 @@
-import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:wisdom/core/supabase_ext.dart';
+import 'package:wisdom/api/api_client.dart';
+import 'package:wisdom/core/errors/app_failure.dart';
 
 class FollowsRepository {
-  final _sb = Supabase.instance.client;
+  FollowsRepository(this._client);
+
+  final ApiClient _client;
 
   Future<void> follow(String userId) async {
-    await _sb.schema('app').rpc('follow', params: {'p_user': userId});
+    try {
+      await _client.post('/community/follows/$userId');
+    } catch (error, stackTrace) {
+      throw AppFailure.from(error, stackTrace);
+    }
   }
 
   Future<void> unfollow(String userId) async {
-    await _sb.schema('app').rpc('unfollow', params: {'p_user': userId});
-  }
-
-  Future<List<String>> followersOf(String userId) async {
-    final rows = await _sb.app
-        .from('follows')
-        .select('follower_id')
-        .eq('followee_id', userId);
-    return (rows as List? ?? [])
-        .map((e) => (e as Map)['follower_id'] as String)
-        .toList();
-  }
-
-  Future<List<String>> followingOf(String userId) async {
-    final rows = await _sb.app
-        .from('follows')
-        .select('followee_id')
-        .eq('follower_id', userId);
-    return (rows as List? ?? [])
-        .map((e) => (e as Map)['followee_id'] as String)
-        .toList();
+    try {
+      await _client.delete('/community/follows/$userId');
+    } catch (error, stackTrace) {
+      throw AppFailure.from(error, stackTrace);
+    }
   }
 }

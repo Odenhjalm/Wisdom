@@ -3,33 +3,38 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:wisdom/core/errors/app_failure.dart';
-import 'package:wisdom/core/supabase_ext.dart';
-import 'package:wisdom/features/auth/data/auth_profile_repository.dart';
+import 'package:wisdom/api/auth_repository.dart';
+import 'package:wisdom/core/auth/auth_controller.dart';
 import 'package:wisdom/features/community/data/community_repository.dart';
 import 'package:wisdom/features/community/data/posts_repository.dart';
-import 'package:wisdom/features/studio/data/certificates_repository.dart';
+import 'package:wisdom/features/community/data/admin_repository.dart';
+import 'package:wisdom/features/studio/application/studio_providers.dart';
 import 'package:wisdom/data/models/certificate.dart';
-import 'package:wisdom/supabase_client.dart';
 import 'package:wisdom/features/community/data/meditations_repository.dart';
 
 final communityRepositoryProvider = Provider<CommunityRepository>((ref) {
-  final client = ref.watch(supabaseMaybeProvider);
-  if (client == null) {
-    throw ConfigurationFailure(message: 'Supabase ej konfigurerat.');
-  }
-  return CommunityRepository();
+  final client = ref.watch(apiClientProvider);
+  return CommunityRepository(client);
 });
 
 final postsRepositoryProvider = Provider<PostsRepository>((ref) {
-  final client = ref.watch(supabaseMaybeProvider);
-  if (client == null) {
-    throw ConfigurationFailure(message: 'Supabase ej konfigurerat.');
-  }
+  final client = ref.watch(apiClientProvider);
   return PostsRepository(client: client);
 });
 
-final postsProvider =
-    AutoDisposeFutureProvider<List<CommunityPost>>((ref) async {
+final adminRepositoryProvider = Provider<AdminRepository>((ref) {
+  final client = ref.watch(apiClientProvider);
+  return AdminRepository(client);
+});
+
+final meditationsRepositoryProvider = Provider<MeditationsRepository>((ref) {
+  final client = ref.watch(apiClientProvider);
+  return MeditationsRepository(client);
+});
+
+final postsProvider = AutoDisposeFutureProvider<List<CommunityPost>>((
+  ref,
+) async {
   final repo = ref.watch(postsRepositoryProvider);
   return repo.feed(limit: 50);
 });
@@ -49,20 +54,12 @@ final teacherDirectoryProvider =
   final repo = ref.watch(communityRepositoryProvider);
   try {
     final teachers = await repo.listTeachers();
-    final ids = teachers
-        .map((t) => t['user_id'] as String?)
-        .whereType<String>()
-        .toList();
-    final certCount = await repo.listVerifiedCertCount(ids);
-    final certSpecs = await repo.listVerifiedCertSpecialties(ids);
-    for (final t in teachers) {
-      final id = t['user_id'] as String?;
+    final certCount = <String, int>{};
+    for (final teacher in teachers) {
+      final id = teacher['user_id'] as String?;
       if (id == null) continue;
-      final dirSpecs =
-          (t['specialties'] as List?)?.cast<String>() ?? const <String>[];
-      if (dirSpecs.isEmpty && certSpecs[id] != null) {
-        t['specialties'] = certSpecs[id];
-      }
+      final count = teacher['verified_certificates'];
+      certCount[id] = count is num ? count.toInt() : 0;
     }
     return TeacherDirectoryState(teachers: teachers, certCount: certCount);
   } catch (error, stackTrace) {
@@ -70,22 +67,26 @@ final teacherDirectoryProvider =
   }
 });
 
-final authProfileRepositoryProvider = Provider<AuthProfileRepository>((ref) {
-  return AuthProfileRepository();
-});
-
-final myProfileProvider =
-    AutoDisposeFutureProvider<Map<String, dynamic>?>((ref) async {
-  final repo = ref.watch(authProfileRepositoryProvider);
-  return repo.getMyProfile();
-});
-
-final myCertificatesProvider =
-    AutoDisposeFutureProvider<List<Certificate>>((ref) async {
-  final certs = await CertificatesRepository().myCertificates();
-  return certs
-      .where((c) => c.title != Certificate.teacherApplicationTitle)
-      .toList(growable: false);
+final myCertificatesProvider = AutoDisposeFutureProvider<List<Certificate>>((
+  ref,
+) async {
+  final auth = ref.watch(authControllerProvider);
+  if (auth.profile == null) {
+    return const <Certificate>[];
+  }
+  final repo = ref.watch(certificatesRepositoryProvider);
+  try {
+    final certs = await repo.myCertificates();
+    return certs
+        .where((c) => c.title != Certificate.teacherApplicationTitle)
+        .toList(growable: false);
+  } catch (error, stackTrace) {
+    final failure = AppFailure.from(error, stackTrace);
+    if (failure.kind == AppFailureKind.unauthorized) {
+      return const <Certificate>[];
+    }
+    throw failure;
+  }
 });
 
 class TeacherProfileState {
@@ -103,28 +104,30 @@ class TeacherProfileState {
 }
 
 final teacherProfileProvider =
-    AutoDisposeFutureProvider.family<TeacherProfileState, String>(
-  (ref, userId) async {
-    final repo = ref.watch(communityRepositoryProvider);
-    try {
-      final teacher = await repo.getTeacher(userId);
-      final services = await repo.listServices(userId);
-      final meditations = await repo.listMeditations(userId);
-      final certsRaw = await CertificatesRepository().certificatesOf(userId);
-      final certs = certsRaw
-          .where((c) => c.title != Certificate.teacherApplicationTitle)
-          .toList(growable: false);
-      return TeacherProfileState(
-        teacher: teacher,
-        services: services,
-        meditations: meditations,
-        certificates: certs,
-      );
-    } catch (error, stackTrace) {
-      throw AppFailure.from(error, stackTrace);
-    }
-  },
-);
+    AutoDisposeFutureProvider.family<TeacherProfileState, String>((
+  ref,
+  userId,
+) async {
+  final repo = ref.watch(communityRepositoryProvider);
+  final certRepo = ref.watch(certificatesRepositoryProvider);
+  try {
+    final teacher = await repo.getTeacher(userId);
+    final services = await repo.listServices(userId);
+    final meditations = await repo.listMeditations(userId);
+    final certsRaw = await certRepo.certificatesOf(userId);
+    final certs = certsRaw
+        .where((c) => c.title != Certificate.teacherApplicationTitle)
+        .toList(growable: false);
+    return TeacherProfileState(
+      teacher: teacher,
+      services: services,
+      meditations: meditations,
+      certificates: certs,
+    );
+  } catch (error, stackTrace) {
+    throw AppFailure.from(error, stackTrace);
+  }
+});
 
 class AdminDashboardState {
   const AdminDashboardState({
@@ -138,29 +141,13 @@ class AdminDashboardState {
   final List<Map<String, dynamic>> certificates;
 }
 
-final adminDashboardProvider =
-    AutoDisposeFutureProvider<AdminDashboardState>((ref) async {
-  final client = ref.watch(supabaseMaybeProvider);
-  if (client == null) {
-    throw ConfigurationFailure(message: 'Supabase ej konfigurerat.');
-  }
-  final user = client.auth.currentUser;
-  if (user == null) {
-    return const AdminDashboardState(
-      isAdmin: false,
-      requests: [],
-      certificates: [],
-    );
-  }
+final adminDashboardProvider = AutoDisposeFutureProvider<AdminDashboardState>((
+  ref,
+) async {
   try {
-    final profileRes = await client.schema('app').rpc('get_my_profile');
-    Map<String, dynamic>? profile;
-    if (profileRes is Map) {
-      profile = profileRes.cast<String, dynamic>();
-    } else if (profileRes is List && profileRes.isNotEmpty) {
-      profile = (profileRes.first as Map).cast<String, dynamic>();
-    }
-    final isAdmin = profile?['is_admin'] == true || profile?['role'] == 'admin';
+    final repo = ref.watch(adminRepositoryProvider);
+    final data = await repo.fetchDashboard();
+    final isAdmin = data['is_admin'] == true;
     if (!isAdmin) {
       return const AdminDashboardState(
         isAdmin: false,
@@ -168,43 +155,12 @@ final adminDashboardProvider =
         certificates: [],
       );
     }
-    final requestsRes = await client.app
-        .from('certificates')
-        .select('user_id, title, status, notes, created_at, updated_at')
-        .eq('title', 'Läraransökan')
-        .order('created_at', ascending: false);
-    final approvalsRes = await client.app
-        .from('teacher_approvals')
-        .select('user_id, approved_by, approved_at');
-    final certRes = await client.app
-        .from('certificates')
-        .select('id, user_id, title, status, notes, created_at, updated_at')
-        .order('created_at', ascending: false)
-        .limit(200);
-
-    final approvalsByUser = <String, Map<String, dynamic>>{};
-    for (final row in (approvalsRes as List? ?? [])) {
-      final map = Map<String, dynamic>.from(row as Map);
-      final userId = map['user_id'] as String?;
-      if (userId != null) {
-        approvalsByUser[userId] = map;
-      }
-    }
-
-    final requests = (requestsRes as List? ?? [])
+    final requests = (data['requests'] as List? ?? [])
         .map((e) => Map<String, dynamic>.from(e as Map))
-        .map((req) {
-      final userId = req['user_id'] as String?;
-      final approval = userId != null ? approvalsByUser[userId] : null;
-      return {
-        ...req,
-        if (approval != null) 'approval': approval,
-      };
-    }).toList();
-
-    final certs = (certRes as List? ?? [])
+        .toList(growable: false);
+    final certs = (data['certificates'] as List? ?? [])
         .map((e) => Map<String, dynamic>.from(e as Map))
-        .toList();
+        .toList(growable: false);
     return AdminDashboardState(
       isAdmin: true,
       requests: requests,
@@ -230,108 +186,62 @@ class ProfileViewState {
 }
 
 final profileViewProvider =
-    AutoDisposeFutureProvider.family<ProfileViewState, String>(
-  (ref, userId) async {
-    final client = ref.watch(supabaseMaybeProvider);
-    if (client == null) {
-      throw ConfigurationFailure(message: 'Supabase ej konfigurerat.');
-    }
-    try {
-      final profRes = await client
-          .schema('app')
-          .from('profiles')
-          .select(
-              'user_id, display_name, photo_url, bio, role, role_v2, is_admin')
-          .eq('user_id', userId)
-          .maybeSingle();
-      final profile = (profRes as Map?)?.cast<String, dynamic>();
-      final me = client.auth.currentUser?.id;
-      bool following = false;
-      if (me != null) {
-        final followRes = await client
-            .schema('app')
-            .from('follows')
-            .select('follower_id')
-            .eq('follower_id', me)
-            .eq('followee_id', userId)
-            .maybeSingle();
-        following = followRes != null;
-      }
-      final services =
-          await ref.watch(communityRepositoryProvider).listServices(userId);
-      final meditations = await MeditationsRepository().byTeacher(userId);
-      return ProfileViewState(
-        profile: profile,
-        isFollowing: following,
-        services: services,
-        meditations: meditations,
-      );
-    } catch (error, stackTrace) {
-      throw AppFailure.from(error, stackTrace);
-    }
-  },
-);
+    AutoDisposeFutureProvider.family<ProfileViewState, String>((
+  ref,
+  userId,
+) async {
+  try {
+    final repo = ref.watch(communityRepositoryProvider);
+    final detail = await repo.profileDetail(userId);
+    final profile = detail['profile'] as Map<String, dynamic>?;
+    final services = (detail['services'] as List?)
+            ?.map((e) => Map<String, dynamic>.from(e as Map))
+            .toList(growable: false) ??
+        const <Map<String, dynamic>>[];
+    final meditations = (detail['meditations'] as List?)
+            ?.map((e) => Map<String, dynamic>.from(e as Map))
+            .toList(growable: false) ??
+        const <Map<String, dynamic>>[];
+    final isFollowing = detail['is_following'] == true;
+    return ProfileViewState(
+      profile: profile,
+      isFollowing: isFollowing,
+      services: services,
+      meditations: meditations,
+    );
+  } catch (error, stackTrace) {
+    throw AppFailure.from(error, stackTrace);
+  }
+});
 
 class ServiceDetailState {
-  const ServiceDetailState({
-    required this.service,
-    required this.provider,
-  });
+  const ServiceDetailState({required this.service, required this.provider});
 
   final Map<String, dynamic>? service;
   final Map<String, dynamic>? provider;
 }
 
 final serviceDetailProvider =
-    AutoDisposeFutureProvider.family<ServiceDetailState, String>(
-  (ref, serviceId) async {
-    final client = ref.watch(supabaseMaybeProvider);
-    if (client == null) {
-      throw ConfigurationFailure(message: 'Supabase ej konfigurerat.');
-    }
-    try {
-      final res = await client.app
-          .from('services')
-          .select('id, provider_id, title, description, price_cents, active')
-          .eq('id', serviceId)
-          .maybeSingle();
-      Map<String, dynamic>? service;
-      Map<String, dynamic>? provider;
-      if (res != null) {
-        service = Map<String, dynamic>.from(res as Map);
-        final profRes = await client.app
-            .from('profiles')
-            .select('user_id, display_name, photo_url')
-            .eq('user_id', service['provider_id'])
-            .maybeSingle();
-        if (profRes != null) {
-          provider = Map<String, dynamic>.from(profRes as Map);
-        }
-      }
-      return ServiceDetailState(service: service, provider: provider);
-    } catch (error, stackTrace) {
-      throw AppFailure.from(error, stackTrace);
-    }
-  },
-);
+    AutoDisposeFutureProvider.family<ServiceDetailState, String>((
+  ref,
+  serviceId,
+) async {
+  try {
+    final repo = ref.watch(communityRepositoryProvider);
+    final detail = await repo.serviceDetail(serviceId);
+    final service = detail['service'] as Map<String, dynamic>?;
+    final provider = detail['provider'] as Map<String, dynamic>?;
+    return ServiceDetailState(service: service, provider: provider);
+  } catch (error, stackTrace) {
+    throw AppFailure.from(error, stackTrace);
+  }
+});
 
 final tarotRequestsProvider =
     AutoDisposeFutureProvider<List<Map<String, dynamic>>>((ref) async {
-  final client = ref.watch(supabaseMaybeProvider);
-  if (client == null) {
-    throw ConfigurationFailure(message: 'Supabase ej konfigurerat.');
-  }
-  final user = client.auth.currentUser;
-  if (user == null) return const [];
   try {
-    final rows = await client.app
-        .from('tarot_requests')
-        .select('id, question, status, created_at')
-        .eq('requester_id', user.id)
-        .order('created_at', ascending: false);
-    return (rows as List? ?? [])
-        .map((e) => Map<String, dynamic>.from(e as Map))
-        .toList();
+    final repo = ref.watch(communityRepositoryProvider);
+    return await repo.tarotRequests();
   } catch (error, stackTrace) {
     throw AppFailure.from(error, stackTrace);
   }

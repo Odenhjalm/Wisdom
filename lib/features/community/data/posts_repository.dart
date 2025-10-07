@@ -1,48 +1,27 @@
 import 'dart:async';
 
-import 'package:supabase_flutter/supabase_flutter.dart';
-
+import 'package:wisdom/api/api_client.dart';
 import 'package:wisdom/core/errors/app_failure.dart';
-import 'package:wisdom/core/supabase_ext.dart';
 
 class PostsRepository {
-  PostsRepository({SupabaseClient? client})
-      : _client = client ?? Supabase.instance.client;
+  PostsRepository({required ApiClient client}) : _client = client;
 
-  final SupabaseClient _client;
+  final ApiClient _client;
 
   Future<List<CommunityPost>> feed({int limit = 50}) async {
     try {
-      final rows = await _client.app
-          .from('posts')
-          .select('id, author_id, content, media_paths, created_at')
-          .order('created_at', ascending: false)
-          .limit(limit);
-      final posts = (rows as List? ?? [])
-          .map((row) => CommunityPost.fromJson(row as Map<String, dynamic>))
-          .toList();
-
-      final authorIds = posts
-          .map((post) => post.authorId)
-          .whereType<String>()
-          .toSet()
-          .toList();
-      if (authorIds.isEmpty) return posts;
-
-      final inList = '(${authorIds.map((id) => '"$id"').join(',')})';
-      final profRows = await _client.app
-          .from('profiles')
-          .select('user_id, display_name, photo_url')
-          .filter('user_id', 'in', inList);
-      final profiles = <String, CommunityProfile>{
-        for (final row in (profRows as List? ?? []))
-          if (row is Map<String, dynamic>)
-            row['user_id'] as String: CommunityProfile.fromJson(row),
-      };
-
-      return posts
-          .map((post) => post.copyWith(profile: profiles[post.authorId]))
-          .toList();
+      final response = await _client.get<Map<String, dynamic>>(
+        '/community/posts',
+        queryParameters: {
+          'limit': limit,
+        },
+      );
+      final items = (response['items'] as List? ?? [])
+          .map((item) => CommunityPost.fromJson(
+                Map<String, dynamic>.from(item as Map),
+              ))
+          .toList(growable: false);
+      return items;
     } catch (error, stackTrace) {
       throw AppFailure.from(error, stackTrace);
     }
@@ -53,45 +32,15 @@ class PostsRepository {
     List<String>? mediaPaths,
   }) async {
     try {
-      final uid = _client.auth.currentUser?.id;
-      if (uid == null) {
-        throw UnauthorizedFailure(
-            message: 'Du måste vara inloggad för att posta.');
-      }
-      final payload = {
-        'author_id': uid,
-        'content': content,
-        if (mediaPaths != null && mediaPaths.isNotEmpty)
-          'media_paths': mediaPaths,
-      };
-      final res = await _client.app
-          .from('posts')
-          .insert(payload)
-          .select()
-          .maybeSingle();
-      if (res == null) {
-        throw ServerFailure(message: 'Inlägget kunde inte sparas.');
-      }
-      return CommunityPost.fromJson(res);
-    } catch (error, stackTrace) {
-      throw AppFailure.from(error, stackTrace);
-    }
-  }
-
-  Future<RealtimeChannel> subscribeToFeed({
-    required void Function() onChanged,
-  }) async {
-    try {
-      final channel = _client
-          .channel('posts-feed')
-          .onPostgresChanges(
-            event: PostgresChangeEvent.insert,
-            schema: 'app',
-            table: 'posts',
-            callback: (_) => onChanged(),
-          )
-          .subscribe();
-      return channel;
+      final response = await _client.post<Map<String, dynamic>>(
+        '/community/posts',
+        body: {
+          'content': content,
+          if (mediaPaths != null && mediaPaths.isNotEmpty)
+            'media_paths': mediaPaths,
+        },
+      );
+      return CommunityPost.fromJson(response);
     } catch (error, stackTrace) {
       throw AppFailure.from(error, stackTrace);
     }
@@ -117,17 +66,26 @@ class CommunityPost {
 
   factory CommunityPost.fromJson(Map<String, dynamic> json) {
     final created = json['created_at'];
+    final profile = json['profile'];
     return CommunityPost(
       id: json['id'] as String,
       authorId: (json['author_id'] ?? '') as String,
       content: (json['content'] ?? '') as String,
       createdAt: created is String
           ? DateTime.tryParse(created) ?? DateTime.fromMillisecondsSinceEpoch(0)
-          : DateTime.fromMillisecondsSinceEpoch(0),
-      mediaPaths: (json['media_paths'] as List?)
-              ?.map((item) => item.toString())
-              .toList() ??
-          const [],
+          : created is DateTime
+              ? created
+              : DateTime.fromMillisecondsSinceEpoch(0),
+      mediaPaths: (json['media_paths'] as List? ?? const [])
+          .map((item) => item.toString())
+          .toList(growable: false),
+      profile: profile is Map<String, dynamic>
+          ? CommunityProfile.fromJson(profile)
+          : profile is Map
+              ? CommunityProfile.fromJson(
+                  Map<String, dynamic>.from(profile),
+                )
+              : null,
     );
   }
 

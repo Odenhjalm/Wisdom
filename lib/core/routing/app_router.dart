@@ -1,15 +1,10 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:wisdom/data/models/profile.dart';
-import 'package:wisdom/features/auth/application/user_access_provider.dart';
-import 'package:wisdom/domain/models/user_access.dart';
 
-import 'package:wisdom/data/supabase/supabase_client.dart';
-import 'package:wisdom/features/auth/presentation/auth_callback_page.dart';
+import 'package:wisdom/core/auth/auth_controller.dart';
+import 'package:wisdom/domain/models/user_access.dart';
+import 'package:wisdom/features/auth/application/user_access_provider.dart';
 import 'package:wisdom/features/auth/presentation/forgot_password_page.dart';
 import 'package:wisdom/features/auth/presentation/login_page.dart';
 import 'package:wisdom/features/auth/presentation/new_password_page.dart';
@@ -25,7 +20,6 @@ import 'package:wisdom/features/community/presentation/profile_view_page.dart';
 import 'package:wisdom/features/community/presentation/service_detail_page.dart';
 import 'package:wisdom/features/community/presentation/tarot_page.dart';
 import 'package:wisdom/features/community/presentation/teacher_profile_page.dart';
-import 'package:wisdom/widgets/base_page.dart';
 import 'package:wisdom/features/courses/presentation/course_intro_page.dart';
 import 'package:wisdom/features/courses/presentation/course_intro_redirect_page.dart';
 import 'package:wisdom/features/courses/presentation/course_page.dart';
@@ -37,97 +31,96 @@ import 'package:wisdom/features/landing/presentation/legal/terms_page.dart';
 import 'package:wisdom/features/messages/presentation/chat_page.dart';
 import 'package:wisdom/features/messages/presentation/messages_page.dart';
 import 'package:wisdom/features/payments/presentation/booking_page.dart';
-import 'package:wisdom/features/payments/presentation/subscribe_screen.dart';
 import 'package:wisdom/features/payments/presentation/claim_purchase_page.dart';
+import 'package:wisdom/features/payments/presentation/subscribe_screen.dart';
 import 'package:wisdom/features/studio/presentation/course_editor_page.dart';
 import 'package:wisdom/features/studio/presentation/studio_page.dart';
 import 'package:wisdom/features/studio/presentation/teacher_home_page.dart';
 
-class AuthState {
-  const AuthState(this.session);
-
-  final Session? session;
-
-  bool get isAuthenticated => session != null;
-}
-
-final _authStateStreamProvider = StreamProvider<AuthState>((ref) async* {
-  final client = Supa.client.auth;
-  yield AuthState(client.currentSession);
-  yield* client.onAuthStateChange.map((event) => AuthState(event.session));
-});
-
-final sessionProvider = Provider<AuthState>((ref) {
-  return ref.watch(_authStateStreamProvider).maybeWhen(
-        data: (auth) => auth,
-        orElse: () => const AuthState(null),
-      );
-});
-
-class GoRouterRefreshStream extends ChangeNotifier {
-  late final StreamSubscription<dynamic> _sub;
-
-  GoRouterRefreshStream(Stream<dynamic> stream) {
-    _sub = stream.asBroadcastStream().listen((_) => notifyListeners());
+class _RouterNotifier extends ChangeNotifier {
+  _RouterNotifier(this.ref) {
+    _authSub = ref.listen<AuthState>(authControllerProvider, (_, __) {
+      notifyListeners();
+    });
+    _accessSub = ref.listen<UserAccessState>(userAccessProvider, (_, __) {
+      notifyListeners();
+    });
   }
 
-  @override
-  void dispose() {
-    _sub.cancel();
-    super.dispose();
-  }
-}
+  final Ref ref;
+  late final ProviderSubscription<AuthState> _authSub;
+  late final ProviderSubscription<UserAccessState> _accessSub;
 
-class AuthGuard {
-  const AuthGuard(this.publicPaths);
+  bool get isAuthenticated => ref.read(authControllerProvider).isAuthenticated;
 
-  final Set<String> publicPaths;
+  UserAccessState get access => ref.read(userAccessProvider);
 
-  String? redirect(AuthState authState, String path) {
-    if (!authState.isAuthenticated && !publicPaths.contains(path)) {
+  String? handleRedirect(GoRouterState state) {
+    final path = state.uri.path;
+    final wantsPublic = _publicPaths.contains(path);
+    if (!isAuthenticated && !wantsPublic) {
+      final redirect = state.matchedLocation;
+      if (redirect != '/login') {
+        return '/login?redirect=${Uri.encodeComponent(redirect)}';
+      }
       return '/login';
     }
 
-    if (authState.isAuthenticated &&
-        (path == '/login' || path == '/signup' || path == '/landing')) {
+    if (isAuthenticated && _publicRedirects.contains(path)) {
+      return '/';
+    }
+
+    if (_requiresTeacher(path) && !access.isTeacher && !access.isAdmin) {
       return '/';
     }
 
     return null;
   }
+
+  @override
+  void dispose() {
+    _authSub.close();
+    _accessSub.close();
+    super.dispose();
+  }
+}
+
+bool _requiresTeacher(String path) {
+  return path.startsWith('/teacher') || path.startsWith('/studio');
 }
 
 const _publicPaths = <String>{
+  '/landing',
+  '/',
   '/login',
   '/signup',
   '/forgot-password',
   '/new-password',
-  '/auth-callback',
-  '/landing',
+  '/course-intro',
+  '/course-quiz',
+  '/privacy',
+  '/terms',
   '/claim',
 };
 
-final userProfileProvider = FutureProvider<Profile?>((ref) async {
-  final access = await ref.watch(userAccessProvider.future);
-  return access.effectiveProfile;
+const _publicRedirects = <String>{
+  '/landing',
+  '/login',
+  '/signup',
+};
+
+final _routerNotifierProvider = Provider<_RouterNotifier>((ref) {
+  final notifier = _RouterNotifier(ref);
+  ref.onDispose(notifier.dispose);
+  return notifier;
 });
 
 final appRouterProvider = Provider<GoRouter>((ref) {
-  final access = ref.watch(userAccessProvider).maybeWhen(
-        data: (value) => value,
-        orElse: () => UserAccessState.unauthenticated,
-      );
-  final profile = access.effectiveProfile;
-  final authState = ref.watch(sessionProvider);
-  const guard = AuthGuard(_publicPaths);
-  final refreshListenable = GoRouterRefreshStream(
-    Supa.client.auth.onAuthStateChange.map((event) => event.event),
-  );
-
+  final notifier = ref.watch(_routerNotifierProvider);
   return GoRouter(
     initialLocation: '/landing',
-    refreshListenable: refreshListenable,
-    redirect: (context, state) => guard.redirect(authState, state.uri.path),
+    refreshListenable: notifier,
+    redirect: (context, state) => notifier.handleRedirect(state),
     routes: [
       GoRoute(
         path: '/login',
@@ -147,24 +140,14 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const ForgotPasswordPage(),
       ),
       GoRoute(
-        path: '/auth-callback',
-        name: 'auth-callback',
-        builder: (context, state) => AuthCallbackPage(state: state),
-      ),
-      GoRoute(
         path: '/new-password',
         name: 'new-password',
         builder: (context, state) => const NewPasswordPage(),
       ),
       GoRoute(
         path: '/',
-        name: 'home',
-        builder: (context, state) => const HomeShell(),
-      ),
-      GoRoute(
-        path: '/home',
-        name: 'home-legacy',
-        builder: (context, state) => const HomeShell(),
+        name: 'landing-root',
+        builder: (context, state) => const LandingPage(),
       ),
       GoRoute(
         path: '/landing',
@@ -172,11 +155,9 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const LandingPage(),
       ),
       GoRoute(
-        path: '/claim',
-        name: 'claim',
-        builder: (context, state) => ClaimPurchasePage(
-          token: state.uri.queryParameters['token'],
-        ),
+        path: '/home',
+        name: 'home',
+        builder: (context, state) => const HomeShell(),
       ),
       GoRoute(
         path: '/course-intro',
@@ -189,38 +170,31 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const QuizTakePage(),
       ),
       GoRoute(
-        path: '/subscribe',
-        name: 'subscribe',
-        builder: (context, state) => const SubscribeScreen(),
-      ),
-      GoRoute(
-        path: '/teacher',
-        name: 'teacher-home',
-        redirect: (_, __) {
-          if (!access.isTeacher && !access.isAdmin) {
-            return '/profile';
-          }
-          return null;
-        },
-        builder: (context, state) => const TeacherHomeScreen(),
-      ),
-      GoRoute(
-        path: '/teacher/editor',
-        name: 'teacher-editor',
-        redirect: (_, __) {
-          if (!access.isTeacher && !access.isAdmin) {
-            return '/profile';
-          }
-          return null;
-        },
-        builder: (context, state) => CourseEditorScreen(
-          courseId: state.uri.queryParameters['id'],
+        path: '/course/:slug',
+        name: 'course',
+        builder: (context, state) => CoursePage(
+          slug: state.pathParameters['slug']!,
         ),
       ),
       GoRoute(
-        path: '/profile/edit',
-        name: 'profile-edit',
-        builder: (context, state) => const ProfileEditScreen(),
+        path: '/lesson/:id',
+        name: 'lesson',
+        builder: (context, state) => LessonPage(
+          lessonId: state.pathParameters['id']!,
+        ),
+      ),
+      GoRoute(
+        path: '/course-intro-redirect',
+        name: 'course-intro-redirect',
+        builder: (context, state) => const CourseIntroRedirectPage(),
+      ),
+      GoRoute(
+        path: '/messages',
+        name: 'messages',
+        builder: (context, state) => MessagesPage(
+          kind: state.uri.queryParameters['kind'] ?? 'dm',
+          id: state.uri.queryParameters['id'] ?? '',
+        ),
       ),
       GoRoute(
         path: '/messages/:uid',
@@ -228,77 +202,32 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const ChatPage(),
       ),
       GoRoute(
-        path: '/community',
-        name: 'community',
-        builder: (context, state) => const CommunityPage(),
+        path: '/profile',
+        name: 'profile',
+        builder: (context, state) => const community_profile.ProfilePage(),
       ),
       GoRoute(
-        path: '/profile/:id',
+        path: '/profile/edit',
+        name: 'profile-edit',
+        builder: (context, state) => const ProfileEditScreen(),
+      ),
+      GoRoute(
+        path: '/profile/view/:id',
         name: 'profile-view',
-        builder: (context, state) {
-          final id = state.pathParameters['id'];
-          if (id == null || id.isEmpty) return const LandingPage();
-          return ProfileViewPage(userId: id);
-        },
+        builder: (context, state) =>
+            ProfileViewPage(userId: state.pathParameters['id']!),
       ),
       GoRoute(
-        path: '/course/intro',
-        name: 'course-intro-redirect',
-        builder: (context, state) => const CourseIntroRedirectPage(),
-      ),
-      GoRoute(
-        path: '/course/:slug',
-        name: 'course-detail',
-        builder: (context, state) {
-          final slug = state.pathParameters['slug'];
-          if (slug == null || slug.isEmpty) return const LandingPage();
-          return CoursePage(slug: slug);
-        },
-      ),
-      GoRoute(
-        path: '/lesson/:id',
-        name: 'lesson',
-        builder: (context, state) {
-          final id = state.pathParameters['id'];
-          if (id == null || id.isEmpty) return const LandingPage();
-          return LessonPage(lessonId: id);
-        },
-      ),
-      GoRoute(
-        path: '/teacher/:id',
+        path: '/teacher/profile/:id',
         name: 'teacher-profile',
-        builder: (context, state) {
-          final id = state.pathParameters['id'];
-          if (id == null || id.isEmpty) return const LandingPage();
-          return TeacherProfilePage(userId: id);
-        },
-      ),
-      GoRoute(
-        path: '/messages/dm/:id',
-        name: 'messages-dm',
-        builder: (context, state) {
-          final id = state.pathParameters['id'];
-          if (id == null || id.isEmpty) return const LandingPage();
-          return MessagesPage(kind: 'dm', id: id);
-        },
-      ),
-      GoRoute(
-        path: '/messages/service/:id',
-        name: 'messages-service',
-        builder: (context, state) {
-          final id = state.pathParameters['id'];
-          if (id == null || id.isEmpty) return const LandingPage();
-          return MessagesPage(kind: 'service', id: id);
-        },
+        builder: (context, state) =>
+            TeacherProfilePage(userId: state.pathParameters['id']!),
       ),
       GoRoute(
         path: '/service/:id',
         name: 'service-detail',
-        builder: (context, state) {
-          final id = state.pathParameters['id'];
-          if (id == null || id.isEmpty) return const LandingPage();
-          return ServiceDetailPage(id: id);
-        },
+        builder: (context, state) =>
+            ServiceDetailPage(id: state.pathParameters['id']!),
       ),
       GoRoute(
         path: '/tarot',
@@ -306,34 +235,53 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const TarotPage(),
       ),
       GoRoute(
-        path: '/booking',
-        name: 'booking',
-        builder: (context, state) => const BookingPage(),
+        path: '/admin',
+        name: 'admin',
+        builder: (context, state) => const AdminPage(),
       ),
       GoRoute(
         path: '/studio',
         name: 'studio',
-        redirect: (_, __) {
-          if (profile == null) return null;
-          if (!profile.isTeacher && !profile.isAdmin) return '/profile';
-          return null;
-        },
         builder: (context, state) => const StudioPage(),
       ),
       GoRoute(
-        path: '/admin',
-        name: 'admin',
-        redirect: (_, __) {
-          if (profile == null) return null;
-          if (!profile.isAdmin) return '/profile';
-          return null;
-        },
-        builder: (context, state) => const AdminPage(),
+        path: '/teacher',
+        name: 'teacher-home',
+        builder: (context, state) => const TeacherHomeScreen(),
       ),
       GoRoute(
-        path: '/profile',
-        name: 'profile',
-        builder: (context, state) => const community_profile.ProfilePage(),
+        path: '/teacher/editor',
+        name: 'teacher-editor',
+        builder: (context, state) => CourseEditorScreen(
+          courseId: state.uri.queryParameters['id'],
+        ),
+      ),
+      GoRoute(
+        path: '/subscribe',
+        name: 'subscribe',
+        builder: (context, state) => const SubscribeScreen(),
+      ),
+      GoRoute(
+        path: '/booking/:id',
+        name: 'booking',
+        builder: (context, state) => const BookingPage(),
+      ),
+      GoRoute(
+        path: '/claim',
+        name: 'claim',
+        builder: (context, state) => ClaimPurchasePage(
+          token: state.uri.queryParameters['token'],
+        ),
+      ),
+      GoRoute(
+        path: '/privacy',
+        name: 'privacy',
+        builder: (context, state) => const PrivacyPage(),
+      ),
+      GoRoute(
+        path: '/terms',
+        name: 'terms',
+        builder: (context, state) => const TermsPage(),
       ),
       GoRoute(
         path: '/settings',
@@ -341,23 +289,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const SettingsPage(),
       ),
       GoRoute(
-        path: '/legal/privacy',
-        name: 'privacy',
-        builder: (context, state) => const PrivacyPage(),
-      ),
-      GoRoute(
-        path: '/legal/terms',
-        name: 'terms',
-        builder: (context, state) => const TermsPage(),
+        path: '/community',
+        name: 'community',
+        builder: (context, state) => const CommunityPage(),
       ),
     ],
-    errorBuilder: (context, state) => Scaffold(
-      appBar: AppBar(title: const Text('Fel')),
-      body: BasePage(
-        child: Center(
-          child: Text('Sidan hittades inte: ${state.error}'),
-        ),
-      ),
-    ),
   );
 });

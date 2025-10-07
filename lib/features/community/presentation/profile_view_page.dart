@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:wisdom/core/errors/app_failure.dart';
 import 'package:wisdom/features/community/application/community_providers.dart';
 import 'package:wisdom/features/community/data/follows_repository.dart';
+import 'package:wisdom/api/auth_repository.dart';
+import 'package:wisdom/core/auth/auth_controller.dart';
 import 'package:wisdom/shared/utils/snack.dart';
 import 'package:wisdom/shared/widgets/app_scaffold.dart';
 
@@ -158,15 +159,15 @@ class _ProfileViewPageState extends ConsumerState<ProfileViewPage> {
   }
 
   Future<void> _toggleFollow(bool currentlyFollowing) async {
-    final me = Supabase.instance.client.auth.currentUser;
-    if (me == null) {
+    final auth = ref.read(authControllerProvider);
+    if (!auth.isAuthenticated) {
       if (!mounted) return;
       showSnack(context, 'Logga in för att följa');
       return;
     }
     setState(() => _toggling = true);
     try {
-      final repo = FollowsRepository();
+      final repo = FollowsRepository(ref.read(apiClientProvider));
       if (currentlyFollowing) {
         await repo.unfollow(widget.userId);
       } else {

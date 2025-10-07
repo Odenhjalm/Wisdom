@@ -2,9 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
-import 'package:wisdom/supabase_client.dart';
+import 'package:wisdom/api/auth_repository.dart';
 
 class LandingSectionState {
   const LandingSectionState({
@@ -46,134 +45,38 @@ LandingSectionState _landingErrorState(
 }
 
 String? get _devHintMessage =>
-    kDebugMode ? 'Konfigurera Supabase i .env om data saknas.' : null;
+    kDebugMode ? 'Kontrollera att API_BASE_URL är konfigurerad.' : null;
 
-final introCoursesProvider = FutureProvider<LandingSectionState>((ref) async {
-  final sb = ref.read(supabaseMaybeProvider);
-  if (sb == null) {
-    return _landingErrorState();
-  }
+Future<LandingSectionState> _fetchLandingSection(
+  Ref ref,
+  String path,
+  String errorLabel,
+) async {
+  final api = ref.read(apiClientProvider);
   try {
-    final query = sb
-        .schema('app')
-        .from('courses')
-        .select(
-          'id, title, description, cover_url, video_url, is_free_intro, branch, price_cents, created_at',
-        )
-        .eq('is_free_intro', true)
-        .order('created_at', ascending: false)
-        .limit(5);
-    final res = await query.timeout(const Duration(seconds: 12));
-    final items = _castList(res);
+    final response = await api.get<Map<String, dynamic>>(path);
+    final items = _castList(response['items']);
     return _landingSuccessState(items);
-  } on TimeoutException catch (_) {
+  } on TimeoutException {
     return _landingErrorState(
-      message: 'Tidsgränsen gick ut när vi hämtade gratiskurser.',
-    );
-  } on PostgrestException catch (_) {
-    return _landingErrorState(
-      message: 'Kunde inte hämta gratiskurser just nu.',
-    );
+        message: 'Tidsgränsen gick ut när vi hämtade $errorLabel.');
   } catch (_) {
-    return _landingErrorState(
-      message: 'Något gick fel när vi hämtade gratiskurser.',
-    );
+    return _landingErrorState(message: 'Kunde inte hämta $errorLabel just nu.');
   }
+}
+
+final introCoursesProvider = FutureProvider<LandingSectionState>((ref) {
+  return _fetchLandingSection(ref, '/landing/intro-courses', 'gratiskurser');
 });
 
-final popularCoursesProvider = FutureProvider<LandingSectionState>((ref) async {
-  final sb = ref.read(supabaseMaybeProvider);
-  if (sb == null) {
-    return _landingErrorState();
-  }
-  try {
-    final query = sb
-        .schema('app')
-        .from('courses')
-        .select(
-          'id, title, description, cover_url, video_url, is_free_intro, branch, price_cents, created_at',
-        )
-        .order('is_free_intro', ascending: false)
-        .order('created_at', ascending: false)
-        .limit(6);
-    final res = await query.timeout(const Duration(seconds: 12));
-    final items = _castList(res);
-    return _landingSuccessState(items);
-  } on TimeoutException catch (_) {
-    return _landingErrorState(
-      message: 'Tidsgränsen gick ut när vi hämtade kurser.',
-    );
-  } on PostgrestException catch (_) {
-    return _landingErrorState(
-      message: 'Kunde inte hämta kurslistan just nu.',
-    );
-  } catch (_) {
-    return _landingErrorState(
-      message: 'Något gick fel när vi hämtade kurslistan.',
-    );
-  }
+final popularCoursesProvider = FutureProvider<LandingSectionState>((ref) {
+  return _fetchLandingSection(ref, '/landing/popular-courses', 'kurslistan');
 });
 
-final teachersProvider = FutureProvider<LandingSectionState>((ref) async {
-  final sb = ref.read(supabaseMaybeProvider);
-  if (sb == null) {
-    return _landingErrorState();
-  }
-  try {
-    final query = sb
-        .schema('app')
-        .from('profiles')
-        .select('user_id, display_name, photo_url, bio')
-        .inFilter('role', ['teacher', 'admin'])
-        .order('display_name', ascending: true)
-        .limit(20);
-    final res = await query.timeout(const Duration(seconds: 12));
-    final items = _castList(res);
-    return _landingSuccessState(items);
-  } on TimeoutException catch (_) {
-    return _landingErrorState(
-      message: 'Tidsgränsen gick ut när vi hämtade lärarna.',
-    );
-  } on PostgrestException catch (_) {
-    return _landingErrorState(
-      message: 'Kunde inte hämta lärarlistan just nu.',
-    );
-  } catch (_) {
-    return _landingErrorState(
-      message: 'Något gick fel när vi hämtade lärarlistan.',
-    );
-  }
+final teachersProvider = FutureProvider<LandingSectionState>((ref) {
+  return _fetchLandingSection(ref, '/landing/teachers', 'lärarlistan');
 });
 
-final recentServicesProvider = FutureProvider<LandingSectionState>((ref) async {
-  final sb = ref.read(supabaseMaybeProvider);
-  if (sb == null) {
-    return _landingErrorState();
-  }
-  try {
-    final query = sb
-        .schema('app')
-        .from('services')
-        .select(
-          'id, title, description, price_cents, duration_min, requires_cert, certified_area, created_at',
-        )
-        .eq('active', true)
-        .order('created_at', ascending: false)
-        .limit(6);
-    final res = await query.timeout(const Duration(seconds: 12));
-    final items = _castList(res);
-    return _landingSuccessState(items);
-  } on TimeoutException catch (_) {
-    return _landingErrorState(
-      message: 'Tidsgränsen gick ut när vi hämtade tjänsterna.',
-    );
-  } on PostgrestException catch (_) {
-    return _landingErrorState(
-      message: 'Kunde inte hämta tjänsterna just nu.',
-    );
-  } catch (_) {
-    return _landingErrorState(
-      message: 'Något gick fel när vi hämtade tjänsterna.',
-    );
-  }
+final recentServicesProvider = FutureProvider<LandingSectionState>((ref) {
+  return _fetchLandingSection(ref, '/landing/services', 'tjänsterna');
 });
