@@ -2,7 +2,7 @@
 
 ## Förutsättningar
 - Miljövariabler i `.env` bör innehålla `SUPABASE_URL` och `SUPABASE_ANON_KEY`.
-- Testkonto: `odenhjalm@outlook.com` / `1124`.
+- Testkonto: `teacher.local@example.com` / `ChangeMe123!`.
 
 ## Status (2024-11-23)
 Jag kan inte verifiera mot Supabase från den här miljön (ingen nätverksåtkomst / saknade credentials). Stegen nedan är dokumenterade för manuell körning på en maskin med åtkomst:
@@ -19,8 +19,8 @@ Jag kan inte verifiera mot Supabase från den här miljön (ingen nätverksåtko
    ```
 
 3. **Logga in som lärare**
-   - E-post: `odenhjalm@outlook.com`
-   - Lösenord: `1124`
+   - E-post: `teacher.local@example.com`
+   - Lösenord: `ChangeMe123!`
    - Bekräfta att `[AUTH] SignedIn` skrivs i loggen.
 
 4. **Skapa kurser i Teacher Editor**

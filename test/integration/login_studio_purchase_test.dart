@@ -43,7 +43,7 @@ void main() {
       );
 
       when(
-        () => apiClient.get<Map<String, dynamic>>('/profiles/me'),
+        () => apiClient.get<Map<String, dynamic>>('/auth/me'),
       ).thenAnswer(
         (_) async => {
           'user_id': 'user-1',

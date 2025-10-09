@@ -24,7 +24,6 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
   static const _maxAvatarBytes = 5 * 1024 * 1024;
 
   final _displayNameCtrl = TextEditingController();
-  final _photoCtrl = TextEditingController();
   final _bioCtrl = TextEditingController();
   bool _loading = false;
 
@@ -32,6 +31,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
   String? _avatarDraftName;
   String? _avatarDraftContentType;
   String? _currentPhotoUrl;
+  bool _removeCurrentAvatar = false;
 
   @override
   void initState() {
@@ -42,7 +42,6 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
   @override
   void dispose() {
     _displayNameCtrl.dispose();
-    _photoCtrl.dispose();
     _bioCtrl.dispose();
     super.dispose();
   }
@@ -69,13 +68,13 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
 
   void _applyProfile(Profile profile) {
     _displayNameCtrl.text = profile.displayName ?? '';
-    _photoCtrl.text = profile.photoUrl ?? '';
     _bioCtrl.text = profile.bio ?? '';
     if (!mounted) {
       _currentPhotoUrl = profile.photoUrl;
       _avatarDraft = null;
       _avatarDraftName = null;
       _avatarDraftContentType = null;
+      _removeCurrentAvatar = false;
       return;
     }
     setState(() {
@@ -83,6 +82,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
       _avatarDraft = null;
       _avatarDraftName = null;
       _avatarDraftContentType = null;
+      _removeCurrentAvatar = false;
     });
   }
 
@@ -119,6 +119,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
         _avatarDraft = data;
         _avatarDraftName = file.name;
         _avatarDraftContentType = contentType;
+        _removeCurrentAvatar = false;
       });
     } catch (error) {
       if (mounted) {
@@ -133,6 +134,18 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
       _avatarDraft = null;
       _avatarDraftName = null;
       _avatarDraftContentType = null;
+      _removeCurrentAvatar = false;
+    });
+  }
+
+  void _removeExistingAvatar() {
+    if (!mounted) return;
+    setState(() {
+      _avatarDraft = null;
+      _avatarDraftName = null;
+      _avatarDraftContentType = null;
+      _currentPhotoUrl = null;
+      _removeCurrentAvatar = true;
     });
   }
 
@@ -154,11 +167,9 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
     final profile = ref.watch(authControllerProvider).profile;
     final config = ref.watch(appConfigProvider);
     final nameFallback = profile?.displayName ?? profile?.email ?? 'Profil';
-    final effectivePhotoPath = _photoCtrl.text.trim().isNotEmpty
-        ? _photoCtrl.text.trim()
-        : _currentPhotoUrl;
-    final resolvedPhotoUrl =
-        _avatarDraft != null ? null : _resolvePhotoUrl(effectivePhotoPath, config);
+    final resolvedPhotoUrl = _avatarDraft != null
+        ? null
+        : _resolvePhotoUrl(_currentPhotoUrl, config);
     final ImageProvider<Object>? avatarImage = _avatarDraft != null
         ? MemoryImage(_avatarDraft!)
         : (resolvedPhotoUrl != null ? NetworkImage(resolvedPhotoUrl) : null);
@@ -226,8 +237,9 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                                       padding: const EdgeInsets.only(top: 8),
                                       child: Text(
                                         _avatarDraftName!,
-                                        style:
-                                            Theme.of(context).textTheme.bodySmall,
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodySmall,
                                       ),
                                     )
                                   else if (resolvedPhotoUrl != null)
@@ -237,14 +249,16 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                                         resolvedPhotoUrl,
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
-                                        style:
-                                            Theme.of(context).textTheme.bodySmall,
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodySmall,
                                       ),
                                     ),
                                   const SizedBox(height: 8),
                                   Text(
                                     'Max 5 MB, format: PNG/JPG/WebP.',
-                                    style: Theme.of(context).textTheme.bodySmall,
+                                    style:
+                                        Theme.of(context).textTheme.bodySmall,
                                   ),
                                   if (_avatarDraft != null)
                                     TextButton.icon(
@@ -252,6 +266,16 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                                           _loading ? null : _clearAvatarDraft,
                                       icon: const Icon(Icons.delete_outline),
                                       label: const Text('Ångra vald bild'),
+                                    ),
+                                  if (_avatarDraft == null &&
+                                      _currentPhotoUrl != null)
+                                    TextButton.icon(
+                                      onPressed: _loading
+                                          ? null
+                                          : _removeExistingAvatar,
+                                      icon: const Icon(Icons.delete_outline),
+                                      label:
+                                          const Text('Ta bort nuvarande bild'),
                                     ),
                                 ],
                               ),
@@ -264,14 +288,6 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                           decoration: InputDecoration(
                             labelText: 'Visningsnamn',
                             hintText: nameFallback,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        TextField(
-                          controller: _photoCtrl,
-                          decoration: const InputDecoration(
-                            labelText: 'Extern bild-URL (valfritt)',
-                            hintText: 'https://…',
                           ),
                         ),
                         const SizedBox(height: 12),
@@ -315,12 +331,16 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
     setState(() => _loading = true);
     try {
       final repo = ref.read(profileRepositoryProvider);
+      String? photoPatch;
+      if (_removeCurrentAvatar && _avatarDraft == null) {
+        photoPatch = '';
+      }
+
       var updated = await repo.updateMe(
         displayName: _displayNameCtrl.text.trim().isEmpty
             ? null
             : _displayNameCtrl.text.trim(),
-        photoUrl:
-            _photoCtrl.text.trim().isEmpty ? null : _photoCtrl.text.trim(),
+        photoUrl: photoPatch,
         bio: _bioCtrl.text.trim().isEmpty ? null : _bioCtrl.text.trim(),
       );
 

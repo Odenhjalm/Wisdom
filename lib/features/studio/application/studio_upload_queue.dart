@@ -249,7 +249,12 @@ class UploadQueueNotifier extends StateNotifier<List<UploadJob>> {
                   error: 'Avbruten',
                 ));
       } else {
-        _handleFailure(job.id, e.message ?? 'Nätverksfel');
+        final friendly = _friendlyErrorMessage(e);
+        _handleFailure(
+          job.id,
+          friendly,
+          statusCode: e.response?.statusCode,
+        );
       }
     } catch (e) {
       _handleFailure(job.id, e.toString());
@@ -258,16 +263,31 @@ class UploadQueueNotifier extends StateNotifier<List<UploadJob>> {
     }
   }
 
-  void _handleFailure(String jobId, String message) {
+  void _handleFailure(String jobId, String message, {int? statusCode}) {
     if (_disposed) return;
     final job = _jobById(jobId);
     if (job == null) return;
+
+    final normalizedMessage = statusCode == 401
+        ? 'Sessionen har gått ut. Logga in igen för att fortsätta ladda upp.'
+        : message;
+
+    if (statusCode == 401) {
+      _updateJob(
+          jobId,
+          (current) => current.copyWith(
+                status: UploadJobStatus.failed,
+                error: normalizedMessage,
+                clearData: true,
+              ));
+      return;
+    }
     if (job.attempts >= job.maxAttempts) {
       _updateJob(
           jobId,
           (current) => current.copyWith(
                 status: UploadJobStatus.failed,
-                error: message,
+                error: normalizedMessage,
               ));
       return;
     }
@@ -278,7 +298,7 @@ class UploadQueueNotifier extends StateNotifier<List<UploadJob>> {
       (current) => current.copyWith(
         status: UploadJobStatus.pending,
         progress: 0,
-        error: message,
+        error: normalizedMessage,
         scheduledAt: scheduledAt,
       ),
     );
@@ -287,6 +307,25 @@ class UploadQueueNotifier extends StateNotifier<List<UploadJob>> {
         _processQueue();
       }
     });
+  }
+
+  String _friendlyErrorMessage(DioException error) {
+    final status = error.response?.statusCode;
+    if (status == 401) {
+      return 'Sessionen har gått ut. Logga in igen för att fortsätta.';
+    }
+    final data = error.response?.data;
+    if (data is Map<String, dynamic>) {
+      final detail = data['detail'] ?? data['message'] ?? data['error'];
+      if (detail is String && detail.isNotEmpty) {
+        return detail;
+      }
+    }
+    final reason = error.response?.statusMessage;
+    if (reason != null && reason.isNotEmpty) {
+      return reason;
+    }
+    return error.message ?? 'Nätverksfel';
   }
 
   void _updateJob(String id, UploadJob Function(UploadJob) updater) {

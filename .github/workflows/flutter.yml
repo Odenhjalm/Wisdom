@@ -43,6 +43,9 @@ jobs:
           python -m pip install poetry
           poetry install
 
+      - name: Verify schema sync
+        run: make schema.check
+
       - name: Run backend tests
         working-directory: backend
         run: poetry run pytest
@@ -89,9 +92,10 @@ jobs:
 
       - name: Prepare database schema
         run: |
-          PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -c "CREATE USER oden WITH PASSWORD '1124vattnaRn';"
-          PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -c "CREATE DATABASE wisdom OWNER oden;"
-          scripts/setup_local_backend.sh
+          PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -c "CREATE USER oden WITH PASSWORD '1124vattnaRn';" || true
+          PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -c "ALTER ROLE oden WITH LOGIN;"
+          PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -c "CREATE DATABASE wisdom OWNER oden;" || true
+          PGPASSWORD=1124vattnaRn LOCAL_DATABASE_URL=$LOCAL_DATABASE_URL scripts/setup_local_backend.sh
 
       - name: Launch backend
         run: |

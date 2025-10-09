@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Any, List, Optional
 
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel
 from uuid import UUID
 
 
@@ -16,22 +16,22 @@ class TokenPayload(BaseModel):
 
 
 class AuthLoginRequest(BaseModel):
-    email: EmailStr
+    email: str
     password: str
 
 
 class AuthRegisterRequest(BaseModel):
-    email: EmailStr
+    email: str
     password: str
     display_name: str
 
 
 class AuthForgotPasswordRequest(BaseModel):
-    email: EmailStr
+    email: str
 
 
 class AuthResetPasswordRequest(BaseModel):
-    email: EmailStr
+    email: str
     new_password: str
 
 
@@ -41,7 +41,7 @@ class TokenRefreshRequest(BaseModel):
 
 class Profile(BaseModel):
     user_id: UUID
-    email: EmailStr
+    email: str
     display_name: str | None = None
     bio: str | None = None
     photo_url: str | None = None
@@ -194,9 +194,108 @@ class TeacherApplication(BaseModel):
     created_at: datetime
     updated_at: datetime
     display_name: Optional[str] = None
-    email: Optional[EmailStr] = None
+    email: Optional[str] = None
     role_v2: Optional[str] = None
     approval: Optional[dict[str, Any]] = None
+
+
+# ---------------------------------------------------------------------------
+# V2 API schemas (Wisdom by SoulWisdom)
+# ---------------------------------------------------------------------------
+
+
+class MeResponse(BaseModel):
+    user_id: UUID
+    email: str
+    display_name: Optional[str] = None
+    role: str
+    is_admin: bool
+
+
+class ServiceItem(BaseModel):
+    id: UUID
+    title: str
+    description: Optional[str] = None
+    price_cents: int
+    currency: str
+    status: str
+    duration_minutes: Optional[int] = None
+    requires_certification: bool
+    certified_area: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class ServiceListResponse(BaseModel):
+    items: List[ServiceItem]
+
+
+class OrderCreateRequest(BaseModel):
+    service_id: Optional[UUID] = None
+    course_id: Optional[UUID] = None
+    amount_cents: Optional[int] = None
+    currency: Optional[str] = None
+    metadata: Optional[dict[str, Any]] = None
+
+
+class OrderRecord(BaseModel):
+    id: UUID
+    user_id: UUID
+    service_id: Optional[UUID] = None
+    course_id: Optional[UUID] = None
+    amount_cents: int
+    currency: str
+    status: str
+    stripe_checkout_id: Optional[str] = None
+    stripe_payment_intent: Optional[str] = None
+    metadata: dict[str, Any] = {}
+    created_at: datetime
+    updated_at: datetime
+
+
+class OrderResponse(BaseModel):
+    order: OrderRecord
+
+
+class CheckoutSessionRequest(BaseModel):
+    order_id: UUID
+    success_url: str
+    cancel_url: str
+    customer_email: Optional[str] = None
+
+
+class CheckoutSessionResponse(BaseModel):
+    url: str
+    id: str
+
+
+class StripeWebhookEvent(BaseModel):
+    type: str
+    data: dict[str, Any]
+
+
+class FeedItem(BaseModel):
+    id: UUID
+    activity_type: str
+    actor_id: Optional[UUID] = None
+    subject_table: Optional[str] = None
+    subject_id: Optional[UUID] = None
+    summary: Optional[str] = None
+    metadata: dict[str, Any] = {}
+    occurred_at: datetime
+
+
+class FeedResponse(BaseModel):
+    items: List[FeedItem]
+
+
+class LiveKitTokenRequest(BaseModel):
+    seminar_id: UUID
+
+
+class LiveKitTokenResponse(BaseModel):
+    ws_url: str
+    token: str
 
 
 class CertificateRecord(BaseModel):

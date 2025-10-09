@@ -1,9 +1,12 @@
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:flutter_quill/flutter_quill.dart'
+    show FlutterQuillLocalizations;
 
 import 'package:wisdom/features/courses/application/course_providers.dart';
 import 'package:wisdom/features/courses/data/courses_repository.dart';
@@ -165,6 +168,16 @@ void main() {
           ),
         ],
         child: MaterialApp(
+          localizationsDelegates: const [
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+            FlutterQuillLocalizations.delegate,
+          ],
+          supportedLocales: const [
+            Locale('en'),
+            Locale('sv'),
+          ],
           home: CourseEditorScreen(
             studioRepository: studioRepo,
             coursesRepository: coursesRepo,
@@ -178,6 +191,6 @@ void main() {
     expect(find.text('Tarot Basics'), findsWidgets);
     expect(find.text('Moduler & lektioner'), findsOneWidget);
     expect(find.text('Välkommen'), findsWidgets);
-    expect(find.text('Förhandsgranska kurs'), findsOneWidget);
+    expect(find.text('Spara lektionsinnehåll'), findsOneWidget);
   });
 }

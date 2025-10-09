@@ -10,6 +10,20 @@ from psycopg.types.json import Jsonb
 
 from .db import get_conn, pool
 from .auth import hash_password
+from .repositories import (
+    create_order as repo_create_order,
+    create_user as repo_create_user,
+    get_order as repo_get_order,
+    get_profile as repo_get_profile,
+    get_user_by_email as repo_get_user_by_email,
+    get_user_by_id as repo_get_user_by_id,
+    get_user_order as repo_get_user_order,
+    list_services as repo_list_services,
+    mark_order_paid as repo_mark_order_paid,
+    set_order_checkout_reference as repo_set_order_checkout_reference,
+    update_profile as repo_update_profile,
+    upsert_refresh_token as repo_upsert_refresh_token,
+)
 
 
 async def _fetchone(cur):
@@ -110,22 +124,12 @@ async def register_refresh_token(
     user_id: str, token: str, jti: str, expires_at: datetime
 ) -> None:
     token_hash = _hash_refresh_token(token)
-    async with pool.connection() as conn:  # type: ignore
-        async with conn.cursor(row_factory=dict_row) as cur:  # type: ignore[attr-defined]
-            await cur.execute(
-                """
-                INSERT INTO app.refresh_tokens (user_id, jti, token_hash, expires_at, last_used_at)
-                VALUES (%s, %s, %s, %s, now())
-                ON CONFLICT (jti) DO UPDATE
-                  SET token_hash = excluded.token_hash,
-                      expires_at = excluded.expires_at,
-                      revoked_at = NULL,
-                      rotated_at = NULL,
-                      last_used_at = now()
-                """,
-                (user_id, jti, token_hash, expires_at),
-            )
-            await conn.commit()
+    await repo_upsert_refresh_token(
+        user_id=user_id,
+        jti=jti,
+        token_hash=token_hash,
+        expires_at=expires_at,
+    )
 
 
 async def validate_refresh_token(jti: str, token: str) -> dict | None:
@@ -209,67 +213,21 @@ async def record_auth_event(
 
 
 async def get_user_by_email(email: str):
-    async with get_conn() as cur:
-        await cur.execute(
-            "SELECT id, email, encrypted_password FROM auth.users WHERE lower(email) = lower(%s)",
-            (email,),
-        )
-        return await _fetchone(cur)
+    return await repo_get_user_by_email(email)
 
 
 async def get_user_by_id(user_id: str):
-    async with get_conn() as cur:
-        await cur.execute(
-            "SELECT id, email FROM auth.users WHERE id = %s",
-            (user_id,),
-        )
-        return await _fetchone(cur)
+    return await repo_get_user_by_id(user_id)
 
 
 async def create_user(email: str, password: str, display_name: str):
     hashed = hash_password(password)
-    async with pool.connection() as conn:  # type: ignore
-        async with conn.cursor(row_factory=dict_row) as cur:  # type: ignore[attr-defined]
-            await cur.execute("SELECT gen_random_uuid()")
-            user_id_row = await _fetchone(cur)
-            user_id = user_id_row["gen_random_uuid"]
-
-            await cur.execute(
-                """
-                INSERT INTO auth.users (id, email, encrypted_password, aud, role, raw_app_meta_data, raw_user_meta_data, email_confirmed_at, last_sign_in_at, created_at, updated_at)
-                VALUES (%s, %s, %s, 'authenticated', 'authenticated', jsonb_build_object('role','user'), jsonb_build_object('seed', false), now(), now(), now(), now())
-                RETURNING id
-                """,
-                (user_id, email, hashed),
-            )
-            await _fetchone(cur)
-
-            await cur.execute(
-                """
-                INSERT INTO auth.identities (user_id, provider, provider_id, identity_data, email, created_at, updated_at)
-                VALUES (%s, 'email', %s, jsonb_build_object('email', %s::text, 'sub', %s::text, 'email_verified', true), %s, now(), now())
-                ON CONFLICT (provider_id, provider) DO UPDATE
-                  SET identity_data = excluded.identity_data,
-                      email = excluded.email,
-                      updated_at = now()
-                """,
-                (user_id, email, email, str(user_id), email),
-            )
-
-            await cur.execute(
-                """
-                INSERT INTO app.profiles (user_id, email, display_name, role_v2, is_admin, created_at, updated_at)
-                VALUES (%s, %s, %s, 'user', false, now(), now())
-                ON CONFLICT (user_id) DO UPDATE
-                  SET email = excluded.email,
-                      display_name = excluded.display_name,
-                      updated_at = now()
-                """,
-                (user_id, email, display_name),
-            )
-
-            await conn.commit()
-    return user_id
+    result = await repo_create_user(
+        email=email,
+        hashed_password=hashed,
+        display_name=display_name,
+    )
+    return result["user"]["id"]
 
 
 async def is_teacher_user(user_id: str) -> bool:
@@ -633,41 +591,12 @@ async def list_teachers(limit: int = 20) -> Iterable[dict]:
 
 
 async def list_services(limit: int = 6) -> Iterable[dict]:
-    async with get_conn() as cur:
-        try:
-            await cur.execute(
-                """
-                SELECT id, title, description, price_cents, duration_min,
-                       requires_cert, certified_area, created_at
-                FROM app.services
-                WHERE active = true
-                ORDER BY created_at DESC
-                LIMIT %s
-                """,
-                (limit,),
-            )
-        except errors.UndefinedColumn:
-            await cur.connection.rollback()  # type: ignore[attr-defined]
-            await cur.execute(
-                """
-                SELECT id, title, description, price_cents, duration_min,
-                       certified_area, created_at
-                FROM app.services
-                WHERE active = true
-                ORDER BY created_at DESC
-                LIMIT %s
-                """,
-                (limit,),
-            )
-        rows = await cur.fetchall()
-
-    normalized: list[dict] = []
-    for row in rows:
-        item = dict(row)
-        if "requires_cert" not in item:
-            item["requires_cert"] = False
-        normalized.append(item)
-    return normalized
+    services: list[dict] = []
+    async for service in repo_list_services(status="active"):
+        services.append(service)
+        if len(services) >= limit:
+            break
+    return services
 
 
 async def get_course(course_id: str | None = None, slug: str | None = None):
@@ -1148,16 +1077,7 @@ async def set_lesson_intro(lesson_id: str, is_intro: bool) -> dict | None:
 
 
 async def get_profile(user_id: str):
-    async with get_conn() as cur:
-        await cur.execute(
-            """
-            SELECT user_id, email, display_name, bio, photo_url, avatar_media_id, role_v2, is_admin, created_at, updated_at
-            FROM app.profiles
-            WHERE user_id = %s
-            """,
-            (user_id,),
-        )
-        return await _fetchone(cur)
+    return await repo_get_profile(user_id)
 
 
 async def update_profile(
@@ -1168,41 +1088,13 @@ async def update_profile(
     photo_url: str | None = None,
     avatar_media_id: str | None = None,
 ) -> dict | None:
-    assignments: list[str] = []
-    params: list[object] = []
-
-    def _append(column: str, value: str | None) -> None:
-        assignments.append(f"{column} = %s")
-        params.append(value)
-
-    if display_name is not None:
-        _append("display_name", display_name if display_name.strip() else None)
-    if bio is not None:
-        _append("bio", bio if bio.strip() else None)
-    if photo_url is not None:
-        _append("photo_url", photo_url if photo_url.strip() else None)
-    if avatar_media_id is not None:
-        _append("avatar_media_id", avatar_media_id)
-
-    if not assignments:
-        return await get_profile(user_id)
-
-    assignments.append("updated_at = now()")
-    params.append(user_id)
-
-    query = """
-        UPDATE app.profiles
-           SET {set_clause}
-         WHERE user_id = %s
-         RETURNING user_id, email, display_name, bio, photo_url, avatar_media_id, role_v2, is_admin, created_at, updated_at
-    """.format(set_clause=", ".join(assignments))
-
-    async with pool.connection() as conn:  # type: ignore
-        async with conn.cursor(row_factory=dict_row) as cur:  # type: ignore[attr-defined]
-            await cur.execute(query, params)
-            row = await _fetchone(cur)
-            await conn.commit()
-            return row
+    return await repo_update_profile(
+        user_id,
+        display_name=display_name,
+        bio=bio,
+        photo_url=photo_url,
+        avatar_media_id=avatar_media_id,
+    )
 
 
 async def free_course_limit() -> int:
@@ -1339,24 +1231,11 @@ async def course_access_snapshot(user_id: str, course_id: str) -> dict:
 async def set_order_checkout_reference(
     order_id: str, *, checkout_id: str, payment_intent: str | None
 ) -> dict | None:
-    async with pool.connection() as conn:  # type: ignore
-        async with conn.cursor(row_factory=dict_row) as cur:  # type: ignore[attr-defined]
-            await cur.execute(
-                """
-                UPDATE app.orders
-                   SET stripe_checkout_id = %s,
-                       stripe_payment_intent = COALESCE(%s, stripe_payment_intent),
-                       updated_at = now()
-                 WHERE id = %s
-                 RETURNING id, user_id, course_id, service_id, amount_cents, currency,
-                           status, stripe_checkout_id, stripe_payment_intent,
-                           metadata, created_at, updated_at
-                """,
-                (checkout_id, payment_intent, order_id),
-            )
-            row = await _fetchone(cur)
-            await conn.commit()
-            return dict(row) if row else None
+    return await repo_set_order_checkout_reference(
+        order_id=order_id,
+        checkout_id=checkout_id,
+        payment_intent=payment_intent,
+    )
 
 
 async def get_user_email(user_id: str) -> str | None:
@@ -1622,21 +1501,14 @@ async def start_course_order(
     currency: str,
     metadata: dict | None = None,
 ) -> dict:
-    async with pool.connection() as conn:  # type: ignore
-        async with conn.cursor(row_factory=dict_row) as cur:  # type: ignore[attr-defined]
-            await cur.execute(
-                """
-                INSERT INTO app.orders (user_id, course_id, amount_cents, currency, status, metadata)
-                VALUES (%s, %s, %s, %s, 'pending', %s)
-                RETURNING id, user_id, course_id, service_id, amount_cents, currency,
-                          status, stripe_checkout_id, stripe_payment_intent,
-                          metadata, created_at, updated_at
-                """,
-                (user_id, course_id, amount_cents, currency or "sek", Jsonb(metadata or {})),
-            )
-            row = await _fetchone(cur)
-            await conn.commit()
-            return dict(row)
+    return await repo_create_order(
+        user_id=user_id,
+        service_id=None,
+        course_id=course_id,
+        amount_cents=amount_cents,
+        currency=currency or "sek",
+        metadata=metadata,
+    )
 
 
 async def start_service_order(
@@ -1646,55 +1518,22 @@ async def start_service_order(
     currency: str,
     metadata: dict | None = None,
 ) -> dict:
-    async with pool.connection() as conn:  # type: ignore
-        async with conn.cursor(row_factory=dict_row) as cur:  # type: ignore[attr-defined]
-            await cur.execute(
-                """
-                INSERT INTO app.orders (user_id, service_id, amount_cents, currency, status, metadata)
-                VALUES (%s, %s, %s, %s, 'pending', %s)
-                RETURNING id, user_id, course_id, service_id, amount_cents, currency,
-                          status, stripe_checkout_id, stripe_payment_intent,
-                          metadata, created_at, updated_at
-                """,
-                (user_id, service_id, amount_cents, currency or "sek", Jsonb(metadata or {})),
-            )
-            row = await _fetchone(cur)
-            await conn.commit()
-            return dict(row)
+    return await repo_create_order(
+        user_id=user_id,
+        service_id=service_id,
+        course_id=None,
+        amount_cents=amount_cents,
+        currency=currency or "sek",
+        metadata=metadata,
+    )
 
 
 async def get_order(order_id: str, user_id: str) -> dict | None:
-    async with get_conn() as cur:
-        await cur.execute(
-            """
-            SELECT id, user_id, course_id, service_id, amount_cents, currency,
-                   status, stripe_checkout_id, stripe_payment_intent,
-                   metadata, created_at, updated_at
-            FROM app.orders
-            WHERE id = %s AND user_id = %s
-            LIMIT 1
-            """,
-            (order_id, user_id),
-        )
-        row = await _fetchone(cur)
-    return dict(row) if row else None
+    return await repo_get_user_order(order_id, user_id)
 
 
 async def get_order_by_id(order_id: str) -> dict | None:
-    async with get_conn() as cur:
-        await cur.execute(
-            """
-            SELECT id, user_id, course_id, service_id, amount_cents, currency,
-                   status, stripe_checkout_id, stripe_payment_intent,
-                   metadata, created_at, updated_at
-            FROM app.orders
-            WHERE id = %s
-            LIMIT 1
-            """,
-            (order_id,),
-        )
-        row = await _fetchone(cur)
-    return dict(row) if row else None
+    return await repo_get_order(order_id)
 
 
 async def mark_order_paid(
@@ -1703,30 +1542,19 @@ async def mark_order_paid(
     payment_intent: str | None,
     checkout_id: str | None,
 ) -> dict | None:
-    async with pool.connection() as conn:  # type: ignore
-        async with conn.cursor(row_factory=dict_row) as cur:  # type: ignore[attr-defined]
-            await cur.execute(
-                """
-                UPDATE app.orders
-                   SET status = 'paid',
-                       stripe_payment_intent = COALESCE(%s, stripe_payment_intent),
-                       stripe_checkout_id = COALESCE(%s, stripe_checkout_id),
-                       updated_at = now()
-                 WHERE id = %s
-                 RETURNING id, user_id, course_id, service_id, amount_cents, currency,
-                           status, stripe_checkout_id, stripe_payment_intent,
-                           metadata, created_at, updated_at
-                """,
-                (payment_intent, checkout_id, order_id),
-            )
-            order = await _fetchone(cur)
-            if not order:
-                await conn.rollback()
-                return None
+    order = await repo_mark_order_paid(
+        order_id,
+        payment_intent=payment_intent,
+        checkout_id=checkout_id,
+    )
+    if not order:
+        return None
 
-            course_id = order.get("course_id")
-            user_id = order.get("user_id")
-            if course_id and user_id:
+    course_id = order.get("course_id")
+    user_id = order.get("user_id")
+    if course_id and user_id:
+        async with pool.connection() as conn:  # type: ignore[attr-defined]
+            async with conn.cursor() as cur:  # type: ignore[attr-defined]
                 await cur.execute(
                     """
                     INSERT INTO app.enrollments (user_id, course_id, source)
@@ -1735,9 +1563,9 @@ async def mark_order_paid(
                     """,
                     (user_id, course_id),
                 )
+                await conn.commit()
 
-            await conn.commit()
-            return dict(order)
+    return order
 
 
 async def upsert_subscription_record(
@@ -2408,7 +2236,7 @@ async def list_channel_messages(channel: str) -> list[dict]:
             """
             SELECT id, channel, sender_id, content, created_at
             FROM app.messages
-            WHERE channel = %s
+            WHERE channel = %s AND sender_id IS NOT NULL
             ORDER BY created_at
             """,
             (channel,),

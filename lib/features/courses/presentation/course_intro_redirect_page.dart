@@ -19,11 +19,12 @@ class CourseIntroRedirectPage extends ConsumerStatefulWidget {
 class _CourseIntroRedirectPageState
     extends ConsumerState<CourseIntroRedirectPage> {
   bool _navigated = false;
+  ProviderSubscription<AsyncValue<CourseSummary?>>? _courseSub;
 
   @override
   void initState() {
     super.initState();
-    ref.listen<AsyncValue<CourseSummary?>>(
+    _courseSub = ref.listenManual<AsyncValue<CourseSummary?>>(
       firstFreeIntroCourseProvider,
       (previous, next) => _handleState(next),
     );
@@ -41,7 +42,7 @@ class _CourseIntroRedirectPageState
         final slug = course?.slug;
         if (!mounted || !context.mounted) return;
         if (slug != null && slug.isNotEmpty) {
-          context.go('/course/$slug');
+          context.go('/course/${Uri.encodeComponent(slug)}');
         } else {
           context.go('/');
         }
@@ -54,6 +55,12 @@ class _CourseIntroRedirectPageState
       },
       loading: () {},
     );
+  }
+
+  @override
+  void dispose() {
+    _courseSub?.close();
+    super.dispose();
   }
 
   @override

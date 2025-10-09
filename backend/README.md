@@ -33,6 +33,7 @@ backend/
    STRIPE_SECRET_KEY=sk_test_xxx
    STRIPE_WEBHOOK_SECRET=whsec_xxx
    ```
+   > Tips: håll hemligheter utanför git och injicera dem via miljövariabler, `direnv` eller CI-secret stores.
 4. Starta servern:
    ```bash
    poetry run uvicorn app.main:app --reload

@@ -115,10 +115,12 @@ sealed class AppFailure implements Exception {
 
   static bool _looksLikeConfigError(Object error) {
     final text = error.toString().toLowerCase();
-    final mentionsApi =
-        text.contains('api_base_url') || text.contains('api base url') || text.contains('api');
-    final mentionsConfig =
-        text.contains('konfig') || text.contains('config') || text.contains('init');
+    final mentionsApi = text.contains('api_base_url') ||
+        text.contains('api base url') ||
+        text.contains('api');
+    final mentionsConfig = text.contains('konfig') ||
+        text.contains('config') ||
+        text.contains('init');
     final mentionsMissing = text.contains('saknas') || text.contains('missing');
     return mentionsApi && mentionsConfig && mentionsMissing;
   }

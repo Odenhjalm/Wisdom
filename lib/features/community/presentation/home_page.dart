@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -157,53 +159,50 @@ class _ComposerCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context).textTheme;
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Dela något i communityt',
-              style: t.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+    return _GlassSection(
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            'Dela något i communityt',
+            style: t.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: controller,
+            minLines: 2,
+            maxLines: 4,
+            decoration: const InputDecoration(
+              hintText: 'Skriv ett inlägg...',
             ),
-            const SizedBox(height: 8),
-            TextField(
-              controller: controller,
-              minLines: 2,
-              maxLines: 4,
-              decoration: const InputDecoration(
-                hintText: 'Skriv ett inlägg...',
+          ),
+          const SizedBox(height: 8),
+          Align(
+            alignment: Alignment.centerRight,
+            child: ElevatedButton(
+              onPressed: isPublishing ? null : () => onPublish(controller.text),
+              child: isPublishing
+                  ? const SizedBox(
+                      height: 18,
+                      width: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Text('Publicera'),
+            ),
+          ),
+          if (error != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                _errorMessage(error),
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.error,
+                    ),
               ),
             ),
-            const SizedBox(height: 8),
-            Align(
-              alignment: Alignment.centerRight,
-              child: ElevatedButton(
-                onPressed: isPublishing
-                    ? null
-                    : () => onPublish(controller.text),
-                child: isPublishing
-                    ? const SizedBox(
-                        height: 18,
-                        width: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Text('Publicera'),
-              ),
-            ),
-            if (error != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: Text(
-                  _errorMessage(error),
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.error,
-                  ),
-                ),
-              ),
-          ],
-        ),
+        ],
       ),
     );
   }
@@ -222,13 +221,13 @@ class _FeedCard extends StatelessWidget {
   });
 
   const _FeedCard({required List<CommunityPost> posts})
-    : this._(posts: posts, loading: false, errorMessage: null);
+      : this._(posts: posts, loading: false, errorMessage: null);
 
   const _FeedCard.loading()
-    : this._(posts: const [], loading: true, errorMessage: null);
+      : this._(posts: const [], loading: true, errorMessage: null);
 
   const _FeedCard.error({required String message})
-    : this._(posts: const [], loading: false, errorMessage: message);
+      : this._(posts: const [], loading: false, errorMessage: message);
 
   final List<CommunityPost> posts;
   final bool loading;
@@ -237,51 +236,49 @@ class _FeedCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context).textTheme;
+    Widget content;
     if (loading) {
-      return const Card(
-        child: Padding(
-          padding: EdgeInsets.all(24),
-          child: Center(child: CircularProgressIndicator()),
-        ),
-      );
-    }
-    if (errorMessage != null) {
-      return Card(
-        child: Padding(
-          padding: const EdgeInsets.all(18),
-          child: Text(errorMessage!, style: t.bodyMedium),
-        ),
-      );
-    }
-    if (posts.isEmpty) {
-      return Card(
-        child: Padding(
-          padding: const EdgeInsets.all(18),
-          child: Text('Inga inlägg ännu.', style: t.bodyMedium),
-        ),
-      );
-    }
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Nyligen i communityt',
-              style: t.titleMedium?.copyWith(fontWeight: FontWeight.w800),
-            ),
-            const SizedBox(height: 8),
-            ...posts.map(
-              (post) => ListTile(
-                leading: const Icon(Icons.person_rounded),
-                title: Text(post.profile?.displayName ?? 'Användare'),
-                subtitle: Text(post.content),
+      content = const Center(child: CircularProgressIndicator());
+    } else if (errorMessage != null) {
+      content = Text(errorMessage!, style: t.bodyMedium);
+    } else if (posts.isEmpty) {
+      content = Text('Inga inlägg ännu.', style: t.bodyMedium);
+    } else {
+      content = Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            'Nyligen i communityt',
+            style: t.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 10),
+          ...posts.map(
+            (post) => Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    post.profile?.displayName ?? 'Användare',
+                    style: t.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    post.content,
+                    style: t.bodyMedium,
+                  ),
+                ],
               ),
             ),
-          ],
-        ),
-      ),
+          ),
+        ],
+      );
+    }
+    return _GlassSection(
+      padding: const EdgeInsets.all(18),
+      child: content,
     );
   }
 }
@@ -290,50 +287,49 @@ class _ShortcutCards extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context).textTheme;
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(18),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Välkommen hem.',
-              style: t.displaySmall?.copyWith(fontWeight: FontWeight.w800),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Utforska introduktionskurser (gratis förhandsvisningar).',
-              style: t.bodyLarge,
-            ),
-            const SizedBox(height: 14),
-            Wrap(
-              spacing: 12,
-              runSpacing: 12,
-              children: [
-                ElevatedButton(
-                  onPressed: () => context.push('/course/intro'),
-                  child: const Text('Öppna introduktionskurs'),
-                ),
-                OutlinedButton(
-                  onPressed: () => context.push('/studio'),
-                  child: const Text('Gå till Studio (lärare)'),
-                ),
-                OutlinedButton(
-                  onPressed: () => context.push('/community'),
-                  child: const Text('Community'),
-                ),
-                OutlinedButton(
-                  onPressed: () => context.push('/tarot'),
-                  child: const Text('Tarotförfrågan'),
-                ),
-                OutlinedButton(
-                  onPressed: () => context.push('/booking'),
-                  child: const Text('Bokningar'),
-                ),
-              ],
-            ),
-          ],
-        ),
+    return _GlassSection(
+      padding: const EdgeInsets.all(18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            'Välkommen hem.',
+            style: t.displaySmall?.copyWith(fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Utforska introduktionskurser (gratis förhandsvisningar).',
+            style: t.bodyLarge,
+          ),
+          const SizedBox(height: 14),
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: [
+              ElevatedButton(
+                onPressed: () => context.push('/course/intro'),
+                child: const Text('Öppna introduktionskurs'),
+              ),
+              OutlinedButton(
+                onPressed: () => context.push('/studio'),
+                child: const Text('Gå till Studio (lärare)'),
+              ),
+              OutlinedButton(
+                onPressed: () => context.push('/community'),
+                child: const Text('Community'),
+              ),
+              OutlinedButton(
+                onPressed: () => context.push('/tarot'),
+                child: const Text('Tarotförfrågan'),
+              ),
+              OutlinedButton(
+                onPressed: () => context.push('/booking'),
+                child: const Text('Bokningar'),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -348,50 +344,92 @@ class _CoursesCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context).textTheme;
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(18),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Mina kurser',
-              style: t.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+    return _GlassSection(
+      padding: const EdgeInsets.all(18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            'Mina kurser',
+            style: t.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 10),
+          coursesAsync.when(
+            loading: () => const Center(
+              child: Padding(
+                padding: EdgeInsets.all(8),
+                child: CircularProgressIndicator(),
+              ),
             ),
-            const SizedBox(height: 10),
-            coursesAsync.when(
-              loading: () => const Center(
-                child: Padding(
-                  padding: EdgeInsets.all(8),
-                  child: CircularProgressIndicator(),
-                ),
-              ),
-              error: (error, _) => Text(
-                error is AppFailure ? error.message : error.toString(),
-                style: t.bodyMedium,
-              ),
-              data: (courses) {
-                if (courses.isEmpty) {
-                  return Text(
-                    'Du är ännu inte anmäld till någon kurs.',
-                    style: t.bodyMedium,
-                  );
-                }
-                return progressAsync.when(
-                  loading: () => const Padding(
-                    padding: EdgeInsets.all(8),
-                    child: Center(child: CircularProgressIndicator()),
-                  ),
-                  error: (error, _) => Text(
-                    error is AppFailure ? error.message : error.toString(),
-                    style: t.bodyMedium,
-                  ),
-                  data: (progress) =>
-                      CoursesGrid(courses: courses, progress: progress),
+            error: (error, _) => Text(
+              error is AppFailure ? error.message : error.toString(),
+              style: t.bodyMedium,
+            ),
+            data: (courses) {
+              if (courses.isEmpty) {
+                return Text(
+                  'Du är ännu inte anmäld till någon kurs.',
+                  style: t.bodyMedium,
                 );
-              },
+              }
+              return progressAsync.when(
+                loading: () => const Padding(
+                  padding: EdgeInsets.all(8),
+                  child: Center(child: CircularProgressIndicator()),
+                ),
+                error: (error, _) => Text(
+                  error is AppFailure ? error.message : error.toString(),
+                  style: t.bodyMedium,
+                ),
+                data: (progress) =>
+                    CoursesGrid(courses: courses, progress: progress),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _GlassSection extends StatelessWidget {
+  const _GlassSection({
+    required this.child,
+    this.padding = const EdgeInsets.all(12),
+  });
+
+  final Widget child;
+  final EdgeInsetsGeometry padding;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final baseColor = theme.brightness == Brightness.dark
+        ? Colors.white.withValues(alpha: 0.08)
+        : Colors.white.withValues(alpha: 0.38);
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(20),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                baseColor,
+                baseColor.withValues(alpha: 0.7),
+              ],
             ),
-          ],
+          ),
+          child: Padding(
+            padding: padding,
+            child: child,
+          ),
         ),
       ),
     );

@@ -10,15 +10,15 @@
 \set ON_ERROR_STOP on
 \if :{?email}
 \else
-\set email 'odenhjalm@outlook.com'
+\set email 'teacher.local@example.com'
 \endif
 \if :{?password}
 \else
-\set password '1124vattnaRn'
+\set password 'ChangeMe123!'
 \endif
 \if :{?display_name}
 \else
-\set display_name 'Oden Hjalm'
+\set display_name 'Local Teacher'
 \endif
 
 begin;

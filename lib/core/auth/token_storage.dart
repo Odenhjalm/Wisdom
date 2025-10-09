@@ -19,11 +19,9 @@ class TokenStorage {
   Future<void> updateAccessToken(String accessToken) =>
       _storage.write(key: _accessTokenKey, value: accessToken);
 
-  Future<String?> readAccessToken() =>
-      _storage.read(key: _accessTokenKey);
+  Future<String?> readAccessToken() => _storage.read(key: _accessTokenKey);
 
-  Future<String?> readRefreshToken() =>
-      _storage.read(key: _refreshTokenKey);
+  Future<String?> readRefreshToken() => _storage.read(key: _refreshTokenKey);
 
   Future<void> clear() async {
     await _storage.delete(key: _accessTokenKey);

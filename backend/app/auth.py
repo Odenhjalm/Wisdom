@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, timezone
+import hashlib
 import uuid
 from typing import Annotated, Any
 
@@ -55,6 +56,10 @@ def create_refresh_token(
     }
     token = jwt.encode(to_encode, settings.jwt_secret, algorithm=settings.jwt_algorithm)
     return token, jti, expire
+
+
+def hash_refresh_token(token: str) -> str:
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
 
 async def get_current_user(token: Annotated[str, Depends(oauth2_scheme)]):

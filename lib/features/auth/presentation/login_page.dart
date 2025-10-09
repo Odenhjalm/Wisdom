@@ -199,7 +199,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
       if (redirect != null && redirect.startsWith('/')) {
         context.go(redirect);
       } else {
-        context.go('/');
+        context.go('/home');
       }
     } catch (error) {
       if (!mounted || !context.mounted) return;

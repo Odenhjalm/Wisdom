@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_quill/flutter_quill.dart'
+    show FlutterQuillLocalizations;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_stripe/flutter_stripe.dart';
@@ -20,13 +23,12 @@ Future<void> main() async {
   } catch (_) {
     // Filen är valfri; saknas den så förlitar vi oss på --dart-define eller runtime vars.
   }
-  final rawBaseUrl =
-      dotenv.maybeGet('API_BASE_URL') ?? const String.fromEnvironment('API_BASE_URL');
+  final rawBaseUrl = dotenv.maybeGet('API_BASE_URL') ??
+      const String.fromEnvironment('API_BASE_URL');
   final baseUrl = _resolveApiBaseUrl(rawBaseUrl);
   final publishableKey = dotenv.maybeGet('STRIPE_PUBLISHABLE_KEY') ??
       const String.fromEnvironment('STRIPE_PUBLISHABLE_KEY');
-  final merchantDisplayName =
-      dotenv.maybeGet('STRIPE_MERCHANT_DISPLAY_NAME') ??
+  final merchantDisplayName = dotenv.maybeGet('STRIPE_MERCHANT_DISPLAY_NAME') ??
       const String.fromEnvironment('STRIPE_MERCHANT_DISPLAY_NAME');
 
   final missingKeys = <String>[];
@@ -44,15 +46,13 @@ Future<void> main() async {
     TargetPlatform.android,
     TargetPlatform.iOS,
   };
-  final canInitStripe =
-      publishableKey.isNotEmpty &&
+  final canInitStripe = publishableKey.isNotEmpty &&
       (kIsWeb || stripeSupportedPlatforms.contains(defaultTargetPlatform));
 
   if (canInitStripe) {
     Stripe.publishableKey = publishableKey;
-    Stripe.merchantIdentifier = merchantDisplayName.isNotEmpty
-        ? merchantDisplayName
-        : 'Wisdom';
+    Stripe.merchantIdentifier =
+        merchantDisplayName.isNotEmpty ? merchantDisplayName : 'Wisdom';
     await Stripe.instance.applySettings();
   }
   if (!canInitStripe && publishableKey.isNotEmpty) {
@@ -115,6 +115,16 @@ class WisdomApp extends ConsumerWidget {
       title: 'Wisdom',
       theme: buildLightTheme(),
       themeMode: ThemeMode.light,
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+        FlutterQuillLocalizations.delegate,
+      ],
+      supportedLocales: const [
+        Locale('en'),
+        Locale('sv'),
+      ],
       routerConfig: router,
       builder: (context, child) {
         if (child == null) return const SizedBox.shrink();

@@ -136,10 +136,12 @@ class MediaRepository {
     if (input.startsWith('http://') || input.startsWith('https://')) {
       final uri = Uri.parse(input);
       final base = Uri.parse(_config.apiBaseUrl);
-      final sameOrigin =
-          uri.scheme == base.scheme && uri.host == base.host && uri.port == base.port;
+      final sameOrigin = uri.scheme == base.scheme &&
+          uri.host == base.host &&
+          uri.port == base.port;
       if (!sameOrigin) {
-        throw ArgumentError('downloadPath must target the configured API host.');
+        throw ArgumentError(
+            'downloadPath must target the configured API host.');
       }
       final path = uri.path.isEmpty ? '/' : uri.path;
       final query = uri.hasQuery ? '?${uri.query}' : '';

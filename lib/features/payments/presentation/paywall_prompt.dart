@@ -105,7 +105,11 @@ class _PaywallBody extends StatelessWidget {
                       child: FilledButton(
                         onPressed: courseSlug == null
                             ? null
-                            : () => context.go('/course/$courseSlug'),
+                            : () {
+                                final slug = courseSlug!;
+                                context
+                                    .go('/course/${Uri.encodeComponent(slug)}');
+                              },
                         child: const Text('Öppna kursöversikten'),
                       ),
                     ),

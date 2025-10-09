@@ -4,6 +4,9 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:wisdom/api/auth_repository.dart';
+import 'package:wisdom/core/auth/auth_controller.dart';
+import 'package:wisdom/features/studio/application/studio_providers.dart'
+    as studio;
 
 class LandingSectionState {
   const LandingSectionState({
@@ -79,4 +82,25 @@ final teachersProvider = FutureProvider<LandingSectionState>((ref) {
 
 final recentServicesProvider = FutureProvider<LandingSectionState>((ref) {
   return _fetchLandingSection(ref, '/landing/services', 'tjänsterna');
+});
+
+final myStudioCoursesProvider =
+    FutureProvider<LandingSectionState>((ref) async {
+  final auth = ref.watch(authControllerProvider);
+  final profile = auth.profile;
+  final isTeacher = profile?.isTeacher == true || profile?.isAdmin == true;
+  if (!isTeacher) {
+    return const LandingSectionState(items: []);
+  }
+  try {
+    final repo = ref.read(studio.studioRepositoryProvider);
+    final courses = await repo.myCourses();
+    return _landingSuccessState(
+      courses.length > 3 ? courses.sublist(0, 3) : courses,
+    );
+  } catch (_) {
+    return _landingErrorState(
+      message: 'Kunde inte hämta dina studio-kurser.',
+    );
+  }
 });

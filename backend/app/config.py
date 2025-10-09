@@ -14,6 +14,9 @@ class Settings(BaseSettings):
     stripe_checkout_base: str | None = None
     stripe_secret_key: str | None = None
     stripe_webhook_secret: str | None = None
+    livekit_api_key: str | None = None
+    livekit_api_secret: str | None = None
+    livekit_ws_url: str | None = "wss://lk.wisdom.local"
 
 
 settings = Settings()

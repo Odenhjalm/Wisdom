@@ -66,8 +66,9 @@ class CoursesRepository {
 
   Future<CourseDetailData> fetchCourseDetailBySlug(String slug) async {
     try {
+      final encoded = Uri.encodeComponent(slug);
       final res =
-          await _client.get<Map<String, dynamic>>('/courses/by-slug/$slug');
+          await _client.get<Map<String, dynamic>>('/courses/by-slug/$encoded');
       final detail = _mapCourseDetail(res);
       return _augmentCourseDetail(detail);
     } catch (error, stackTrace) {
@@ -575,10 +576,9 @@ class LessonMediaItem {
 
   bool get isPublicBucket => (storageBucket ?? '').startsWith('public');
 
-  String get fileName =>
-      (originalName == null || originalName!.isEmpty)
-          ? storagePath.split('/').last
-          : originalName!;
+  String get fileName => (originalName == null || originalName!.isEmpty)
+      ? storagePath.split('/').last
+      : originalName!;
 }
 
 class CourseOrderSummary {

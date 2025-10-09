@@ -33,19 +33,24 @@ class Profile extends Equatable {
     final admin = json['is_admin'] == true || legacy == 'admin';
 
     DateTime parseDate(dynamic value) {
-      if (value is DateTime) return value;
+      if (value is DateTime) return value.toUtc();
       if (value is String && value.isNotEmpty) {
-        return DateTime.parse(value).toUtc();
+        return DateTime.tryParse(value)?.toUtc() ??
+            DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
       }
-      return DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
+      if (value is int) {
+        return DateTime.fromMillisecondsSinceEpoch(value, isUtc: true);
+      }
+      return DateTime.now().toUtc();
     }
 
+    final idValue = (json['user_id'] ?? json['id'])?.toString() ?? '';
+
     return Profile(
-      id: (json['user_id'] ?? json['id']) as String,
+      id: idValue,
       email: (json['email'] ?? '') as String,
-      userRole: admin
-          ? UserRole.teacher
-          : parseUserRole(userRoleValue ?? legacy),
+      userRole:
+          admin ? UserRole.teacher : parseUserRole(userRoleValue ?? legacy),
       isAdmin: admin,
       displayName: json['display_name'] as String?,
       bio: json['bio'] as String?,
@@ -99,15 +104,15 @@ class Profile extends Equatable {
 
   @override
   List<Object?> get props => [
-    id,
-    email,
-    userRole,
-    isAdmin,
-    displayName,
-    bio,
-    photoUrl,
-    avatarMediaId,
-    createdAt,
-    updatedAt,
-  ];
+        id,
+        email,
+        userRole,
+        isAdmin,
+        displayName,
+        bio,
+        photoUrl,
+        avatarMediaId,
+        createdAt,
+        updatedAt,
+      ];
 }

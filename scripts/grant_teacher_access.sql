@@ -1,5 +1,8 @@
--- Grant teacher rights to a specific user by email (Phase A schema)
--- Usage: run with service role (`psql -f scripts/grant_teacher_access.sql`)
+\set ON_ERROR_STOP on
+\if :{?email}
+\else
+\set email 'teacher.local@example.com'
+\endif
 
 begin;
 
@@ -7,7 +10,7 @@ begin;
 with target as (
   select u.id as user_id, u.email
   from auth.users u
-  where lower(u.email) = lower('odenhjalm@outlook.com')
+  where lower(u.email) = lower(:'email')
 )
 insert into app.profiles (user_id, email, display_name, role_v2, is_admin, created_at, updated_at)
 select t.user_id,
@@ -30,13 +33,13 @@ update app.profiles
 set role_v2 = 'teacher',
     is_admin = false,
     updated_at = now()
-where lower(email) = lower('odenhjalm@outlook.com');
+where lower(email) = lower(:'email');
 
 -- Teacher permissions (edit + publish)
 with target as (
   select p.user_id
   from app.profiles p
-  where lower(p.email) = lower('odenhjalm@outlook.com')
+  where lower(p.email) = lower(:'email')
 ), granter as (
   select user_id
   from app.profiles
@@ -63,7 +66,7 @@ select p.user_id,
        coalesce((select user_id from app.profiles where is_admin = true order by created_at limit 1), p.user_id),
        now()
 from app.profiles p
-where lower(p.email) = lower('odenhjalm@outlook.com')
+where lower(p.email) = lower(:'email')
 on conflict (user_id) do update
 set approved_by = excluded.approved_by,
     approved_at = excluded.approved_at;
@@ -74,7 +77,7 @@ set status = 'verified',
     notes = 'Granted via grant_teacher_access.sql',
     updated_at = now()
 where user_id in (
-        select user_id from app.profiles where lower(email) = lower('odenhjalm@outlook.com')
+        select user_id from app.profiles where lower(email) = lower(:'email')
       )
   and title = 'Läraransökan';
 
@@ -86,7 +89,7 @@ select p.user_id,
        now(),
        now()
 from app.profiles p
-where lower(p.email) = lower('odenhjalm@outlook.com')
+where lower(p.email) = lower(:'email')
   and not exists (
         select 1 from app.certificates c
         where c.user_id = p.user_id
@@ -105,4 +108,4 @@ select p.user_id,
 from app.profiles p
 left join app.teacher_approvals ta on ta.user_id = p.user_id
 left join app.certificates c on c.user_id = p.user_id and c.title = 'Läraransökan'
-where lower(p.email) = lower('odenhjalm@outlook.com');
+where lower(p.email) = lower(:'email');

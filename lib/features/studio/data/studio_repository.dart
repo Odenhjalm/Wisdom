@@ -330,8 +330,9 @@ class StudioStatus {
   final bool hasApplication;
 
   factory StudioStatus.fromJson(Map<String, dynamic> json) => StudioStatus(
-    isTeacher: json['is_teacher'] == true,
-    verifiedCertificates: (json['verified_certificates'] as num?)?.toInt() ?? 0,
-    hasApplication: json['has_application'] == true,
-  );
+        isTeacher: json['is_teacher'] == true,
+        verifiedCertificates:
+            (json['verified_certificates'] as num?)?.toInt() ?? 0,
+        hasApplication: json['has_application'] == true,
+      );
 }

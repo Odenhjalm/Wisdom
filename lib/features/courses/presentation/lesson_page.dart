@@ -24,15 +24,23 @@ class LessonPage extends ConsumerStatefulWidget {
 }
 
 class _LessonPageState extends ConsumerState<LessonPage> {
+  ProviderSubscription<AsyncValue<LessonDetailData>>? _lessonSub;
+
   @override
   void initState() {
     super.initState();
-    ref.listen<AsyncValue<LessonDetailData>>(
+    _lessonSub = ref.listenManual<AsyncValue<LessonDetailData>>(
       lessonDetailProvider(widget.lessonId),
       (previous, next) {
         next.whenData(_updateProgress);
       },
     );
+  }
+
+  @override
+  void dispose() {
+    _lessonSub?.close();
+    super.dispose();
   }
 
   Future<void> _updateProgress(LessonDetailData data) async {
@@ -90,22 +98,20 @@ class _LessonContent extends StatelessWidget {
       }
     }
 
-    final coreContent = Column(
+    final coreContent = ListView(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
       children: [
-        Expanded(
-          child: Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Markdown(
-                data: lesson.contentMarkdown ?? 'Inget innehåll.',
-                selectable: true,
-                styleSheet: MarkdownStyleSheet.fromTheme(Theme.of(context)),
-              ),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Markdown(
+              data: lesson.contentMarkdown ?? 'Inget innehåll.',
+              styleSheet: MarkdownStyleSheet.fromTheme(Theme.of(context)),
             ),
           ),
         ),
         if (media.isNotEmpty) ...[
-          const SizedBox(height: 8),
+          const SizedBox(height: 16),
           Card(
             child: Padding(
               padding: const EdgeInsets.all(12),
@@ -120,7 +126,7 @@ class _LessonContent extends StatelessWidget {
             ),
           ),
         ],
-        const SizedBox(height: 8),
+        const SizedBox(height: 16),
         Row(
           children: [
             Expanded(
@@ -148,7 +154,6 @@ class _LessonContent extends StatelessWidget {
             ),
           ],
         ),
-        const SizedBox(height: 12),
       ],
     );
 

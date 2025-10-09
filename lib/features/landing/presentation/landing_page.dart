@@ -4,6 +4,8 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:wisdom/core/auth/auth_controller.dart';
+import 'package:wisdom/core/env/app_config.dart';
 import 'package:wisdom/core/env/env_state.dart';
 import 'package:wisdom/features/landing/application/landing_providers.dart';
 import 'package:wisdom/shared/utils/snack.dart';
@@ -109,18 +111,87 @@ class _LandingPageState extends ConsumerState<LandingPage>
       final intros = await ref.read(introCoursesProvider.future);
       final services = await ref.read(recentServicesProvider.future);
       final teachers = await ref.read(teachersProvider.future);
+      final myStudio = await ref.read(myStudioCoursesProvider.future);
+      final teacherItems = teachers.items
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList(growable: true);
+
+      final hasOden = teacherItems.any((item) {
+        final profile = (item['profile'] as Map?) ?? item;
+        final name = (profile['display_name'] ?? profile['name'])
+            ?.toString()
+            .toLowerCase();
+        return name == 'oden';
+      });
+
+      if (!hasOden) {
+        final currentProfile = ref.read(authControllerProvider).profile;
+        if (currentProfile != null && currentProfile.isTeacher) {
+          teacherItems.insert(0, {
+            'display_name': currentProfile.displayName ?? currentProfile.email,
+            'photo_url': currentProfile.photoUrl,
+            'bio': currentProfile.bio,
+            'user_id': currentProfile.id,
+          });
+        }
+      }
+
+      final teachersWithOden = LandingSectionState(
+        items: teacherItems,
+        errorMessage: teachers.errorMessage,
+        devHint: teachers.devHint,
+      );
       if (!mounted) return;
       setState(() {
-        _popularCourses = popular;
+        _popularCourses = _mergePopularWithMyCourses(popular, myStudio);
         _introCourses = intros;
         _services = services;
-        _teachers = teachers;
+        _teachers = teachersWithOden;
         _loading = false;
       });
     } catch (_) {
       if (!mounted) return;
       setState(() => _loading = false);
     }
+  }
+
+  LandingSectionState _mergePopularWithMyCourses(
+    LandingSectionState popular,
+    LandingSectionState myCourses,
+  ) {
+    final combined = <Map<String, dynamic>>[];
+    final seen = <String>{};
+
+    String keyFor(Map<String, dynamic> map) {
+      final slug = (map['slug'] as String?)?.trim();
+      if (slug != null && slug.isNotEmpty) return slug;
+      final id = (map['id'] as String?)?.trim();
+      if (id != null && id.isNotEmpty) return id;
+      return map.hashCode.toString();
+    }
+
+    void addCourse(Map<String, dynamic> map) {
+      final key = keyFor(map);
+      if (seen.contains(key)) return;
+      seen.add(key);
+      combined.add(Map<String, dynamic>.from(map));
+    }
+
+    for (final course in myCourses.items) {
+      if (course['is_published'] == true) {
+        addCourse(course);
+      }
+    }
+
+    for (final course in popular.items) {
+      addCourse(course);
+    }
+
+    return LandingSectionState(
+      items: combined.take(6).toList(growable: false),
+      errorMessage: popular.errorMessage,
+      devHint: popular.devHint,
+    );
   }
 
   void _openIntroModal() {
@@ -186,7 +257,8 @@ class _LandingPageState extends ConsumerState<LandingPage>
                                 Navigator.of(context).pop();
                                 final slug = (c['slug'] as String?) ?? '';
                                 if (slug.isNotEmpty) {
-                                  context.push('/course/$slug');
+                                  context.push(
+                                      '/course/${Uri.encodeComponent(slug)}');
                                 } else {
                                   context.push('/course/intro');
                                 }
@@ -210,6 +282,7 @@ class _LandingPageState extends ConsumerState<LandingPage>
     final theme = Theme.of(context);
     final t = theme.textTheme;
     final isLightMode = theme.brightness == Brightness.light;
+    final config = ref.watch(appConfigProvider);
     final envInfo = ref.watch(envInfoProvider);
     final hasEnvIssues = envInfo.hasIssues;
     final mediaQuery = MediaQuery.of(context);
@@ -433,6 +506,7 @@ class _LandingPageState extends ConsumerState<LandingPage>
                                         'Sveriges ledande plattform för andlig utveckling',
                                   ),
                                 ),
+                                const SizedBox(height: 12),
                                 const SizedBox(height: 14),
                                 Text(
                                   'Populära kurser',
@@ -535,7 +609,9 @@ class _LandingPageState extends ConsumerState<LandingPage>
                                                   const SizedBox(width: 8),
                                               itemBuilder: (_, i) =>
                                                   _TeacherPillData(
-                                                      map: _teacherItems[i]),
+                                                map: _teacherItems[i],
+                                                apiBaseUrl: config.apiBaseUrl,
+                                              ),
                                             ),
                                 ),
                               ),
@@ -1040,17 +1116,27 @@ class _CourseTileGlass extends StatelessWidget {
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
             AspectRatio(
               aspectRatio: 16 / 9,
               child: cover.isNotEmpty
-                  ? Image.network(cover, fit: BoxFit.cover)
+                  ? Image.network(
+                      cover,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, _, __) => Container(
+                        color: Colors.white.withValues(alpha: .4),
+                        alignment: Alignment.center,
+                        child: const Icon(Icons.image_not_supported_outlined),
+                      ),
+                    )
                   : Container(color: Colors.white.withValues(alpha: .4)),
             ),
             Padding(
               padding: const EdgeInsets.all(12),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   Row(
                     children: [
@@ -1082,7 +1168,8 @@ class _CourseTileGlass extends StatelessWidget {
                     child: ElevatedButton(
                       onPressed: () {
                         if (slug.isNotEmpty) {
-                          context.push('/course/$slug');
+                          context.push(
+                              '/course/${Uri.encodeComponent(slug)}');
                         } else {
                           context.push('/course/intro');
                         }
@@ -1125,12 +1212,17 @@ class _TeacherPillSkeleton extends StatelessWidget {
 
 class _TeacherPillData extends StatelessWidget {
   final Map<String, dynamic> map;
-  const _TeacherPillData({required this.map});
+  final String apiBaseUrl;
+  const _TeacherPillData({required this.map, required this.apiBaseUrl});
   @override
   Widget build(BuildContext context) {
-    final prof = (map['profile'] as Map?)?.cast<String, dynamic>() ?? const {};
-    final name = (prof['display_name'] as String?) ?? 'Lärare';
-    final avatar = (prof['photo_url'] as String?) ?? '';
+    final rawProfile = (map['profile'] as Map?)?.cast<String, dynamic>() ?? {};
+    final merged =
+        rawProfile.isNotEmpty ? rawProfile : map.cast<String, dynamic>();
+    final name = (merged['display_name'] as String?) ?? 'Lärare';
+    final avatar = (merged['photo_url'] as String?) ?? '';
+    final bio = (merged['bio'] as String?) ?? '';
+    final resolvedAvatar = _resolveUrl(avatar);
     return ClipRRect(
       borderRadius: BorderRadius.circular(22),
       child: BackdropFilter(
@@ -1147,17 +1239,45 @@ class _TeacherPillData extends StatelessWidget {
             children: [
               CircleAvatar(
                 radius: 24,
-                backgroundImage:
-                    avatar.isNotEmpty ? NetworkImage(avatar) : null,
-                child: avatar.isEmpty ? const Icon(Icons.person_outline) : null,
+                backgroundImage: resolvedAvatar != null
+                    ? NetworkImage(resolvedAvatar)
+                    : null,
+                child: resolvedAvatar == null
+                    ? const Icon(Icons.person_outline)
+                    : null,
               ),
               const SizedBox(width: 10),
-              Text(name, style: const TextStyle(fontWeight: FontWeight.w700)),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(name,
+                      style: const TextStyle(fontWeight: FontWeight.w700)),
+                  if (bio.isNotEmpty)
+                    Text(
+                      bio,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Colors.black54,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                ],
+              ),
             ],
           ),
         ),
       ),
     );
+  }
+
+  String? _resolveUrl(String? path) {
+    if (path == null || path.isEmpty) return null;
+    final uri = Uri.parse(path);
+    if (uri.hasScheme) return uri.toString();
+    final base = Uri.parse(apiBaseUrl);
+    return base.resolve(path.startsWith('/') ? path : '/$path').toString();
   }
 }
 

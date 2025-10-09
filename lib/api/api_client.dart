@@ -7,15 +7,15 @@ import 'package:wisdom/core/auth/token_storage.dart';
 
 class ApiClient {
   ApiClient({required String baseUrl, required TokenStorage tokenStorage})
-    : _tokenStorage = tokenStorage,
-      _dio = Dio(
-        BaseOptions(
-          baseUrl: baseUrl,
-          connectTimeout: const Duration(seconds: 10),
-          receiveTimeout: const Duration(seconds: 15),
-          contentType: 'application/json',
-        ),
-      ) {
+      : _tokenStorage = tokenStorage,
+        _dio = Dio(
+          BaseOptions(
+            baseUrl: baseUrl,
+            connectTimeout: const Duration(seconds: 10),
+            receiveTimeout: const Duration(seconds: 15),
+            contentType: 'application/json',
+          ),
+        ) {
     _dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) async {

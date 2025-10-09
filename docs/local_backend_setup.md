@@ -12,6 +12,7 @@ Det här dokumentet beskriver hur du kör databasschemat lokalt och kopplar Flut
    scripts/setup_local_backend.sh
    ```
    Scriptet använder per default `postgresql://oden:1124vattnaRn@localhost:5432/wisdom`. Ange annan URL via `LOCAL_DATABASE_URL` eller ett första argument.
+   > Tips: sätt `LOCAL_DATABASE_URL` och `PGPASSWORD` i din shell-miljö (t.ex. via `direnv` eller `.env.local`) i stället för att hårdkoda dem i script.
 
 2. Skapa eller återställ databasen från scratch:
    ```bash
@@ -25,9 +26,9 @@ Det här dokumentet beskriver hur du kör databasschemat lokalt och kopplar Flut
 3. Skapa en lärare (eller annan användare) med `scripts/create_teacher_local.sql`:
    ```bash
    PGPASSWORD=1124vattnaRn psql postgresql://oden@localhost:5432/wisdom \
-     -v email="odenhjalm@outlook.com" \
-     -v password="1124vattnaRn" \
-     -v display_name="Oden Hjalm" \
+     -v email="teacher.local@example.com" \
+     -v password="ChangeMe123!" \
+     -v display_name="Local Teacher" \
      -f scripts/create_teacher_local.sql
    ```
    Scriptet kan återanvändas för fler konton genom att ändra variablerna. Konton skapas i `auth.users`, får bcrypt-hashat lösenord, får profil med `role_v2 = 'teacher'`, registreras i `app.teacher_permissions`, `app.teacher_approvals` och läggs i `app.teacher_directory`. Därmed kan de ladda upp media enligt RLS-policys.
@@ -39,12 +40,19 @@ Det här dokumentet beskriver hur du kör databasschemat lokalt och kopplar Flut
    poetry install        # eller pip install -r <exporterat requirements>
    poetry run uvicorn app.main:app --reload
    ```
+   Alternativt kan du från repo-roten köra `make backend.dev` som automatiskt ser till att Postgres är igång och startar uvicorn med auto-reload.
    API:t exponerar `http://localhost:8000/docs` och pratar direkt med Postgres. Standardlösenord från seed-scriptet:
    - admin@example.com / `admin123`
    - teacher@example.com / `teacher123`
    - student@example.com / `student123`
 
    > **Tokener:** Access-token lever nu i 15 minuter (styrt av `JWT_EXPIRES_MINUTES`, default 15). Backend utfärdar också refresh-token (`JWT_REFRESH_EXPIRES_MINUTES`, default 1440 = 24 h) och endpointen `POST /auth/refresh` roterar bägge token automatiskt.
+
+   Kontrollera att `database/schema.sql` är synk med migreringarna innan commit:
+   ```bash
+   make schema.check
+   ```
+   Skriptet (`scripts/check_schema_sync.py`) visar diff om filerna inte matchar.
 
 ### Studio-endpoints & tester
 - Backendens studio-API (`/studio/*`) ersätter Supabase-beroendena för kurs-/modul-/leksions-CRUD, quiz och mediauppladdningar. Endpointsen kräver att användaren är lärare eller admin (`is_teacher_user` checken).

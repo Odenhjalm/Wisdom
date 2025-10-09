@@ -96,7 +96,7 @@ class AuthRepository {
   }
 
   Future<Profile> getCurrentProfile() async {
-    final data = await _client.get<Map<String, dynamic>>('/profiles/me');
+    final data = await _client.get<Map<String, dynamic>>('/auth/me');
     return Profile.fromJson(data);
   }
 

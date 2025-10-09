@@ -12,7 +12,8 @@ import 'package:wisdom/features/auth/presentation/settings_page.dart';
 import 'package:wisdom/features/auth/presentation/signup_page.dart';
 import 'package:wisdom/features/community/presentation/admin_page.dart';
 import 'package:wisdom/features/community/presentation/community_page.dart';
-import 'package:wisdom/features/community/presentation/home_shell.dart';
+import 'package:wisdom/features/home/presentation/home_dashboard_page.dart';
+import 'package:wisdom/features/home/presentation/livekit_demo_page.dart';
 import 'package:wisdom/features/community/presentation/profile_edit_page.dart';
 import 'package:wisdom/features/community/presentation/profile_page.dart'
     as community_profile;
@@ -86,7 +87,7 @@ class _RouterNotifier extends ChangeNotifier {
 }
 
 bool _requiresTeacher(String path) {
-  return path.startsWith('/teacher') || path.startsWith('/studio');
+  return path.startsWith('/teacher');
 }
 
 const _publicPaths = <String>{
@@ -157,7 +158,12 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/home',
         name: 'home',
-        builder: (context, state) => const HomeShell(),
+        builder: (context, state) => const HomeDashboardPage(),
+      ),
+      GoRoute(
+        path: '/sfu-demo',
+        name: 'sfu-demo',
+        builder: (context, state) => const LiveKitDemoPage(),
       ),
       GoRoute(
         path: '/course-intro',

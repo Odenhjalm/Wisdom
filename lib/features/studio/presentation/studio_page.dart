@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:wisdom/core/auth/auth_controller.dart';
-import 'package:wisdom/shared/utils/snack.dart';
 import 'package:wisdom/shared/widgets/app_scaffold.dart';
 import 'package:wisdom/shared/widgets/glass_card.dart';
 import 'package:wisdom/shared/widgets/hero_background.dart';
@@ -36,7 +35,8 @@ class StudioPage extends ConsumerWidget {
         body: Center(child: Text('Fel: $error')),
       ),
       data: (status) {
-        final isTeacher = status.isTeacher || profile.isTeacher || profile.isAdmin;
+        final isTeacher =
+            status.isTeacher || profile.isTeacher || profile.isAdmin;
         if (isTeacher) {
           return const TeacherHomeScreen();
         }
@@ -56,35 +56,13 @@ class _StudioApplyView extends ConsumerStatefulWidget {
 }
 
 class _StudioApplyViewState extends ConsumerState<_StudioApplyView> {
-  bool _sending = false;
-
-  Future<void> _apply() async {
-    if (_sending) return;
-    setState(() => _sending = true);
-    try {
-      await ref.read(studioRepositoryProvider).applyAsTeacher();
-      if (!mounted) return;
-      showSnack(context, 'Ansökan inskickad.');
-      ref.invalidate(studioStatusProvider);
-    } catch (e) {
-      if (!mounted) return;
-      showSnack(context, 'Kunde inte skicka ansökan: $e');
-    } finally {
-      if (mounted) setState(() => _sending = false);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context).textTheme;
     final verified = widget.status.verifiedCertificates;
-    final canApply = verified > 0;
-    final hasApplication = widget.status.hasApplication;
-    final message = canApply
-        ? (hasApplication
-            ? 'Din ansökan har redan skickats in. Vi kontaktar dig så snart den är behandlad.'
-            : 'För att få tillgång till Studio behöver du bli godkänd lärare. Skicka in en ansökan så återkommer vi.')
-        : 'Du behöver minst ett verifierat certifikat för att kunna ansöka som lärare. Lägg till certifikat på din profil och invänta verifiering.';
+    final message = verified > 0
+        ? 'Dina verifierade certifikat aktiverar Pro-status när sista kursdel är klar. Studio låses automatiskt upp därefter.'
+        : 'Du behöver minst ett verifierat certifikat för att få tillgång till Studio. Lägg till certifikat på din profil och invänta verifiering.';
 
     return AppScaffold(
       title: 'Studio',
@@ -104,40 +82,18 @@ class _StudioApplyViewState extends ConsumerState<_StudioApplyView> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Ansök som lärare',
+                Text('Studio är på väg',
                     style: t.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
                 const SizedBox(height: 8),
                 Text(message),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    FilledButton(
-                      onPressed: (!canApply || hasApplication || _sending)
-                          ? null
-                          : _apply,
-                      child: _sending
-                          ? const SizedBox(
-                              height: 18,
-                              width: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : Text(
-                              hasApplication
-                                  ? 'Ansökan skickad'
-                                  : (canApply
-                                      ? 'Ansök som lärare'
-                                      : 'Certifikat krävs'),
-                            ),
-                    ),
-                    const SizedBox(width: 12),
-                    Text('Verifierade certifikat: $verified'),
-                  ],
-                ),
-                if (!canApply) ...[
+                const SizedBox(height: 16),
+                Text('Verifierade certifikat: $verified'),
+                if (verified == 0) ...[
                   const SizedBox(height: 8),
                   TextButton(
                     onPressed: () => context.push('/profile'),
-                    child: const Text('Gå till profil för att lägga till certifikat'),
+                    child: const Text(
+                        'Gå till profil för att lägga till certifikat'),
                   ),
                 ],
               ],

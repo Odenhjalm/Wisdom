@@ -32,6 +32,14 @@ android/key.properties
 .idea/
 .metadata
 *.iml
+
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Next.js
+web/node_modules/
+web/.next/
 EOF
 
 checklist_supabase.md

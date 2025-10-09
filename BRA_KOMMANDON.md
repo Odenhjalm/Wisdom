@@ -27,7 +27,14 @@ poetry run uvicorn app.main:app --reload
 STARTA ANDRIOD:
 
 flutter devices
-
+startar telefon:
 flutter emulators --launch Pixel_7_API34
-
+startar app
 flutter run -d emulator-5554
+
+
+Github :
+gh auth login
+
+git config --global user.name "Odenhjalm"
+git config --global user.email "odenhjalm@outlook.com"
